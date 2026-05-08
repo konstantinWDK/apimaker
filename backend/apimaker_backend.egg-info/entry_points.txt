@@ -1,0 +1,2 @@
+[console_scripts]
+apimaker-backend = app.main:app
