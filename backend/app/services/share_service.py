@@ -96,9 +96,9 @@ def get_share_snapshot(session: Session, snapshot_id: str, slug: str, password: 
     if not snapshot:
         raise KeyError("Share snapshot not found")
 
-    # Check expiration
+    # Check expiration (both datetimes are already timezone-aware UTC)
     now = datetime.now(timezone.utc)
-    if snapshot.expires_at and snapshot.expires_at.replace(tzinfo=timezone.utc) < now:
+    if snapshot.expires_at and snapshot.expires_at < now:
         raise ValueError("Share link has expired")
 
     # Check password if set

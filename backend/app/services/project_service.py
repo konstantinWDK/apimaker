@@ -177,6 +177,14 @@ class ProjectService:
                 session.delete(f)
             session.delete(ds)
 
+        # Delete share snapshots
+        from ..db_models import ShareSnapshot
+        existing_shares = session.exec(
+            select(ShareSnapshot).where(ShareSnapshot.project_id == str(project_id))
+        ).all()
+        for share in existing_shares:
+            session.delete(share)
+
         session.delete(project)
         session.commit()
 

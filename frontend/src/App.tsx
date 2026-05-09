@@ -4,6 +4,7 @@ import { ApiPlayground } from './components/ApiPlayground'
 import { ApiUsagePanel } from './components/ApiUsagePanel'
 import { BackendSyncCard } from './components/BackendSyncCard'
 import { CredentialPanel } from './components/CredentialPanel'
+import { DatabaseConfigPanel } from './components/DatabaseConfigPanel'
 import { DatasetUploader } from './components/DatasetUploader'
 import { EndpointDesigner } from './components/EndpointDesigner'
 import { EndpointGallery } from './components/EndpointGallery'
@@ -104,28 +105,28 @@ export function App() {
         description: endpoint.summary || endpoint.name,
       }))
 
-      // Auto-login: try stored credentials first, then admin/admin
+      // Auto-login: try stored credentials only (no fallback to default admin/admin)
       let token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
       if (!token) {
-        // Try stored credentials
         const storedCreds = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-creds') : null
         const creds = storedCreds ? JSON.parse(storedCreds) : null
-        const loginBody = creds || { username: 'admin', password: 'admin' }
-        const loginRes = await fetch(`${backendBaseUrl}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(loginBody),
-        })
-        if (loginRes.ok) {
-          const loginData = await loginRes.json()
-          if (loginData.access_token && typeof window !== 'undefined') {
-            window.sessionStorage.setItem('apimaker-jwt-token', loginData.access_token)
-            token = loginData.access_token
+        if (creds) {
+          const loginRes = await fetch(`${backendBaseUrl}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(creds),
+          })
+          if (loginRes.ok) {
+            const loginData = await loginRes.json()
+            if (loginData.access_token && typeof window !== 'undefined') {
+              window.sessionStorage.setItem('apimaker-jwt-token', loginData.access_token)
+              token = loginData.access_token
+            }
           }
         }
       }
       if (!token) {
-        alert('No se pudo conectar con el backend. Asegúrate de que está corriendo.')
+        alert('No hay sesión activa. Inicia sesión desde la pantalla de login antes de generar la API.')
         return
       }
 
@@ -456,7 +457,11 @@ export function App() {
           )}
 
           {activePage === 'admin' && (
-            <SectionCard title="Administración" subtitle="Control de acceso al builder" fullWidth>
+            <div className="admin-grid">
+              <SectionCard title="Base de datos" subtitle="Configuración y sincronización" fullWidth>
+                <DatabaseConfigPanel />
+              </SectionCard>
+              <SectionCard title="Administración" subtitle="Control de acceso al builder" fullWidth>
               <div className="info-panel">
                 <p>
                   Actualiza el usuario y contraseña que protegen este builder. Tras guardar, deberás iniciar sesión de nuevo. También puedes
@@ -494,6 +499,7 @@ export function App() {
                 <p className="muted-text">Consejo: cambia estas credenciales después de cada despliegue y guarda el acceso en un gestor seguro.</p>
               </div>
             </SectionCard>
+            </div>
           )}
 
         </div>

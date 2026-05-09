@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from typing import Generator
@@ -12,14 +13,32 @@ from .config import get_settings
 
 settings = get_settings()
 
-# Resolve database URL from environment or use SQLite by default
-DATABASE_URL = os.getenv(
-    "APIMAKER_DATABASE_URL",
-    f"sqlite:///{Path(__file__).resolve().parent / 'data' / 'apimaker.db'}",
-)
+# Resolve database URL from environment or config file
+ADMIN_CONFIG_PATH = Path(__file__).resolve().parent / "data" / "admin_config.json"
 
-# For PostgreSQL in production:
-# DATABASE_URL = os.getenv("APIMAKER_DATABASE_URL", "postgresql+psycopg2://user:pass@host:5432/apimaker")
+
+def _get_database_url() -> str:
+    """Get database URL from env var or admin config file."""
+    # Environment variable takes priority
+    env_url = os.getenv("APIMAKER_DATABASE_URL")
+    if env_url:
+        return env_url
+
+    # Check admin config file
+    if ADMIN_CONFIG_PATH.exists():
+        try:
+            with open(ADMIN_CONFIG_PATH, "r") as f:
+                config = json.load(f)
+            if config.get("database_type") == "postgresql" and config.get("postgres_url"):
+                return config["postgres_url"]
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    # Default to SQLite
+    return f"sqlite:///{Path(__file__).resolve().parent / 'data' / 'apimaker.db'}"
+
+
+DATABASE_URL = _get_database_url()
 
 connect_args = {}
 if DATABASE_URL.startswith("sqlite"):
@@ -37,3 +56,35 @@ def get_session() -> Generator[Session, None, None]:
     """FastAPI dependency: yield a Session and close it afterwards."""
     with Session(engine) as session:
         yield session
+
+
+def get_database_info() -> dict:
+    """Get current database connection info."""
+    if DATABASE_URL.startswith("sqlite"):
+        db_path = DATABASE_URL.replace("sqlite:///", "")
+        return {
+            "type": "sqlite",
+            "url": f"sqlite:///{db_path}",
+            "path": db_path,
+        }
+    elif DATABASE_URL.startswith("postgresql"):
+        # Parse PostgreSQL URL for display
+        try:
+            # Format: postgresql+psycopg2://user:pass@host:port/dbname
+            after_protocol = DATABASE_URL.split("://")[1]
+            user_pass = after_protocol.split("@")[0]
+            host_db = after_protocol.split("@")[1]
+            username = user_pass.split(":")[0] if ":" in user_pass else "unknown"
+            host_port_db = host_db.split("/")
+            host_port = host_port_db[0]
+            dbname = host_port_db[1] if len(host_port_db) > 1 else "unknown"
+            return {
+                "type": "postgresql",
+                "url": "postgresql+psycopg2://***:***@" + host_port + "/" + dbname,
+                "host": host_port,
+                "database": dbname,
+                "username": username,
+            }
+        except Exception:
+            return {"type": "postgresql", "url": "***"}
+    return {"type": "unknown", "url": "***"}

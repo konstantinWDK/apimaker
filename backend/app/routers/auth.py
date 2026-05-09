@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from sqlmodel import Session, select
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -16,7 +18,7 @@ from ..services.jwt_service import (
     hash_password,
     verify_password,
 )
-from ..security import CurrentUser, get_current_user_from_header
+from ..security import CurrentUser, get_current_user_from_header, require_admin
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -188,6 +190,7 @@ def change_password(
     # Update username if provided via extra field
     # (for now, only password changes are supported via this endpoint)
     db_user.password_hash = hash_password(payload.new_password)
+    db_user.updated_at = datetime.now(timezone.utc)
     session.add(db_user)
     session.commit()
 
@@ -229,14 +232,20 @@ def auth_status(session: Session = Depends(get_session)) -> dict:
 
 
 @router.post("/reset", status_code=status.HTTP_204_NO_CONTENT)
-def reset_credentials(session: Session = Depends(get_session)) -> None:
-    """Reset admin password and username to admin/admin."""
+def reset_credentials(
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(require_admin),
+) -> None:
+    """Reset admin password and username to admin/admin. Requires admin auth."""
     from ..services.jwt_service import hash_password
-    user = session.exec(select(User).where(User.role == "admin")).first()
-    if user:
-        user.password_hash = hash_password("admin")
-        user.username = "admin"
-        session.add(user)
+    db_user = session.get(User, user.user_id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    admin_user = session.exec(select(User).where(User.role == "admin")).first()
+    if admin_user:
+        admin_user.password_hash = hash_password("admin")
+        admin_user.username = "admin"
+        session.add(admin_user)
         session.commit()
 
 

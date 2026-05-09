@@ -2718,3 +2718,10 @@ input[type='password'] {
 .fab:hover {
   transform: translateY(-1px);
 }
+
+/* Admin page grid */
+.admin-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}

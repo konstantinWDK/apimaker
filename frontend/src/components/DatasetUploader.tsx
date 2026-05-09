@@ -126,21 +126,14 @@ export function DatasetUploader({ dataset, onCommit }: Props) {
   }
 
   const parseCsv = async (file: File) => {
-    const text = await file.text()
-    const lines = text
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-    if (!lines.length) throw new Error('El archivo está vacío')
-    const headers = lines.shift()!.split(',').map((header) => header.trim() || 'Column')
-    const rows = lines.slice(0, 5).map((line) => {
-      const values = line.split(',')
-      return headers.reduce<Record<string, string>>((acc, header, index) => {
-        acc[header || `Column ${index + 1}`] = values[index]?.trim() ?? ''
-        return acc
-      }, {})
-    })
-    parseFromRows(rows)
+    // Use xlsx library for robust CSV parsing (handles quoted commas, etc.)
+    const buffer = await file.arrayBuffer()
+    const workbook = read(buffer, { type: 'array' })
+    const sheetName = workbook.SheetNames[0]
+    if (!sheetName) throw new Error('El archivo CSV no se pudo parsear')
+    const jsonRows = utils.sheet_to_json<Record<string, string>>(workbook.Sheets[sheetName], { defval: '' })
+    if (!jsonRows.length) throw new Error('El archivo está vacío')
+    parseFromRows(jsonRows.slice(0, 5))
   }
 
   const parseExcel = async (file: File) => {

@@ -48,20 +48,9 @@ export function GenerationResultPanel({ result, projectId }: Props) {
       }
       let token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
       if (!token) {
-        const loginRes = await fetch(`${cleanBase}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: 'admin', password: 'admin' }),
-        })
-        if (!loginRes.ok) {
-          setShareError(`No se pudo autenticar: ${loginRes.statusText}`)
-          return
-        }
-        const loginData = await loginRes.json()
-        if (loginData.access_token && typeof window !== 'undefined') {
-          window.sessionStorage.setItem('apimaker-jwt-token', loginData.access_token)
-          token = loginData.access_token
-        }
+        setShareError('No hay sesión activa. Inicia sesión primero.')
+        setSharing(false)
+        return
       }
       const res = await fetch(`${cleanBase}/share/projects/${projectId}`, {
         method: 'POST',
@@ -96,50 +85,10 @@ export function GenerationResultPanel({ result, projectId }: Props) {
       const url = `${cleanBase}/projects/${projectId}/download`
       let token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
 
-      console.log('[Download] Token exists:', !!token, 'Base:', cleanBase)
-
-      // Auto-login: try stored credentials first, then admin/admin
-      const storedCreds = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-creds') : null
-      const creds = storedCreds ? JSON.parse(storedCreds) : null
-      const loginBody = creds || { username: 'admin', password: 'admin' }
-      const loginRes = await fetch(`${cleanBase}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(loginBody),
-      })
-
-      if (loginRes.ok) {
-        const loginData = await loginRes.json()
-        if (loginData.access_token && typeof window !== 'undefined') {
-          window.sessionStorage.setItem('apimaker-jwt-token', loginData.access_token)
-          token = loginData.access_token
-          console.log('[Download] Auto-login OK, token set')
-        }
-      } else {
-        console.log('[Download] Auto-login failed, status:', loginRes.status)
-      }
-
       if (!token) {
-        // Try one more time with manual password entry
-        const manualPw = prompt('Introduce tu contraseña de administrador:')
-        if (!manualPw) { setDownloading(false); return }
-        const storedUser = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-user') : null
-        const username = storedUser ? JSON.parse(storedUser).username : 'admin'
-        const retryLogin = await fetch(`${cleanBase}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password: manualPw }),
-        })
-        if (!retryLogin.ok) {
-          alert('Contraseña incorrecta. La contraseña por defecto es: admin')
-          setDownloading(false)
-          return
-        }
-        const loginData = await retryLogin.json()
-        if (loginData.access_token && typeof window !== 'undefined') {
-          window.sessionStorage.setItem('apimaker-jwt-token', loginData.access_token)
-          token = loginData.access_token
-        }
+        alert('No hay sesión activa. Inicia sesión primero para descargar el bundle.')
+        setDownloading(false)
+        return
       }
 
       const res = await fetch(url, {

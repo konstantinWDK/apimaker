@@ -7,7 +7,7 @@ from sqlmodel import Session, select
 
 from ..db import get_session
 from ..db_models import Project
-from ..security import CurrentUser, require_admin
+from ..security import CurrentUser, get_current_user_from_header, require_admin
 from ..services.mock_server import get_mock_status_fn, start_mock_server_fn, stop_mock_server_fn, router as mock_api_router
 
 
@@ -53,6 +53,7 @@ def mock_stop(
 def mock_status(
     project_id: str,
     session: Session = Depends(get_session),
+    user: CurrentUser = Depends(get_current_user_from_header),
 ) -> dict:
     """Get mock server status."""
     try:

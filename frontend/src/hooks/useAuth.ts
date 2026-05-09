@@ -73,7 +73,7 @@ export function useAuth() {
     const user = readUser()
     return {
       username: user?.username || 'admin',
-      mustChange: user?.role !== 'admin' || false,
+      mustChange: user?.username === 'admin' || false,
     }
   })
   const [currentUser, setCurrentUser] = useState<JwtUser | null>(() => {

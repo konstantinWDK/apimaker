@@ -43,25 +43,9 @@ const ensureAuthToken = async (): Promise<string | null> => {
     const existing = window.sessionStorage.getItem('apimaker-jwt-token')
     if (existing) return existing
   }
-  // Try to login automatically with default credentials
-  const { baseUrl } = readBackendConfig()
-  if (!baseUrl) return null
-  try {
-    const res = await fetch(`${baseUrl.replace(/\/$/, '')}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: 'admin', password: 'admin' }),
-    })
-    if (!res.ok) return null
-    const data = await res.json()
-    if (data.access_token && typeof window !== 'undefined') {
-      window.sessionStorage.setItem('apimaker-jwt-token', data.access_token)
-      return data.access_token
-    }
-  } catch {
-    /* ignore */
-  }
+  // No token — user needs to login manually
   return null
+
 }
 const ensureBaseUrl = (): string => {
   const { baseUrl } = readBackendConfig()

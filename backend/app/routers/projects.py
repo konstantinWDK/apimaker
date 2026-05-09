@@ -240,8 +240,19 @@ def download_bundle(
     """Download the generated code bundle (zip file)."""
     from pathlib import Path
 
-    artifacts_root = Path("artifacts") / str(project_id)
-    bundle_path = artifacts_root / "fastapi-bundle.zip"
+    from ..config import get_settings
+
+    settings = get_settings()
+    artifacts_root = Path(settings.artifacts_dir) / str(project_id)
+
+    # Get project to determine target stack
+    try:
+        data = project_service.get_project_with_data(session, project_id)
+        target_stack = data["project"].target_stack
+    except KeyError:
+        target_stack = "fastapi"
+
+    bundle_path = artifacts_root / f"{target_stack}-bundle.zip"
     if not bundle_path.exists():
         raise HTTPException(status_code=404, detail="Bundle not found. Generate artifacts first.")
     return FileResponse(

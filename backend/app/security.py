@@ -44,10 +44,18 @@ def get_current_user_from_header(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token type",
         )
+    user_id = payload.get("sub")
+    username = payload.get("username")
+    role = payload.get("role")
+    if not user_id or not username or not role:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Malformed token payload",
+        )
     return CurrentUser(
-        user_id=payload["sub"],
-        username=payload["username"],
-        role=payload["role"],
+        user_id=user_id,
+        username=username,
+        role=role,
     )
 
 
@@ -67,10 +75,23 @@ def get_current_user_from_cookie(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e),
         ) from e
+    if payload.get("type") != "access":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token type",
+        )
+    user_id = payload.get("sub")
+    username = payload.get("username")
+    role = payload.get("role")
+    if not user_id or not username or not role:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Malformed token payload",
+        )
     return CurrentUser(
-        user_id=payload["sub"],
-        username=payload["username"],
-        role=payload["role"],
+        user_id=user_id,
+        username=username,
+        role=role,
     )
 
 

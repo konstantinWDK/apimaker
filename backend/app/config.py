@@ -13,9 +13,11 @@ class Settings(BaseSettings):
     environment: str = "development"
     allow_origins: list[str] = ["http://localhost:5173", "http://localhost:4173"]
     builder_token: str | None = None
+    artifacts_dir: str = "artifacts"
 
     # JWT settings
-    jwt_secret_key: str = "apimaker-dev-secret-key-change-in-prod-2026"
+    # SECURITY: In production, always set APIMAKER_JWT_SECRET_KEY env var.
+    jwt_secret_key: str = secrets.token_urlsafe(32)
     jwt_algorithm: str = "HS256"
     jwt_access_expire_minutes: int = 60 * 24  # 24 hours
     jwt_refresh_expire_days: int = 7
