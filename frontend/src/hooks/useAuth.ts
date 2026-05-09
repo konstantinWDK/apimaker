@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { readBackendConfig } from '../lib/backendConfig'
 
-const SESSION_STORAGE_KEY = 'apimaker-auth-session'
+const TOKEN_STORAGE_KEY = 'apimaker-jwt-token'
+const USER_STORAGE_KEY = 'apimaker-jwt-user'
+const CREDS_STORAGE_KEY = 'apimaker-creds'
 
 const buildUrl = (path: string) => {
   const config = readBackendConfig()
@@ -16,16 +18,38 @@ const buildUrl = (path: string) => {
   return path
 }
 
-const readSession = () => {
-  if (typeof window === 'undefined') return false
-  return window.sessionStorage.getItem(SESSION_STORAGE_KEY) === 'yes'
+const readToken = (): string | null => {
+  if (typeof window === 'undefined') return null
+  return window.sessionStorage.getItem(TOKEN_STORAGE_KEY)
+}
+
+const readUser = (): { username: string; role: string } | null => {
+  if (typeof window === 'undefined') return null
+  const raw = window.sessionStorage.getItem(USER_STORAGE_KEY)
+  if (!raw) return null
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
 }
 
 const apiFetch = async (path: string, init?: RequestInit) => {
-  const response = await fetch(buildUrl(path), init)
+  const token = readToken()
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  const response = await fetch(buildUrl(path), {
+    ...init,
+    headers: { ...headers, ...(init?.headers as Record<string, string> || {}) },
+  })
   if (!response.ok) {
     const message = await response.text()
-    throw new Error(message || 'Error al contactar el backend')
+    try {
+      const parsed = JSON.parse(message)
+      throw new Error(typeof parsed.detail === 'string' ? parsed.detail : message)
+    } catch {
+      throw new Error(message || 'Error al contactar el backend')
+    }
   }
   return response
 }
@@ -35,19 +59,38 @@ interface AuthStatus {
   mustChange: boolean
 }
 
-const isDefaultAdmin = (username: string, password: string) => username === 'admin' && password === 'admin'
+interface JwtUser {
+  id: string
+  username: string
+  email: string | null
+  role: string
+}
 
 export function useAuth() {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => readSession())
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => !!readToken())
   const [error, setError] = useState<string | null>(null)
-  const [status, setStatus] = useState<AuthStatus>({ username: 'admin', mustChange: true })
+  const [status, setStatus] = useState<AuthStatus>(() => {
+    const user = readUser()
+    return {
+      username: user?.username || 'admin',
+      mustChange: user?.role !== 'admin' || false,
+    }
+  })
+  const [currentUser, setCurrentUser] = useState<JwtUser | null>(() => {
+    const user = readUser()
+    if (!user) return null
+    return { id: '', ...user, email: null }
+  })
 
   const fetchStatus = useCallback(async () => {
     try {
       const response = await fetch(buildUrl('/auth/status'))
       if (!response.ok) return
-      const data = (await response.json()) as AuthStatus
-      setStatus(data)
+      const data = await response.json()
+      // New format: { hasUsers, userCount }
+      if (!data.hasUsers) {
+        setStatus({ username: '', mustChange: false })
+      }
     } catch {
       /* ignore */
     }
@@ -59,29 +102,25 @@ export function useAuth() {
 
   const login = async (username: string, password: string) => {
     try {
-      await apiFetch('/auth/login', {
+      const response = await apiFetch('/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       })
+      const data = await response.json()
+      // Store JWT tokens
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem(TOKEN_STORAGE_KEY, data.access_token)
+        window.sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user))
+        // Store credentials for auto-login
+        window.sessionStorage.setItem(CREDS_STORAGE_KEY, JSON.stringify({ username, password }))
+      }
+      setCurrentUser(data.user)
+      setStatus({ username: data.user.username, mustChange: false })
       setIsAuthenticated(true)
       setError(null)
-      if (typeof window !== 'undefined') {
-        window.sessionStorage.setItem(SESSION_STORAGE_KEY, 'yes')
-      }
-      fetchStatus()
       return true
     } catch (err) {
-      if (isDefaultAdmin(username, password)) {
-        console.warn('Backend no disponible; iniciando sesión local con admin/admin')
-        setIsAuthenticated(true)
-        setError(null)
-        setStatus({ username: 'admin', mustChange: true })
-        if (typeof window !== 'undefined') {
-          window.sessionStorage.setItem(SESSION_STORAGE_KEY, 'yes')
-        }
-        return true
-      }
       setError(err instanceof Error ? err.message : 'Credenciales incorrectas')
       setIsAuthenticated(false)
       return false
@@ -90,24 +129,29 @@ export function useAuth() {
 
   const logout = () => {
     setIsAuthenticated(false)
+    setCurrentUser(null)
     if (typeof window !== 'undefined') {
-      window.sessionStorage.removeItem(SESSION_STORAGE_KEY)
+      window.sessionStorage.removeItem(TOKEN_STORAGE_KEY)
+      window.sessionStorage.removeItem(USER_STORAGE_KEY)
     }
   }
 
-  const updateCredentials = async (username: string, newPassword: string, currentPassword: string) => {
-    await apiFetch('/auth/update', {
+  const updateCredentials = async (newPassword: string, currentPassword: string) => {
+    await apiFetch('/auth/change-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, new_password: newPassword, current_password: currentPassword }),
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
     })
-    fetchStatus()
   }
 
   const resetCredentials = async () => {
-    await apiFetch('/auth/reset', { method: 'POST' })
-    fetchStatus()
-    logout()
+    try {
+      await apiFetch('/auth/reset', { method: 'POST' })
+      logout()
+    } catch {
+      // If reset fails, just logout locally
+      logout()
+    }
   }
 
   return {
@@ -119,5 +163,13 @@ export function useAuth() {
     resetCredentials,
     resetError: () => setError(null),
     authStatus: status,
+    currentUser,
+    getToken: () => readToken(),
+    getStoredCreds: () => {
+      if (typeof window === 'undefined') return null
+      const raw = window.sessionStorage.getItem(CREDS_STORAGE_KEY)
+      if (!raw) return null
+      try { return JSON.parse(raw) } catch { return null }
+    },
   }
 }

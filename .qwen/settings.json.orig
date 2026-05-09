@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(alembic *)",
+      "Bash(pip install *)",
+      "Bash(python3 *)",
+      "Bash(source *)",
+      "Bash(timeout *)",
+      "Bash(true)",
+      "Bash(gtimeout *)",
+      "Bash(uvicorn *)",
+      "Bash(sleep *)",
+      "Bash(curl *)",
+      "Bash(rm *)",
+      "Bash(python *)",
+      "Bash(npm install)",
+      "Bash(npx *)",
+      "Bash(mkdir *)",
+      "Bash(unzip *)",
+      "Bash(find *)",
+      "Bash(pkill *)",
+      "Bash(echo *)",
+      "Bash(sed *)"
+    ]
+  },
+  "$version": 3
+}

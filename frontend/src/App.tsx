@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { ApiPlayground } from './components/ApiPlayground'
-import { BackendConfigPanel } from './components/BackendConfigPanel'
+import { ApiUsagePanel } from './components/ApiUsagePanel'
 import { BackendSyncCard } from './components/BackendSyncCard'
 import { CredentialPanel } from './components/CredentialPanel'
 import { DatasetUploader } from './components/DatasetUploader'
 import { EndpointDesigner } from './components/EndpointDesigner'
 import { EndpointGallery } from './components/EndpointGallery'
 import { GenerationResultPanel } from './components/GenerationResultPanel'
-import { HowToPlayground } from './components/HowToPlayground'
 import { LoginScreen } from './components/LoginScreen'
 import { PayloadPreview } from './components/PayloadPreview'
 import { PreviewPanel } from './components/PreviewPanel'
@@ -21,11 +20,28 @@ import { useProjectBuilder } from './hooks/useProjectBuilder'
 import { useAuth } from './hooks/useAuth'
 import type { GenerationResult, ProjectDraft } from './types/schemas'
 import { slugify } from './lib/slug'
-import { saveShareSnapshot } from './lib/shareStorage'
+import { readBackendConfig } from './lib/backendConfig'
+
+// Helpers from useAuth for credential panel
+const readToken = () => typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
+const apiFetch = async (path: string, init?: RequestInit) => {
+  const token = readToken()
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  const response = await fetch(`${readBackendConfig().baseUrl?.replace(/\/$/, '')}${path}`, {
+    ...init,
+    headers: { ...headers, ...(init?.headers as Record<string, string> || {}) },
+  })
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(message || 'Error al contactar el backend')
+  }
+  return response
+}
 
 export function App() {
   const isShareView = typeof window !== 'undefined' && window.location.pathname.startsWith('/share/')
-  const { isAuthenticated, login, error: authError, logout, updateCredentials, resetCredentials, authStatus } = useAuth()
+  const { isAuthenticated, login, error: authError, logout, resetCredentials, authStatus } = useAuth()
   const {
     project,
     history,
@@ -51,8 +67,9 @@ export function App() {
   const [result, setResult] = useState<GenerationResult | null>(null)
   const [generationWarning, setGenerationWarning] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'schema' | 'endpoints' | 'delivery' | 'result'>('schema')
-  const [activePage, setActivePage] = useState<'builder' | 'info' | 'howto' | 'admin'>('builder')
+  const [activePage, setActivePage] = useState<'builder' | 'info' | 'usage' | 'admin'>('builder')
   const localBaseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'
+  const backendBaseUrl = readBackendConfig().baseUrl?.replace(/\/$/, '') || 'http://localhost:8000'
 
   const performLogout = () => {
     logout()
@@ -80,42 +97,103 @@ export function App() {
       return
     }
     setIsGenerating(true)
-    await new Promise((resolve) => setTimeout(resolve, 1600))
-    setIsGenerating(false)
-    const endpoints = project.endpoints.map((endpoint) => ({
-      method: endpoint.method,
-      path: normalizePath(endpoint.path),
-      description: endpoint.summary || endpoint.name,
-    }))
-    const shareId = crypto.randomUUID().slice(0, 6)
-    const slug = slugify(project.name)
-    const sharePath = `/share/${shareId}/${slug}`
-    const generationResult: GenerationResult = {
-      message: 'API generated successfully',
-      retentionNotice: 'Tu API se mantiene disponible hasta que decidas regenerarla.',
-      apiUrl: `${localBaseUrl}/api/${project.id}${endpoints[0]?.path ?? '/records'}`,
-      docsUrl: `${localBaseUrl}/api/${project.id}/docs`,
-      endpoints,
-      shareUrl: `${window.location.origin}${sharePath}`,
-      projectName: project.name,
+    try {
+      const endpoints = project.endpoints.map((endpoint) => ({
+        method: endpoint.method,
+        path: normalizePath(endpoint.path),
+        description: endpoint.summary || endpoint.name,
+      }))
+
+      // Auto-login: try stored credentials first, then admin/admin
+      let token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
+      if (!token) {
+        // Try stored credentials
+        const storedCreds = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-creds') : null
+        const creds = storedCreds ? JSON.parse(storedCreds) : null
+        const loginBody = creds || { username: 'admin', password: 'admin' }
+        const loginRes = await fetch(`${backendBaseUrl}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(loginBody),
+        })
+        if (loginRes.ok) {
+          const loginData = await loginRes.json()
+          if (loginData.access_token && typeof window !== 'undefined') {
+            window.sessionStorage.setItem('apimaker-jwt-token', loginData.access_token)
+            token = loginData.access_token
+          }
+        }
+      }
+      if (!token) {
+        alert('No se pudo conectar con el backend. Asegúrate de que está corriendo.')
+        return
+      }
+
+      const auth = { Authorization: `Bearer ${token}` }
+
+      // Create project if doesn't exist
+      const exists = await fetch(`${backendBaseUrl}/projects/${project.id}`, { headers: auth })
+      let effectiveProjectId = project.id
+
+      if (!exists.ok) {
+        const cr = await fetch(`${backendBaseUrl}/projects`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', ...auth },
+          body: JSON.stringify({ name: project.name, description: project.description, target_stack: project.targetStack }),
+        })
+        if (!cr.ok) { alert(`Error al crear proyecto: ${await cr.text()}`); return }
+        const createdProject = await cr.json()
+        // IMPORTANT: use the server-assigned ID, not the client-side one
+        effectiveProjectId = createdProject.id
+        if (effectiveProjectId !== project.id) {
+          replaceProject({ ...project, id: effectiveProjectId })
+        }
+
+        // Sync dataset
+        if (project.dataset) {
+          const dsRes = await fetch(`${backendBaseUrl}/projects/${effectiveProjectId}/dataset`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', ...auth },
+            body: JSON.stringify({ name: project.dataset.name, source_type: project.dataset.sourceType, fields: project.dataset.fields.map(f => ({ name: f.name, type: f.type, required: f.required, description: f.description })) }),
+          })
+          if (!dsRes.ok) { console.error('Error syncing dataset:', await dsRes.text()) }
+        }
+        // Sync endpoints
+        if (project.endpoints.length > 0) {
+          const epRes = await fetch(`${backendBaseUrl}/projects/${effectiveProjectId}/endpoints`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', ...auth },
+            body: JSON.stringify({ endpoints: project.endpoints.map(ep => ({ ...ep, id: crypto.randomUUID() })) }),
+          })
+          if (!epRes.ok) { console.error('Error syncing endpoints:', await epRes.text()) }
+        }
+      }
+
+      // Generate bundle
+      const gr = await fetch(`${backendBaseUrl}/projects/${effectiveProjectId}/generate`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify({ include_mock_server: true, include_sdk: true }),
+      })
+      if (!gr.ok) {
+        alert(`Error al generar bundle: ${await gr.text()}`)
+        return
+      }
+
+      // Build local result
+      const shareId = crypto.randomUUID().slice(0, 6)
+      const generationResult: GenerationResult = {
+        message: 'API generated successfully',
+        retentionNotice: 'Pulsa "Descargar bundle (.zip)" en la API generada para obtener el código.',
+        apiUrl: `${localBaseUrl}/api/mock/${effectiveProjectId}${endpoints[0]?.path ?? '/records'}`,
+        docsUrl: `${backendBaseUrl}/projects/${effectiveProjectId}/docs`,
+        endpoints,
+        shareUrl: `${window.location.origin}/share/${shareId}/${slugify(project.name)}`,
+        projectName: project.name,
+      }
+      setGenerationResult({ lastGeneration: generationResult, sharePath: generationResult.shareUrl })
+      setResult(generationResult)
+    } catch (err) {
+      alert(`Error: ${err instanceof Error ? err.message : 'desconocido'}`)
+    } finally {
+      setIsGenerating(false)
     }
-    const timestamp = new Date().toISOString()
-    const projectSnapshot: ProjectDraft = {
-      ...project,
-      sharePath,
-      lastGeneration: generationResult,
-      updatedAt: timestamp,
-    }
-    saveShareSnapshot({
-      id: shareId,
-      slug,
-      createdAt: timestamp,
-      project: projectSnapshot,
-      result: generationResult,
-    })
-    setGenerationWarning(null)
-    setGenerationResult({ lastGeneration: generationResult, sharePath })
-    setResult(generationResult)
   }
 
   const handleLoadDemo = async () => {
@@ -124,7 +202,7 @@ export function App() {
       const response = await fetch('/demo-project.json', { cache: 'no-store' })
       if (!response.ok) throw new Error('No se pudo cargar el demo')
       const data = (await response.json()) as ProjectDraft
-      replaceProject({ ...data, id: data.id ?? crypto.randomUUID() })
+      replaceProject({ ...data, id: crypto.randomUUID() })
       setResult(null)
     } catch (error) {
       console.error(error)
@@ -138,8 +216,28 @@ export function App() {
     setGenerationWarning(null)
   }, [project.id, project.lastGeneration])
 
+  // Sync result endpoints when project endpoints change (keep "API generada" up to date)
+  useEffect(() => {
+    if (!result || project.endpoints.length === 0) return
+    const updatedEndpoints = project.endpoints.map((endpoint) => ({
+      method: endpoint.method,
+      path: normalizePath(endpoint.path),
+      description: endpoint.summary || endpoint.name,
+    }))
+    setResult((prev) => {
+      if (!prev) return prev
+      const updated: GenerationResult = {
+        ...prev,
+        endpoints: updatedEndpoints,
+        apiUrl: `${localBaseUrl}/api/mock/${project.id}${updatedEndpoints[0]?.path ?? '/records'}`,
+        docsUrl: `${backendBaseUrl}/projects/${project.id}/docs`,
+        projectName: project.name,
+      }
+      return updated
+    })
+  }, [project.endpoints, project.name, project.id, localBaseUrl])
+
   const effectiveResult = result ?? project.lastGeneration ?? null
-  const canSaveSnapshot = Boolean(effectiveResult)
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -193,7 +291,7 @@ export function App() {
         return effectiveResult ? (
           <SectionCard title="API generada" subtitle="Sandbox, docs y endpoints" accent="emerald" fullWidth>
             <div className="api-delivery-grid">
-              <GenerationResultPanel result={effectiveResult} />
+              <GenerationResultPanel result={effectiveResult} projectId={project.id} />
               <EndpointGallery endpoints={effectiveResult.endpoints} />
             </div>
           </SectionCard>
@@ -253,18 +351,17 @@ export function App() {
                 </button>
                 <button
                   type="button"
+                  className={activePage === 'usage' ? 'nav-button active' : 'nav-button'}
+                  onClick={() => setActivePage('usage')}
+                >
+                  Uso
+                </button>
+                <button
+                  type="button"
                   className={activePage === 'info' ? 'nav-button active' : 'nav-button'}
                   onClick={() => setActivePage('info')}
                 >
                   Información
-                </button>
-                <button
-                  type="button"
-                  className={activePage === 'howto' ? 'nav-button active' : 'nav-button'}
-                  onClick={() => setActivePage('howto')}
-                  title="Consulta notas de uso y arranque"
-                >
-                  Cómo usarla
                 </button>
               </div>
               <a className="github-button" href="https://github.com/" target="_blank" rel="noreferrer">
@@ -311,6 +408,8 @@ export function App() {
               <div className="tab-content">{renderTabContent()}</div>
             </>
           )}
+
+          {activePage === 'usage' && <ApiUsagePanel />}
 
           {activePage === 'info' && (
             <SectionCard title="Información" subtitle="Notas del proyecto" fullWidth>
@@ -365,8 +464,26 @@ export function App() {
                 </p>
                 <CredentialPanel
                   currentUsername={authStatus.username}
-                  onUpdate={async (username, newPassword, currentPassword) => {
-                    await updateCredentials(username, newPassword, currentPassword)
+                  onUpdate={async (newUsername, newPassword, currentPassword) => {
+                    // Get current token
+                    const token = readToken()
+                    if (!token) throw new Error('No estás autenticado')
+                    // Change username if different
+                    if (newUsername !== authStatus.username) {
+                      await apiFetch('/auth/change-username', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ new_username: newUsername, current_password: currentPassword }),
+                      })
+                    }
+                    // Change password if provided
+                    if (newPassword) {
+                      await apiFetch('/auth/change-password', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+                      })
+                    }
                     performLogout()
                   }}
                   onReset={async () => {
@@ -379,53 +496,10 @@ export function App() {
             </SectionCard>
           )}
 
-          {activePage === 'howto' && (
-            <SectionCard title="Cómo usar la app" subtitle="Configura, prueba y comparte" fullWidth>
-              <div className="info-panel">
-                <p>
-                  Sigue estos pasos para tener tu builder listo: define el backend, crea datasets/endpoints, sincroniza y comparte la documentación.
-                </p>
-                <div>
-                  <h3>Configuración del backend</h3>
-                  <BackendConfigPanel />
-                </div>
-                <HowToPlayground />
-                <div>
-                  <h3>Ejemplo aplicado</h3>
-                  <p>
-                    Supongamos que quieres exponer una API de inventario para un ecommerce. En la pestaña "Dataset" cargas un CSV con columnas
-                    `sku`, `name`, `category`, `stock`, `price` y `active`. Luego, en "Endpoints" añades:
-                  </p>
-                  <ul>
-                    <li>`GET /products` &ndash; lista todos los productos.</li>
-                    <li>`POST /products` &ndash; crea un producto.</li>
-                    <li>`PUT /products/&#123;id&#125;` &ndash; actualiza un producto.</li>
-                  </ul>
-                  <p>
-                    Con esos endpoints puedes ir a "Payload & Entrega" para ver el JSON estimado y pulsar "Sincronizar con backend". Al hacerlo, el
-                    backend FastAPI guardará el proyecto y habilitará rutas como `http://TU_BACKEND/projects/${project.id}/docs` (UI Redoc) y
-                    `http://TU_BACKEND/projects/${project.id}/openapi.json`. Desde la pestaña "API generada" copiarás la URL del sandbox para consumir la API
-                    y también el openapi.json que usarán tus clientes o pipelines CI. Ejemplo de request: `curl -X GET http://localhost:8000/projects`.
-                  </p>
-                  <p>
-                    Una vez instalado el backend en tu servidor, sigue estos pasos para usar la API desde cualquier entorno:
-                  </p>
-                  <ol>
-                    <li>Inicia el backend (`uvicorn app.main:app --host 0.0.0.0 --port 8000`) y expónlo detrás de tu reverse proxy/HTTPS.</li>
-                    <li>Levanta el frontend (`npm run dev` o sirve el build) y, en la pestaña "Cómo usarla", apunta la URL del backend (por ejemplo `https://api.miempresa.com`).</li>
-                    <li>Diseña dataset y endpoints según tu dominio; guarda un snapshot local para tener historial.</li>
-                    <li>En "Payload & Entrega", pulsa "Sincronizar con backend". Verás enlaces permanentes en la pestaña "API generada".</li>
-                    <li>Para consumir la API, usa la URL del sandbox mostrada ahí (ej. `https://api.miempresa.com/api/${project.id}/products`) y ejecuta tus requests (`curl -X GET ...`, Postman, tests automatizados, etc.).</li>
-                    <li>Comparte `https://api.miempresa.com/projects/${project.id}/docs` con tu equipo o clientes para que vean la documentación siempre actualizada.</li>
-                  </ol>
-                </div>
-              </div>
-            </SectionCard>
-          )}
         </div>
       </div>
-      <button type="button" className="fab" onClick={canSaveSnapshot ? saveSnapshot : handleGenerate} disabled={isGenerating}>
-        {isGenerating ? 'Procesando...' : canSaveSnapshot ? 'Guardar API' : 'Generar API'}
+      <button type="button" className="fab" onClick={handleGenerate} disabled={isGenerating}>
+        {isGenerating ? 'Procesando...' : effectiveResult ? 'Actualizar API' : 'Generar API'}
       </button>
     </div>
   )

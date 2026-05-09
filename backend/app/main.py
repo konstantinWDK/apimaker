@@ -4,7 +4,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
-from .routers import auth, projects
+from .db import create_db_and_tables
+from .routers import auth, mock as mock_ctrl_router, projects, share as share_router
+from .services.mock_server import router as mock_api_router
 
 
 settings = get_settings()
@@ -21,6 +23,15 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(projects.router)
+app.include_router(mock_ctrl_router.router)
+app.include_router(mock_api_router)
+app.include_router(share_router.router)
+
+
+@app.on_event("startup")
+def on_startup() -> None:
+    """Initialize database tables on startup."""
+    create_db_and_tables()
 
 
 @app.get("/health", tags=["health"])

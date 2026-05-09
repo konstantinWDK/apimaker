@@ -1,5 +1,8 @@
 """Application configuration via environment variables."""
 
+from __future__ import annotations
+
+import secrets
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -10,6 +13,12 @@ class Settings(BaseSettings):
     environment: str = "development"
     allow_origins: list[str] = ["http://localhost:5173", "http://localhost:4173"]
     builder_token: str | None = None
+
+    # JWT settings
+    jwt_secret_key: str = "apimaker-dev-secret-key-change-in-prod-2026"
+    jwt_algorithm: str = "HS256"
+    jwt_access_expire_minutes: int = 60 * 24  # 24 hours
+    jwt_refresh_expire_days: int = 7
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="APIMAKER_")
 

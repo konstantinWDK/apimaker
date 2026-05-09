@@ -9,17 +9,61 @@ const handleResponse = async (response: Response) => {
     return response.json()
   }
   const message = await response.text()
-  throw new Error(message || 'Error en la API del backend')
+  // Try to parse FastAPI error response
+  try {
+    const parsed = JSON.parse(message)
+    const detail = typeof parsed.detail === 'string' ? parsed.detail : JSON.stringify(parsed.detail)
+    throw new Error(detail)
+  } catch (e) {
+    if (e instanceof Error) throw e
+    throw new Error(message || 'Error en la API del backend')
+  }
 }
 
-const buildHeaders = () => {
+const buildHeaders = (): HeadersInit => {
   const { apiKey } = readBackendConfig()
   const headers: HeadersInit = { 'Content-Type': 'application/json' }
-  if (apiKey) headers['X-API-Key'] = apiKey
+  // Prefer JWT token over API key
+  if (typeof window !== 'undefined') {
+    const token = window.sessionStorage.getItem('apimaker-jwt-token')
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    } else if (apiKey) {
+      headers['X-API-Key'] = apiKey
+    }
+  } else if (apiKey) {
+    headers['X-API-Key'] = apiKey
+  }
   return headers
 }
 
-const ensureBaseUrl = () => {
+const ensureAuthToken = async (): Promise<string | null> => {
+  // Check if we already have a JWT token
+  if (typeof window !== 'undefined') {
+    const existing = window.sessionStorage.getItem('apimaker-jwt-token')
+    if (existing) return existing
+  }
+  // Try to login automatically with default credentials
+  const { baseUrl } = readBackendConfig()
+  if (!baseUrl) return null
+  try {
+    const res = await fetch(`${baseUrl.replace(/\/$/, '')}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'admin', password: 'admin' }),
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    if (data.access_token && typeof window !== 'undefined') {
+      window.sessionStorage.setItem('apimaker-jwt-token', data.access_token)
+      return data.access_token
+    }
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+const ensureBaseUrl = (): string => {
   const { baseUrl } = readBackendConfig()
   if (!baseUrl) throw new Error('Configura la URL del backend antes de sincronizar')
   return cleanBaseUrl(baseUrl)
@@ -47,7 +91,6 @@ const normalizeEndpointId = (endpointId: string) => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return crypto.randomUUID()
   }
-  // fallback simple uuid v4-ish
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0
     const v = c === 'x' ? r : (r & 0x3) | 0x8
@@ -61,8 +104,14 @@ export interface SyncResult {
   openapiUrl: string
 }
 
+/**
+ * Sync a local project draft with the backend.
+ * Creates the project if no remoteId exists, otherwise updates dataset + endpoints.
+ */
 export const syncProjectWithBackend = async (project: ProjectDraft): Promise<SyncResult> => {
   const baseUrl = ensureBaseUrl()
+  // Auto-login if no token
+  await ensureAuthToken()
   const headers = buildHeaders()
   let remoteId = project.remoteId
 
@@ -113,6 +162,9 @@ export const syncProjectWithBackend = async (project: ProjectDraft): Promise<Syn
   }
 }
 
+/**
+ * Fetch all projects from the backend.
+ */
 export const fetchRemoteProjects = async (): Promise<ProjectDraft[]> => {
   const baseUrl = ensureBaseUrl()
   const response = await fetch(`${baseUrl}/projects`)
@@ -135,4 +187,140 @@ export const fetchRemoteProjects = async (): Promise<ProjectDraft[]> => {
     endpoints: item.endpoints ?? [],
     updatedAt: item.updated_at ?? undefined,
   }))
+}
+
+/**
+ * Create a new project on the backend.
+ */
+export const createRemoteProject = async (
+  name: string,
+  description?: string,
+  targetStack = 'fastapi',
+): Promise<ProjectDraft> => {
+  const baseUrl = ensureBaseUrl()
+  const headers = buildHeaders()
+  const response = await fetch(`${baseUrl}/projects`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ name, description, target_stack: targetStack }),
+  })
+  const data = await handleResponse(response)
+  return {
+    id: data.id,
+    remoteId: data.id,
+    name: data.name,
+    description: data.description ?? undefined,
+    targetStack: data.target_stack,
+    dataset: undefined,
+    endpoints: [],
+    updatedAt: data.updated_at,
+  }
+}
+
+/**
+ * Delete a project from the backend.
+ */
+export const deleteRemoteProject = async (projectId: string): Promise<void> => {
+  const baseUrl = ensureBaseUrl()
+  const headers = buildHeaders()
+  const response = await fetch(`${baseUrl}/projects/${projectId}`, {
+    method: 'DELETE',
+    headers,
+  })
+  await handleResponse(response)
+}
+
+/**
+ * Fetch a single project from the backend.
+ */
+export const fetchRemoteProject = async (projectId: string): Promise<ProjectDraft> => {
+  const baseUrl = ensureBaseUrl()
+  const response = await fetch(`${baseUrl}/projects/${projectId}`)
+  const data = await handleResponse(response)
+  return {
+    id: data.id,
+    remoteId: data.id,
+    name: data.name,
+    description: data.description ?? undefined,
+    targetStack: data.target_stack,
+    dataset: data.dataset
+      ? {
+          id: data.dataset.id,
+          name: data.dataset.name,
+          sourceType: data.dataset.source_type,
+          fields: data.dataset.fields ?? [],
+          sampleRows: [],
+        }
+      : undefined,
+    endpoints: data.endpoints ?? [],
+    updatedAt: data.updated_at ?? undefined,
+  }
+}
+
+/**
+ * Health check the backend.
+ */
+export const healthCheck = async (): Promise<{ status: string; environment: string }> => {
+  const baseUrl = ensureBaseUrl()
+  const response = await fetch(`${baseUrl}/health`)
+  return handleResponse(response)
+}
+
+/**
+ * Start mock server for a project.
+ */
+export const startMockServer = async (projectId: string): Promise<any> => {
+  const baseUrl = ensureBaseUrl()
+  const headers = buildHeaders()
+  const response = await fetch(`${baseUrl}/projects/${projectId}/mock/start`, {
+    method: 'POST',
+    headers,
+  })
+  return handleResponse(response)
+}
+
+/**
+ * Get mock server status.
+ */
+export const getMockStatus = async (projectId: string): Promise<any> => {
+  const baseUrl = ensureBaseUrl()
+  const response = await fetch(`${baseUrl}/projects/${projectId}/mock/status`)
+  return handleResponse(response)
+}
+
+/**
+ * Create a share snapshot.
+ */
+export const createShare = async (
+  projectId: string,
+  password?: string,
+  expiresDays = 30,
+): Promise<{ id: string; slug: string; url: string }> => {
+  const baseUrl = ensureBaseUrl()
+  const headers = buildHeaders()
+  const response = await fetch(`${baseUrl}/share/projects/${projectId}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ password, expires_days: expiresDays }),
+  })
+  return handleResponse(response)
+}
+
+/**
+ * Get a share snapshot (public).
+ */
+export const getShareSnapshot = async (
+  snapshotId: string,
+  slug: string,
+  password?: string,
+): Promise<any> => {
+  const baseUrl = ensureBaseUrl()
+  const params = new URLSearchParams()
+  if (password) params.set('password', password)
+  const response = await fetch(`${baseUrl}/share/${snapshotId}/${slug}?${params}`)
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(message || 'Share not found')
+  }
+  return response.json()
 }
