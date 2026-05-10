@@ -1,0 +1,134 @@
+const express = require('express');
+const { Sequelize, DataTypes } = require('sequelize');
+const dotenv = require('dotenv');
+
+dotenv.config();
+
+const app = express();
+app.use(express.json());
+
+const DATABASE_URL = process.env.DATABASE_URL || 'sqlite:./data.db';
+const API_KEY = process.env.API_KEY || '';
+
+const sequelize = new Sequelize(DATABASE_URL, {
+  logging: false,
+  define: {
+    timestamps: true,
+    underscored: true
+  }
+});
+
+// ─── Models ──────────────────────────────────────────────────────
+{% if dataset %}
+const {{ dataset.name | capitalize }} = sequelize.define('{{ dataset.name | lower }}_record', {
+{% for field in dataset.fields %}
+  {{ field.name }}: {
+    type: {% if field.type == 'integer' %}DataTypes.INTEGER{% elif field.type == 'float' %}DataTypes.FLOAT{% elif field.type == 'boolean' %}DataTypes.BOOLEAN{% elif field.type == 'datetime' %}DataTypes.DATE{% else %}DataTypes.STRING{% endif %},
+    allowNull: {{ 'false' if field.required else 'true' }}
+  },
+{% endfor %}
+});
+{% endif %}
+
+// ─── Middleware ─────────────────────────────────────────────────
+const apiKeyMiddleware = (req, res, next) => {
+  if (API_KEY) {
+    const publicPaths = ['/health', '/docs', '/redoc', '/openapi.json'];
+    if (publicPaths.includes(req.path)) return next();
+    
+    const apiKey = req.headers['x-api-key'];
+    if (apiKey !== API_KEY) {
+      return res.status(401).json({ error: 'Invalid API key' });
+    }
+  }
+  next();
+};
+
+app.use(apiKeyMiddleware);
+
+// ─── Endpoints ───────────────────────────────────────────────────
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    database: DATABASE_URL.startsWith('postgres') ? 'postgresql' : 'sqlite'
+  });
+});
+
+{% if dataset %}
+{% for ep in endpoints %}
+{% if ep.method == "GET" and "{" not in ep.path %}
+// {{ ep.summary or ep.name }}
+app.get('{{ ep.path | replace("{", ":") | replace("}", "") }}', async (req, res) => {
+  const skip = parseInt(req.query.skip) || 0;
+  const limit = parseInt(req.query.limit) || 100;
+  const records = await {{ dataset.name | capitalize }}.findAll({
+    offset: skip,
+    limit: limit
+  });
+  res.json(records);
+});
+
+{% elif ep.method == "GET" and "{" in ep.path %}
+// {{ ep.summary or ep.name }}
+app.get('{{ ep.path | replace("{", ":") | replace("}", "") }}', async (req, res) => {
+  const record = await {{ dataset.name | capitalize }}.findByPk(req.params.{{ ep.path | extract_path_param }});
+  if (!record) return res.status(404).json({ error: 'Record not found' });
+  res.json(record);
+});
+
+{% elif ep.method == "POST" %}
+// {{ ep.summary or ep.name }}
+app.post('{{ ep.path | replace("{", ":") | replace("}", "") }}', async (req, res) => {
+  try {
+    const record = await {{ dataset.name | capitalize }}.create(req.body);
+    res.status(201).json(record);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+{% elif ep.method == "PUT" and "{" in ep.path %}
+// {{ ep.summary or ep.name }}
+app.put('{{ ep.path | replace("{", ":") | replace("}", "") }}', async (req, res) => {
+  const record = await {{ dataset.name | capitalize }}.findByPk(req.params.{{ ep.path | extract_path_param }});
+  if (!record) return res.status(404).json({ error: 'Record not found' });
+  await record.update(req.body);
+  res.json(record);
+});
+
+{% elif ep.method == "DELETE" and "{" in ep.path %}
+// {{ ep.summary or ep.name }}
+app.delete('{{ ep.path | replace("{", ":") | replace("}", "") }}', async (req, res) => {
+  const record = await {{ dataset.name | capitalize }}.findByPk(req.params.{{ ep.path | extract_path_param }});
+  if (!record) return res.status(404).json({ error: 'Record not found' });
+  await record.destroy();
+  res.status(204).send();
+});
+
+{% endif %}
+{% endfor %}
+{% endif %}
+
+const PORT = process.env.PORT || 8000;
+
+sequelize.sync().then(async () => {
+  {% if dataset %}
+  const count = await {{ dataset.name | capitalize }}.count();
+  if (count === 0) {
+    try {
+      const fs = require('fs');
+      if (fs.existsSync('./data.json')) {
+        const data = JSON.parse(fs.readFileSync('./data.json', 'utf8'));
+        console.log(`Seeding database with ${data.length} records...`);
+        await {{ dataset.name | capitalize }}.bulkCreate(data);
+      }
+    } catch (error) {
+      console.error('Error seeding database:', error);
+    }
+  }
+  {% endif %}
+
+  app.listen(PORT, () => {
+    console.log(`{{ project_name }} running on http://localhost:${PORT}`);
+  });
+});

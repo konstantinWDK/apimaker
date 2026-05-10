@@ -53,4 +53,5 @@ export interface GenerationResult {
   endpoints: GeneratedEndpoint[]
   shareUrl?: string
   projectName?: string
+  stack?: string
 }

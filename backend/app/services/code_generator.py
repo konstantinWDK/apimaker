@@ -58,7 +58,15 @@ def _build_context(
                 }
                 for f in fields
             ],
+            "sample_rows": dataset.sample_rows if isinstance(dataset.sample_rows, list) else [],
         }
+        # Handle case where sample_rows might be a JSON string in DB
+        if isinstance(dataset.sample_rows, str):
+            import json
+            try:
+                dataset_context["sample_rows"] = json.loads(dataset.sample_rows)
+            except:
+                dataset_context["sample_rows"] = []
 
     endpoints_context = [
         {
@@ -78,16 +86,23 @@ def _build_context(
     }
 
 
-def render_fastapi_bundle(
+def render_bundle(
+    stack: str,
     project_name: str,
     project_description: str | None,
     dataset: Dataset | None,
     fields: list[DatasetField],
     endpoints: list[Endpoint],
 ) -> bytes:
-    """Render a FastAPI project bundle as zip bytes."""
+    """Render a project bundle as zip bytes based on the selected stack."""
+    stack_dir = TEMPLATE_DIR / stack
+    if not stack_dir.exists():
+        # Fallback to fastapi if stack doesn't exist
+        stack = "fastapi"
+        stack_dir = TEMPLATE_DIR / stack
+
     env = Environment(
-        loader=FileSystemLoader(str(TEMPLATE_DIR / "fastapi")),
+        loader=FileSystemLoader(str(stack_dir)),
         autoescape=select_autoescape(),
     )
     env.filters["capitalize"] = lambda s: s.capitalize() if s else ""
@@ -99,67 +114,105 @@ def render_fastapi_bundle(
 
     buf = BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        # Render main.py
-        main_tpl = env.get_template("main.py.j2")
-        zf.writestr("main.py", main_tpl.render(**context))
+        # Determine files to render based on stack
+        files_to_render = []
+        if stack == "fastapi":
+            files_to_render = [
+                ("main.py.j2", "main.py"),
+                ("requirements.txt.j2", "requirements.txt"),
+                ("Dockerfile.j2", "Dockerfile"),
+                ("env.example.j2", ".env.example"),
+            ]
+        elif stack == "express":
+            files_to_render = [
+                ("app.js.j2", "app.js"),
+                ("package.json.j2", "package.json"),
+                ("Dockerfile.j2", "Dockerfile"),
+                ("env.example.j2", ".env.example"),
+            ]
+        elif stack == "nest":
+            files_to_render = [
+                ("src/main.ts.j2", "src/main.ts"),
+                ("src/app.controller.ts.j2", "src/app.controller.ts"),
+                ("src/app.module.ts.j2", "src/app.module.ts"),
+                ("package.json.j2", "package.json"),
+                ("Dockerfile.j2", "Dockerfile"),
+                ("env.example.j2", ".env.example"),
+            ]
 
-        # Render requirements.txt
-        req_tpl = env.get_template("requirements.txt.j2")
-        zf.writestr("requirements.txt", req_tpl.render())
+        for tpl_name, target_name in files_to_render:
+            try:
+                tpl = env.get_template(tpl_name)
+                zf.writestr(target_name, tpl.render(**context))
+            except Exception:
+                # Skip if template not found
+                pass
 
-        # Render Dockerfile
-        docker_tpl = env.get_template("Dockerfile.j2")
-        zf.writestr("Dockerfile", docker_tpl.render())
+        # Add data.json if we have sample rows
+        if context["dataset"] and context["dataset"]["sample_rows"]:
+            import json
+            zf.writestr("data.json", json.dumps(context["dataset"]["sample_rows"], indent=2, ensure_ascii=False))
 
-        # Render .env.example
-        try:
-            env_tpl = env.get_template("env.example.j2")
-            zf.writestr(".env.example", env_tpl.render())
-        except Exception:
-            # Template may not exist yet — skip gracefully
-            pass
-
-        # Generate basic test file
-        zf.writestr(
-            "tests/__init__.py",
-            "",
-        )
-        zf.writestr(
-            "tests/test_main.py",
-            f'"""Tests for {project_name}."""\n'
-            "from fastapi.testclient import TestClient\n"
-            "from main import app\n\n"
-            "client = TestClient(app)\n\n"
-            "def test_health():\n"
-            '    response = client.get("/health")\n'
-            "    assert response.status_code == 200\n"
-            '    assert response.json()["status"] == "ok"\n',
-        )
-
+        # Add common files
+        if stack == "fastapi":
+            zf.writestr("tests/__init__.py", "")
+            zf.writestr(
+                "tests/test_main.py",
+                f'"""Tests for {project_name}."""\n'
+                "from fastapi.testclient import TestClient\n"
+                "from main import app\n\n"
+                "client = TestClient(app)\n\n"
+                "def test_health():\n"
+                '    response = client.get("/health")\n'
+                "    assert response.status_code == 200\n"
+                '    assert response.json()["status"] == "ok"\n',
+            )
+        
         # README
-        zf.writestr(
-            "README.md",
-            f"# {project_name}\n\nAuto-generated by API Maker.\n\n"
-            f"## Quick Start\n\n"
-            f"```bash\n"
-            f"# 1. Copy env example\n"
-            f"cp .env.example .env\n"
-            f"# 2. Edit .env with your DATABASE_URL (SQLite by default)\n"
-            f"# 3. Install and run\n"
-            f"pip install -r requirements.txt\n"
-            f"uvicorn main:app --reload\n"
-            f"```\n\n"
-            f"## Docker\n\n"
-            f"```bash\n"
-            f"docker build -t {project_name.lower().replace(' ', '-')} .\n"
-            f"docker run -p 8000:8000 -e DATABASE_URL=sqlite:///./data.db {project_name.lower().replace(' ', '-')}\n"
-            f"```\n\n"
-            f"## Tests\n\n"
-            f"```bash\n"
-            f"pip install httpx pytest\n"
-            f"pytest\n"
-            f"```\n",
-        )
+        readme_content = f"# {project_name}\n\nAuto-generated by API Maker ({stack}).\n\n"
+        if project_description:
+            readme_content += f"{project_description}\n\n"
+        
+        if context["dataset"] and context["dataset"]["sample_rows"]:
+            readme_content += "## Initial Data\n\nEste bundle incluye un archivo `data.json` con los datos cargados en el builder. La API los importará automáticamente en el primer arranque si la base de datos está vacía.\n\n"
+
+        readme_content += "## Quick Start\n\n"
+        if stack == "fastapi":
+            readme_content += (
+                "```bash\n"
+                "# 1. Instalar dependencias\n"
+                "pip install -r requirements.txt\n\n"
+                "# 2. Configurar entorno (opcional)\n"
+                "cp .env.example .env\n\n"
+                "# 3. Ejecutar\n"
+                "uvicorn main:app --reload\n"
+                "```\n\n"
+                "La API estará disponible en `http://localhost:8000`. Visita `/docs` para la documentación interactiva.\n"
+            )
+        elif stack == "express":
+            readme_content += (
+                "```bash\n"
+                "# 1. Instalar dependencias\n"
+                "npm install\n\n"
+                "# 2. Ejecutar\n"
+                "npm start\n"
+                "```\n\n"
+                "La API estará disponible en `http://localhost:8000`.\n"
+            )
+        elif stack == "nest":
+            readme_content += (
+                "```bash\n"
+                "# 1. Instalar dependencias\n"
+                "npm install\n\n"
+                "# 2. Ejecutar en modo desarrollo\n"
+                "npm run start:dev\n"
+                "```\n\n"
+                "La API estará disponible en `http://localhost:8000`.\n"
+            )
+        
+        readme_content += "\n## Docker\n\n```bash\ndocker build -t api-generated .\ndocker run -p 8000:8000 api-generated\n```\n"
+        
+        zf.writestr("README.md", readme_content)
 
     buf.seek(0)
     return buf.getvalue()
@@ -180,7 +233,7 @@ def run_generation(
     fields = data["fields"]
     endpoints = data["endpoints"]
 
-    # If no endpoints defined, create a default one so generation still works
+    # If no endpoints defined, create a default one
     if not endpoints:
         from ..db_models import Endpoint as DBEndpoint
         session.add(DBEndpoint(
@@ -196,8 +249,9 @@ def run_generation(
         ).all()
 
     try:
-        # Generate FastAPI bundle
-        zip_bytes = render_fastapi_bundle(
+        # Generate bundle based on target_stack
+        zip_bytes = render_bundle(
+            project.target_stack or "fastapi",
             project.name,
             project.description,
             dataset,

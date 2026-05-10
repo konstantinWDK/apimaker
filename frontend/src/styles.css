@@ -2922,3 +2922,20 @@ input[type='password'] {
   padding-top: 2rem;
   border-top: 1px dashed rgba(148, 163, 184, 0.4);
 }
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.badge--emerald {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #10b981;
+}

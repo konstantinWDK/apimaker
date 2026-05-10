@@ -145,6 +145,7 @@ export function App() {
         endpoints,
         shareUrl: `${window.location.origin}/share/${shareId}/${slugify(project.name)}`,
         projectName: project.name,
+        stack: project.targetStack,
       }
       setGenerationResult({ lastGeneration: generationResult, sharePath: generationResult.shareUrl })
       setResult(generationResult)
@@ -321,14 +322,35 @@ export function App() {
             projects={projects}
             onSave={handleGenerate}
             onCreate={() => {
-              const draft = {
-                id: crypto.randomUUID(),
+              // We'll let replaceProject handle the defaults if we pass a partial, 
+              // but it's better to be explicit here to match createDefaultProject logic
+              const id = crypto.randomUUID()
+              const draft: ProjectDraft = {
+                id,
                 name: 'Nueva API',
                 description: 'Diseña tu API declarando datos y endpoints',
-                targetStack: 'fastapi' as const,
-                endpoints: [],
+                targetStack: 'fastapi',
+                endpoints: [
+                  {
+                    id: crypto.randomUUID(),
+                    name: 'Listar registros',
+                    method: 'GET',
+                    path: '/records',
+                    summary: 'Obtiene la lista de elementos del dataset'
+                  }
+                ],
+                dataset: {
+                  id: crypto.randomUUID(),
+                  name: 'Dataset principal',
+                  sourceType: 'manual',
+                  fields: [
+                    { id: crypto.randomUUID(), name: 'nombre', type: 'string', required: true, description: 'Nombre del elemento' }
+                  ],
+                  sampleRows: [
+                    { nombre: 'Ejemplo 1' }
+                  ]
+                }
               }
-              // Just create local draft — DB sync happens on save or demo load
               replaceProject(draft)
             }}
             mockRunning={mockRunning}

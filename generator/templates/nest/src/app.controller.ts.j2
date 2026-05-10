@@ -1,0 +1,26 @@
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpException, HttpStatus } from '@nestjs/common';
+
+@Controller()
+export class AppController {
+  
+  @Get('health')
+  getHealth() {
+    return { status: 'ok', stack: 'nestjs' };
+  }
+
+  {% if dataset %}
+  {% for ep in endpoints %}
+  @{{ ep.method | capitalize }}('{{ ep.path | replace("{", ":") | replace("}", "") }}')
+  async {{ ep.name | lower | replace(" ", "_") }}(
+    @Body() body: any,
+    @Param() params: any,
+    @Query('skip') skip = 0,
+    @Query('limit') limit = 100,
+  ) {
+    // {{ ep.summary or ep.name }}
+    // Implementation would use a Service and Repository in a real NestJS app
+    return { message: '{{ ep.name }} executed', data: body, params, skip, limit };
+  }
+  {% endfor %}
+  {% endif %}
+}

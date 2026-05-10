@@ -31,13 +31,35 @@ const STORAGE_KEY = 'apimaker-project'
 export const PROJECTS_STORAGE_KEY = 'apimaker-projects'
 const createId = () => crypto.randomUUID()
 
-const createDefaultProject = (): ProjectDraft => ({
-  id: createId(),
-  name: 'Nueva API',
-  description: 'Diseña tu API declarando datos y endpoints',
-  targetStack: 'fastapi',
-  endpoints: [],
-})
+const createDefaultProject = (): ProjectDraft => {
+  const id = createId()
+  return {
+    id,
+    name: 'Nueva API',
+    description: 'Diseña tu API declarando datos y endpoints',
+    targetStack: 'fastapi',
+    endpoints: [
+      {
+        id: createId(),
+        name: 'Listar registros',
+        method: 'GET',
+        path: '/records',
+        summary: 'Obtiene la lista de elementos del dataset'
+      }
+    ],
+    dataset: {
+      id: createId(),
+      name: 'Dataset principal',
+      sourceType: 'manual',
+      fields: [
+        { id: createId(), name: 'nombre', type: 'string', required: true, description: 'Nombre del elemento' }
+      ],
+      sampleRows: [
+        { nombre: 'Ejemplo 1' }
+      ]
+    }
+  }
+}
 
 
 const sanitizeDataset = (dataset?: DatasetMeta): DatasetMeta | undefined => {

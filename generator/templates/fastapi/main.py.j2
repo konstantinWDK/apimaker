@@ -112,8 +112,33 @@ app.add_middleware(APIKeyMiddleware)
 
 @app.on_event("startup")
 def startup():
-    """Create database tables on startup."""
+    """Create database tables and seed initial data on startup."""
     Base.metadata.create_all(bind=engine)
+    
+    # Optional: Seed initial data from data.json if the table is empty
+    {% if dataset %}
+    import json
+    from pathlib import Path
+    data_path = Path("data.json")
+    if data_path.exists():
+        with get_db() as db:
+            # Check if table is empty
+            count = db.query({{ dataset.name | capitalize }}Record).count()
+            if count == 0:
+                print(f"Seeding database with data from {data_path}...")
+                try:
+                    with open(data_path, "r", encoding="utf-8") as f:
+                        items = json.load(f)
+                        for item in items:
+                            # Filter keys to match model (in case JSON has extra fields)
+                            valid_data = {k: v for k, v in item.items() if k in {{ dataset.name | capitalize }}Record.__table__.columns}
+                            db.add({{ dataset.name | capitalize }}Record(**valid_data))
+                    db.commit()
+                    print("Database seeded successfully.")
+                except Exception as e:
+                    print(f"Error seeding database: {e}")
+                    db.rollback()
+    {% endif %}
 
 
 # ─── Endpoints ───────────────────────────────────────────────────

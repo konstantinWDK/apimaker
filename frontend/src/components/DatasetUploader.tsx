@@ -23,9 +23,9 @@ const emptyField = (): FieldSchema => ({
   required: true,
 })
 
-const sampleStrings = ['Pikachu', 'Charizard', 'Gengar', 'Bulbasaur', 'Mewtwo']
-const sampleIntegers = ['25', '6', '94', '1', '150']
-const sampleFloats = ['0.4', '1.7', '1.5', '0.7', '2.0']
+const sampleStrings = ['Ejemplo', 'Dato A', 'Dato B', 'Valor X', 'Item']
+const sampleIntegers = ['1', '2', '3', '4', '5']
+const sampleFloats = ['1.0', '2.5', '3.14', '4.99', '0.5']
 const sampleBooleans = ['true', 'false']
 
 const sampleValue = (type: FieldSchema['type'], idx: number) => {
@@ -43,7 +43,7 @@ const sampleValue = (type: FieldSchema['type'], idx: number) => {
   }
 }
 
-const generateSampleRows = (fields: FieldSchema[], count = 5) => {
+const generateSampleRows = (fields: FieldSchema[], count = 1) => {
   if (fields.length === 0) return []
   return Array.from({ length: count }, (_, rowIndex) => {
     const row: Record<string, string> = {}
@@ -66,46 +66,47 @@ export function DatasetUploader({ dataset, onCommit }: Props) {
 
   // Sync local state when dataset prop changes (e.g., demo loaded)
   useEffect(() => {
-    if (dataset?.fields?.length) {
-      setFields(dataset.fields)
+    if (dataset?.id) {
+      setFields(dataset.fields ?? [])
       setSampleRows(dataset.sampleRows ?? [])
       setName(dataset.name ?? 'Dataset principal')
       setSourceType(dataset.sourceType ?? 'manual')
+      setUploadName(dataset.uploadedFrom ?? '')
     }
-  }, [dataset?.id, dataset?.name])  // re-sync when dataset identity changes
+  }, [dataset?.id])
 
+  // If manual mode and fields changed, we update sampleRows if they were generated ones
   useEffect(() => {
-    if (sourceType === 'manual' && fields.length) {
-      setSampleRows((prev) => (prev.length ? prev : generateSampleRows(fields)))
+    if (sourceType === 'manual' && fields.length > 0) {
+       // Only regenerate if name is missing or we want to keep it fresh
+       // For a cleaner UX, we update the sample row to match field names
+       const next = generateSampleRows(fields, 1)
+       setSampleRows(next)
     }
-  }, [sourceType, fields])
+  }, [fields, sourceType])
+
+  // Auto-sync preview when fields change in manual mode
+  useEffect(() => {
+    if (sourceType === 'manual' && hasValidFields) {
+      const timer = setTimeout(() => {
+        handleCommit()
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [fields, sourceType, name])
 
   const hasValidFields = useMemo(() => fields.every((field) => field.name.trim().length > 0), [fields])
 
-  const syncSampleRows = (nextFields: FieldSchema[]) => {
-    if (sourceType === 'manual') {
-      setSampleRows(generateSampleRows(nextFields))
-    }
-  }
-
   const updateField = (id: string, patch: Partial<FieldSchema>) => {
-    setFields((current) => {
-      const next = current.map((field) => (field.id === id ? { ...field, ...patch } : field))
-      syncSampleRows(next)
-      return next
-    })
+    setFields((current) => current.map((field) => (field.id === id ? { ...field, ...patch } : field)))
   }
 
   const addField = () => {
-    const next = [...fields, emptyField()]
-    setFields(next)
-    syncSampleRows(next)
+    setFields((prev) => [...prev, emptyField()])
   }
 
   const removeField = (id: string) => {
-    const next = fields.filter((field) => field.id !== id)
-    setFields(next)
-    syncSampleRows(next)
+    setFields((prev) => prev.filter((field) => field.id !== id))
   }
 
   const inferType = (values: string[]): FieldSchema['type'] => {
@@ -132,83 +133,54 @@ export function DatasetUploader({ dataset, onCommit }: Props) {
       required: true,
     }))
     setFields(fieldList.length ? fieldList : Array.from({ length: 5 }, emptyField))
-    setSampleRows(rows)
-  }
-
-  const parseCsv = async (file: File) => {
-    // Use xlsx library for robust CSV parsing (handles quoted commas, etc.)
-    const buffer = await file.arrayBuffer()
-    const workbook = read(buffer, { type: 'array' })
-    const sheetName = workbook.SheetNames[0]
-    if (!sheetName) throw new Error('El archivo CSV no se pudo parsear')
-    const jsonRows = utils.sheet_to_json<Record<string, string>>(workbook.Sheets[sheetName], { defval: '' })
-    if (!jsonRows.length) throw new Error('El archivo está vacío')
-    parseFromRows(jsonRows.slice(0, 5))
-  }
-
-  const parseExcel = async (file: File) => {
-    const buffer = await file.arrayBuffer()
-    const workbook = read(buffer, { type: 'array' })
-    const sheetName = workbook.SheetNames[0]
-    if (!sheetName) throw new Error('El archivo no contiene hojas')
-    const jsonRows = utils.sheet_to_json<Record<string, string>>(workbook.Sheets[sheetName], { defval: '' })
-    if (!jsonRows.length) throw new Error('La hoja seleccionada está vacía')
-    parseFromRows(jsonRows.slice(0, 5))
+    setSampleRows(rows.slice(0, 5))
   }
 
   const handleFile = async (file: File) => {
     setUploadError(null)
     setUploadName(file.name)
     try {
-      const extension = file.name.split('.').pop()?.toLowerCase()
-      if (extension === 'csv' || extension === 'tsv') {
-        await parseCsv(file)
-      } else if (extension && ['xlsx', 'xls'].includes(extension)) {
-        await parseExcel(file)
-      } else {
-        throw new Error('Formato no soportado. Usa CSV o Excel')
-      }
+      const buffer = await file.arrayBuffer()
+      const workbook = read(buffer, { type: 'array' })
+      const sheetName = workbook.SheetNames[0]
+      if (!sheetName) throw new Error('El archivo no tiene contenido')
+      const jsonRows = utils.sheet_to_json<Record<string, string>>(workbook.Sheets[sheetName], { defval: '' })
+      if (!jsonRows.length) throw new Error('El archivo está vacío')
+      parseFromRows(jsonRows)
+      setSourceType('upload')
     } catch (error) {
-      setUploadError(error instanceof Error ? error.message : 'No se pudo procesar el archivo')
+      setUploadError(error instanceof Error ? error.message : 'Error al procesar archivo')
     }
   }
 
-  const datasetPayload = (rowsOverride?: Array<Record<string, string>>) => ({
-    id: dataset?.id ?? crypto.randomUUID(),
-    name,
-    sourceType,
-    fields,
-    sampleRows: rowsOverride ?? (sampleRows.length ? sampleRows : generateSampleRows(fields)),
-    uploadedFrom: uploadName || undefined,
-  })
-
   const handleCommit = () => {
     if (!hasValidFields) return
-    let nextRows = sampleRows
-    if (sourceType === 'manual') {
-      const generated = generateSampleRows(fields)
-      nextRows = generated
-      setSampleRows(generated)
-    }
-    onCommit(datasetPayload(nextRows))
+    onCommit({
+      id: dataset?.id ?? crypto.randomUUID(),
+      name,
+      sourceType,
+      fields,
+      sampleRows,
+      uploadedFrom: uploadName || undefined,
+    })
   }
 
   return (
     <div className="dataset-builder">
       <div className="dataset-builder__controls">
         <label className="form-field">
-          <span className="label">Data source</span>
+          <span className="label">Fuente de datos</span>
           <select
             value={sourceType}
             onChange={(event) => setSourceType(event.target.value as DatasetMeta['sourceType'])}
             className="field"
           >
-            <option value="manual">Manual builder</option>
-            <option value="upload">Upload CSV / Excel</option>
+            <option value="manual">Constructor manual</option>
+            <option value="upload">Subir CSV / Excel</option>
           </select>
         </label>
         <label className="form-field">
-          <span className="label">Dataset name</span>
+          <span className="label">Nombre del dataset</span>
           <input value={name} onChange={(event) => setName(event.target.value)} className="field" />
         </label>
         {sourceType === 'upload' ? (
@@ -241,7 +213,7 @@ export function DatasetUploader({ dataset, onCommit }: Props) {
             <span className="dataset-column__title">#{index + 1}</span>
             <div className="dataset-column__row">
               <input
-                placeholder="Column"
+                placeholder="Nombre columna"
                 value={field.name}
                 onChange={(event) => updateField(field.id, { name: event.target.value })}
                 className="field"
@@ -263,7 +235,7 @@ export function DatasetUploader({ dataset, onCommit }: Props) {
                   checked={field.required}
                   onChange={(event) => updateField(field.id, { required: event.target.checked })}
                 />
-                <span>Req.</span>
+                <span>Oblig.</span>
               </label>
               <button type="button" className="chip" onClick={() => removeField(field.id)} disabled={fields.length === 1}>
                 ✕
@@ -281,32 +253,6 @@ export function DatasetUploader({ dataset, onCommit }: Props) {
           Guardar esquema
         </button>
       </div>
-
-      {sampleRows.length > 0 && (
-        <div className="dataset-builder__preview">
-          <p className="eyebrow">Vista previa de datos ({sampleRows.length} filas)</p>
-          <div className="preview-table-wrapper">
-            <table className="preview-table">
-              <thead>
-                <tr>
-                  {fields.map((f) => (
-                    <th key={f.id}>{f.name || 'Column'}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sampleRows.slice(0, 5).map((row, i) => (
-                  <tr key={i}>
-                    {fields.map((f) => (
-                      <td key={f.id}>{row[f.name] ?? '-'}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -147,7 +147,7 @@ export function GenerationResultPanel({ result, projectId }: Props) {
           {downloading ? 'Descargando...' : 'Descargar bundle (.zip)'}
         </button>
         <p className="muted-text" style={{ fontSize: '0.8rem', marginTop: '0.4rem', textAlign: 'center' }}>
-          Código FastAPI listo para desplegar con Docker o VPS
+          Código {result.stack === 'fastapi' ? 'FastAPI' : result.stack === 'express' ? 'Express' : 'NestJS'} listo para desplegar con Docker o VPS
         </p>
       </div>
 
