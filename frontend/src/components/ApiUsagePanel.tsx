@@ -169,14 +169,26 @@ export function ApiUsagePanel() {
         num: 6,
         title: 'Genera la API',
         desc: 'Pulsa el botón azul "Actualizar API" para generar sandbox URL, documentación Redoc y enlace compartible.',
+        action: { label: 'Ver Sandbox y Endpoints', tab: 'codigo' as UsageTab }
       },
       {
         num: 7,
         title: 'Sincroniza y descarga',
         desc: 'En "Payload & Entrega", sincroniza con el backend y descarga el bundle.zip con código listo para desplegar.',
+        action: { label: 'Ver guía de Despliegue', tab: 'desplegar' as UsageTab }
       },
       {
         num: 8,
+        title: 'Colaboración y Share Links',
+        desc: 'Genera un "Share Link" para que clientes o compañeros puedan probar la API y ver la documentación sin necesidad de tener cuenta.',
+      },
+      {
+        num: 9,
+        title: 'Seguridad y Administración',
+        desc: 'Configura las credenciales del builder y protege tus proyectos. Sincroniza con PostgreSQL para persistencia real.',
+      },
+      {
+        num: 10,
         title: 'Despliega',
         desc: 'Descomprime el bundle y despliega:',
         code: 'docker build -t api-usuarios-banco .\ndocker run -p 8000:8000 api-usuarios-banco',
@@ -189,7 +201,7 @@ export function ApiUsagePanel() {
           <svg viewBox="0 0 24 24" fill="currentColor" className="tutorial__header-icon"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
           <div>
             <h2 className="tutorial__title">Guía paso a paso</h2>
-            <p className="tutorial__subtitle">Crea tu primera API en 8 pasos. Ejemplo práctico: API de usuarios de un banco.</p>
+            <p className="tutorial__subtitle">Crea tu primera API en 10 pasos. Ejemplo práctico: API de usuarios de un banco.</p>
           </div>
         </div>
 
@@ -200,6 +212,15 @@ export function ApiUsagePanel() {
               <div className="tutorial__step-content">
                 <h3>{step.title}</h3>
                 <p className="muted-text">{step.desc}</p>
+
+                {step.action && (
+                  <button 
+                    className="tutorial__step-action-btn"
+                    onClick={() => setActiveTab(step.action.tab)}
+                  >
+                    {step.action.label} →
+                  </button>
+                )}
 
                 {/* Inline code block */}
                 {step.code && (
@@ -316,44 +337,6 @@ export function ApiUsagePanel() {
     </div>
   )
 
-  /* ---- TAB: Guía ---- */
-  const renderGuia = () => (
-    <div className="api-usage__guia">
-      <div className="api-usage__guia-step">
-        <span className="api-usage__guia-number">1</span>
-        <div>
-          <h3>Define tu dataset</h3>
-          <p className="muted-text">Ve al <strong>Editor</strong> → pestaña <strong>"Dataset & Vista previa"</strong>. Carga un CSV/Excel o añade campos manualmente.</p>
-        </div>
-      </div>
-      <div className="api-usage__guia-step">
-        <span className="api-usage__guia-number">2</span>
-        <div>
-          <h3>Diseña los endpoints</h3>
-          <p className="muted-text">En <strong>"Endpoints & Simulador"</strong> añade las rutas REST. Pulsa <strong>"Probar API local"</strong> — funciona con datos de ejemplo incluso sin backend.</p>
-        </div>
-      </div>
-      <div className="api-usage__guia-step">
-        <span className="api-usage__guia-number">3</span>
-        <div>
-          <h3>Genera y comparte</h3>
-          <p className="muted-text">Pulsa <strong>"Actualizar API"</strong> para ver la Sandbox URL, documentación Redoc y enlaces compartibles. Descarga el bundle para desplegar en producción.</p>
-        </div>
-      </div>
-      <div className="api-usage__guia-example">
-        <h4>Ejemplo: API de productos</h4>
-        <p>Dataset: <code>sku</code>, <code>name</code>, <code>category</code>, <code>stock</code>, <code>price</code></p>
-        <p>Endpoints:</p>
-        <ul>
-          <li><code>GET /products</code> → lista todos</li>
-          <li><code>POST /products</code> → crea un producto</li>
-          <li><code>{`PUT /products/:id`}</code> → actualiza</li>
-        </ul>
-        <p>Resultado: tu API responde con JSON real que puedes consumir desde cualquier cliente HTTP.</p>
-      </div>
-    </div>
-  )
-
   /* ---- TAB: Desplegar ---- */
   const renderDesplegar = () => (
     <div>
@@ -391,6 +374,36 @@ volumes: {pgdata:}`}</code></pre>
         </div>
         <div className="api-usage__deploy-card">
           <div className="api-usage__deploy-header">
+            <svg className="api-usage__deploy-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            <h3>Reverse Proxy (Nginx)</h3>
+          </div>
+          <p className="muted-text">Configuración recomendada para producción con SSL.</p>
+          <pre className="api-usage__deploy-code"><code>{`server {
+    listen 80;
+    server_name api.tu-dominio.com;
+    location / {
+        proxy_pass http://localhost:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}`}</code></pre>
+        </div>
+        <div className="api-usage__deploy-card">
+          <div className="api-usage__deploy-header">
+            <svg className="api-usage__deploy-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+            <h3>CI/CD (GitHub Actions)</h3>
+          </div>
+          <p className="muted-text">Automatiza el despliegue al hacer push.</p>
+          <pre className="api-usage__deploy-code"><code>{`jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy
+        run: ssh user@host "cd /app && docker compose up -d --build"`}</code></pre>
+        </div>
+        <div className="api-usage__deploy-card">
+          <div className="api-usage__deploy-header">
             <svg className="api-usage__deploy-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/></svg>
             <h3>VPS / Cloud</h3>
           </div>
@@ -422,14 +435,13 @@ fly launch && fly deploy`}</code></pre>
         </div>
       </div>
       <div className="api-usage__deploy-checklist">
-        <h3>Checklist antes de desplegar</h3>
+        <h3>🚀 Checklist de Producción</h3>
         <ul className="api-usage__checklist">
-          <li><span className="api-usage__checkmark">✓</span> Genera el bundle desde <strong>"API generada"</strong></li>
-          <li><span className="api-usage__checkmark">✓</span> Configura env vars: <code>DATABASE_URL</code>, <code>SECRET_KEY</code>, <code>DEBUG=false</code></li>
-          <li><span className="api-usage__checkmark">✓</span> Usa <strong>HTTPS</strong> (Let's Encrypt / Cloudflare)</li>
-          <li><span className="api-usage__checkmark">✓</span> Añade autenticación (JWT, API keys, OAuth)</li>
-          <li><span className="api-usage__checkmark">✓</span> Configura rate limiting y CORS</li>
-          <li><span className="api-usage__checkmark">✓</span> Usa <strong>gunicorn</strong> en producción</li>
+          <li><span className="api-usage__checkmark">✓</span> <strong>Base de Datos:</strong> Usa PostgreSQL persistente en lugar de SQLite.</li>
+          <li><span className="api-usage__checkmark">✓</span> <strong>Seguridad:</strong> Cambia <code>SECRET_KEY</code> y desactiva <code>DEBUG</code>.</li>
+          <li><span className="api-usage__checkmark">✓</span> <strong>HTTPS:</strong> Obligatorio. Usa Certbot (Let's Encrypt) o Cloudflare.</li>
+          <li><span className="api-usage__checkmark">✓</span> <strong>Gunicorn:</strong> Usa un servidor WSGI/ASGI robusto con múltiples workers.</li>
+          <li><span className="api-usage__checkmark">✓</span> <strong>CORS:</strong> Restringe <code>ALLOW_ORIGINS</code> a tus dominios conocidos.</li>
         </ul>
       </div>
     </div>
@@ -438,7 +450,6 @@ fly launch && fly deploy`}</code></pre>
   const tabItems: { id: UsageTab; label: string; icon: React.ReactNode }[] = [
     { id: 'tutorial', label: 'Tutorial', icon: <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg> },
     { id: 'codigo', label: 'Código', icon: <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0L19.2 12l-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg> },
-    { id: 'guia', label: 'Guía paso a paso', icon: <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z"/></svg> },
     { id: 'desplegar', label: 'Desplegar', icon: <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M5 4h2l5 7V5h6v6h-6.2l-5-7H5v14h6v2H5c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm14 8h-6l5 7h-5v2h7c1.1 0 2-.9 2-2v-6c0-1.1-.9-2-2-2h-1z"/></svg> },
   ]
 
@@ -483,7 +494,6 @@ fly launch && fly deploy`}</code></pre>
       <div className="api-usage__tab-content">
         {activeTab === 'tutorial' && renderTutorial()}
         {activeTab === 'codigo' && renderCodigo()}
-        {activeTab === 'guia' && renderGuia()}
         {activeTab === 'desplegar' && renderDesplegar()}
       </div>
     </div>

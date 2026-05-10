@@ -18,24 +18,39 @@ ADMIN_CONFIG_PATH = Path(__file__).resolve().parent / "data" / "admin_config.jso
 
 
 def _get_database_url() -> str:
-    """Get database URL from env var or admin config file."""
+    """Get database URL from env var or environment-specific admin config."""
     # Environment variable takes priority
     env_url = os.getenv("APIMAKER_DATABASE_URL")
     if env_url:
         return env_url
+
+    default_sqlite = f"sqlite:///{Path(__file__).resolve().parent / 'data' / 'apimaker.db'}"
 
     # Check admin config file
     if ADMIN_CONFIG_PATH.exists():
         try:
             with open(ADMIN_CONFIG_PATH, "r") as f:
                 config = json.load(f)
-            if config.get("database_type") == "postgresql" and config.get("postgres_url"):
-                return config["postgres_url"]
+            
+            # Determine which environment config to use
+            env = settings.environment or "development"
+            key = "prod" if env == "production" else "dev"
+            
+            # Handle legacy format if not yet migrated
+            if key not in config and "database_type" in config:
+                if config.get("database_type") == "postgresql" and config.get("postgres_url"):
+                    return config["postgres_url"]
+                return default_sqlite
+
+            env_config = config.get(key, {})
+            if env_config.get("database_type") == "postgresql" and env_config.get("postgres_url"):
+                return env_config["postgres_url"]
         except (json.JSONDecodeError, IOError):
             pass
 
     # Default to SQLite
-    return f"sqlite:///{Path(__file__).resolve().parent / 'data' / 'apimaker.db'}"
+    return default_sqlite
+
 
 
 DATABASE_URL = _get_database_url()

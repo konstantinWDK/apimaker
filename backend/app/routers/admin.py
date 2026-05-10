@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlmodel import Session, create_engine, text
+from sqlmodel import Session, create_engine, text, select
 
 from ..config import get_settings
 from ..db import get_session, get_database_info
@@ -21,12 +21,17 @@ CONFIG_PATH = Path(__file__).resolve().parent.parent / "data" / "admin_config.js
 
 class DatabaseConfig(BaseModel):
     database_type: str = "sqlite"  # "sqlite" or "postgresql"
-    postgres_url: str | None = None  # Full PostgreSQL connection URL
+    postgres_url: str | None = None
     host: str | None = None
     port: int | None = 5432
     username: str | None = None
     password: str | None = None
     database: str | None = None
+
+
+class UpdateConfigRequest(BaseModel):
+    environment: str  # "dev" or "prod"
+    config: DatabaseConfig
 
 
 class TestDbRequest(BaseModel):
@@ -46,20 +51,44 @@ class TestDbResponse(BaseModel):
 
 
 class AdminConfigResponse(BaseModel):
-    database_type: str
-    current_database_url: str
+    dev: DatabaseConfig
+    prod: DatabaseConfig
     current_database_info: dict
-    postgres_configured: bool
-    artifacts_dir: str
-    environment: str
+    environment: str  # active environment from settings
 
 
 def _read_admin_config() -> dict:
-    """Read admin configuration from file."""
+    """Read admin configuration from file with migration support."""
     if CONFIG_PATH.exists():
-        with open(CONFIG_PATH, "r") as f:
-            return json.load(f)
-    return {}
+        try:
+            with open(CONFIG_PATH, "r") as f:
+                data = json.load(f)
+            
+            # Migration: if old format, move to dev
+            if "dev" not in data and "prod" not in data:
+                old_config = {
+                    "database_type": data.get("database_type", "sqlite"),
+                    "postgres_url": data.get("postgres_url"),
+                    "host": data.get("host"),
+                    "port": data.get("port", 5432),
+                    "username": data.get("username"),
+                    "password": data.get("password"),
+                    "database": data.get("database"),
+                }
+                return {
+                    "dev": old_config,
+                    "prod": {**old_config, "database_type": "postgresql"} # Default prod to PG
+                }
+            return data
+        except Exception:
+            return {}
+    
+    # Default initial config
+    default_cfg = {"database_type": "sqlite", "port": 5432}
+    return {
+        "dev": default_cfg,
+        "prod": {**default_cfg, "database_type": "postgresql"}
+    }
 
 
 def _write_admin_config(config: dict) -> None:
@@ -74,59 +103,63 @@ def get_admin_config(
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(require_admin),
 ) -> AdminConfigResponse:
-    """Get current admin configuration."""
+    """Get current admin configuration for both environments."""
     settings = get_settings()
     admin_config = _read_admin_config()
 
-    db_type = admin_config.get("database_type", "sqlite")
-    postgres_url = admin_config.get("postgres_url", "")
-
     return AdminConfigResponse(
-        database_type=db_type,
-        current_database_url=settings.__dict__.get("database_url", "sqlite (default)"),
+        dev=DatabaseConfig(**admin_config.get("dev", {})),
+        prod=DatabaseConfig(**admin_config.get("prod", {})),
         current_database_info=get_database_info(),
-        postgres_configured=bool(postgres_url),
-        artifacts_dir=settings.artifacts_dir,
         environment=settings.environment,
     )
 
 
 @router.post("/config", status_code=status.HTTP_200_OK)
 def update_admin_config(
-    payload: DatabaseConfig,
+    payload: UpdateConfigRequest,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(require_admin),
 ) -> dict:
-    """Update admin configuration (database settings)."""
+    """Update admin configuration for a specific environment."""
     admin_config = _read_admin_config()
+    
+    env = payload.environment
+    if env not in ["dev", "prod"]:
+        raise HTTPException(status_code=400, detail="Invalid environment. Use 'dev' or 'prod'.")
 
-    if payload.database_type == "postgresql":
-        if payload.postgres_url:
-            admin_config["postgres_url"] = payload.postgres_url
-        elif payload.host and payload.username and payload.database:
-            # Build connection URL
-            password = payload.password or ""
-            admin_config["postgres_url"] = (
-                f"postgresql+psycopg2://{payload.username}:{password}"
-                f"@{payload.host}:{payload.port or 5432}/{payload.database}"
+    cfg = payload.config
+    env_data = {
+        "database_type": cfg.database_type,
+        "postgres_url": cfg.postgres_url,
+        "host": cfg.host,
+        "port": cfg.port,
+        "username": cfg.username,
+        "password": cfg.password,
+        "database": cfg.database,
+    }
+
+    if cfg.database_type == "postgresql" and not cfg.postgres_url:
+        if cfg.host and cfg.username and cfg.database:
+            password = cfg.password or ""
+            env_data["postgres_url"] = (
+                f"postgresql+psycopg2://{cfg.username}:{password}"
+                f"@{cfg.host}:{cfg.port or 5432}/{cfg.database}"
             )
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Provide either postgres_url or host/username/database",
+                detail="Provide either postgres_url or host/username/database for PostgreSQL",
             )
-        admin_config["database_type"] = "postgresql"
-    else:
-        # Switch back to SQLite
-        admin_config["database_type"] = "sqlite"
-        admin_config["postgres_url"] = None
 
+    admin_config[env] = env_data
     _write_admin_config(admin_config)
 
     return {
-        "message": "Configuración guardada. Reinicia el backend para aplicar los cambios.",
-        "database_type": admin_config["database_type"],
+        "message": f"Configuración de {env} guardada. Reinicia el backend para aplicar los cambios si este es el entorno activo.",
+        "environment": env,
     }
+
 
 
 @router.post("/config/test-db", response_model=TestDbResponse)
@@ -222,11 +255,11 @@ def sync_databases(
     with open(CONFIG_PATH, "r") as f:
         config = json.load(f)
 
-    postgres_url = config.get("postgres_url")
+    postgres_url = config.get("prod", {}).get("postgres_url")
     if not postgres_url:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="PostgreSQL no configurada. Configura la conexión primero.",
+            detail="PostgreSQL de producción no configurada. Configúrala primero.",
         )
 
     counts = {
