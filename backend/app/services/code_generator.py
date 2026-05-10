@@ -244,9 +244,16 @@ def run_generation(
     # Get project data
     data = project_service.get_project_with_data(session, project_id)
     project = data["project"]
-    dataset = data["dataset"]
-    fields = data["fields"]
+    datasets_with_fields = data["datasets"]
     endpoints = data["endpoints"]
+
+    # Use first dataset for the bundle (main dataset)
+    dataset = None
+    fields = []
+    if datasets_with_fields:
+        first_entry = datasets_with_fields[0]
+        dataset = first_entry["dataset"]
+        fields = first_entry["fields"]
 
     # If no endpoints defined, create a default one
     if not endpoints:
@@ -278,7 +285,7 @@ def run_generation(
             endpoints,
         )
 
-        # Save to artifacts (use slug for folder name to remove UUID traces)
+        # Save to artifacts (use slug for folder name)
         settings = get_settings()
         folder_name = project.slug or str(project.id)
         artifacts_root = Path(settings.artifacts_dir) / folder_name
@@ -287,16 +294,33 @@ def run_generation(
         bundle_path = artifacts_root / f"{project.target_stack}-bundle.zip"
         bundle_path.write_bytes(zip_bytes)
 
-        # Save OpenAPI spec
+        # Build datasets list for OpenAPI doc
+        import json
         from ..openapi_builder import build_openapi_document
         from ..models import Project as PydanticProject
+
+        pydantic_datasets = []
+        for entry in datasets_with_fields:
+            ds = entry["dataset"]
+            ds_fields = entry["fields"]
+            try:
+                sample_rows = json.loads(ds.sample_rows) if ds.sample_rows else []
+            except Exception:
+                sample_rows = []
+            pydantic_datasets.append({
+                "id": ds.id,
+                "name": ds.name,
+                "source_type": ds.source_type,
+                "fields": [{"name": f.name, "type": f.field_type, "required": f.required, "description": f.description} for f in ds_fields],
+                "sample_rows": sample_rows,
+            })
 
         pydantic_project = PydanticProject(
             id=project.id,
             name=project.name,
             description=project.description,
             target_stack=project.target_stack,
-            dataset=None,
+            datasets=pydantic_datasets,
             endpoints=[
                 {
                     "id": ep.id,
@@ -304,7 +328,8 @@ def run_generation(
                     "method": ep.method,
                     "path": ep.path,
                     "summary": ep.summary,
-                    "operation_type": ep.operation_type or "custom"
+                    "operation_type": ep.operation_type or "custom",
+                    "target_dataset_id": ep.target_dataset_id,
                 }
                 for ep in endpoints
             ],
@@ -312,10 +337,10 @@ def run_generation(
             created_at=project.created_at,
             updated_at=project.updated_at,
         )
-        import json
         openapi_doc = build_openapi_document(pydantic_project)
         openapi_path = artifacts_root / "openapi.json"
         openapi_path.write_text(json.dumps(openapi_doc, indent=2, ensure_ascii=False))
+
     except Exception:
         project_service.mark_status(session, project_id, "draft")
         raise

@@ -12,7 +12,7 @@ export function PayloadPreview({ project }: Props) {
     <div className="preview-panel">
       <div className="preview-block">
         <p className="eyebrow">Payload estimado</p>
-        <pre className="preview-json">{JSON.stringify(payload, null, 2)}</pre>
+        <pre className="preview-json">{payload}</pre>
       </div>
     </div>
   )
