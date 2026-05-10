@@ -156,20 +156,22 @@ export const fetchRemoteProjects = async (): Promise<ProjectDraft[]> => {
   return data.map((item) => ({
     id: item.id,
     remoteId: item.id,
+    slug: item.slug,
     name: item.name,
-    description: item.description ?? undefined,
+    description: item.description,
+    authMethod: (item.auth_method as any) || 'none',
     targetStack: item.target_stack,
     dataset: item.dataset
       ? {
           id: item.dataset.id,
           name: item.dataset.name,
           sourceType: item.dataset.source_type,
-          fields: item.dataset.fields ?? [],
-          sampleRows: [],
+          fields: item.dataset.fields,
+          sampleRows: item.dataset.sampleRows || [],
         }
       : undefined,
-    endpoints: item.endpoints ?? [],
-    updatedAt: item.updated_at ?? undefined,
+    endpoints: item.endpoints || [],
+    updatedAt: item.updated_at,
   }))
 }
 
@@ -190,14 +192,24 @@ export const createRemoteProject = async (
   })
   const data = await handleResponse(response)
   return {
-    id: data.id,
-    remoteId: data.id,
-    name: data.name,
-    description: data.description ?? undefined,
-    targetStack: data.target_stack,
-    dataset: undefined,
-    endpoints: [],
-    updatedAt: data.updated_at,
+    id: data.project.id,
+    remoteId: data.project.slug || data.project.id,
+    slug: data.project.slug,
+    name: data.project.name,
+    description: data.project.description,
+    authMethod: (data.project.auth_method as any) || 'none',
+    targetStack: data.project.target_stack,
+    dataset: data.dataset
+      ? {
+          id: data.dataset.id,
+          name: data.dataset.name,
+          sourceType: data.dataset.source_type,
+          fields: data.fields,
+          sampleRows: [],
+        }
+      : undefined,
+    endpoints: data.endpoints || [],
+    updatedAt: data.project.updated_at,
   }
 }
 
@@ -222,22 +234,24 @@ export const fetchRemoteProject = async (projectId: string): Promise<ProjectDraf
   const response = await fetch(`${baseUrl}/projects/${projectId}`)
   const data = await handleResponse(response)
   return {
-    id: data.id,
-    remoteId: data.id,
-    name: data.name,
-    description: data.description ?? undefined,
-    targetStack: data.target_stack,
+    id: data.project.id,
+    remoteId: data.project.slug || data.project.id,
+    slug: data.project.slug,
+    name: data.project.name,
+    description: data.project.description,
+    authMethod: (data.project.auth_method as any) || 'none',
+    targetStack: data.project.target_stack,
     dataset: data.dataset
       ? {
           id: data.dataset.id,
           name: data.dataset.name,
           sourceType: data.dataset.source_type,
-          fields: data.dataset.fields ?? [],
+          fields: data.fields,
           sampleRows: [],
         }
       : undefined,
-    endpoints: data.endpoints ?? [],
-    updatedAt: data.updated_at ?? undefined,
+    endpoints: data.endpoints || [],
+    updatedAt: data.project.updated_at,
   }
 }
 

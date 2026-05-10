@@ -71,68 +71,94 @@ async def mock_get(
     session: Session = Depends(get_session),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, le=1000),
-) -> list[dict]:
+) -> Any:
     """Mock GET — list or get by ID."""
-    resolved_id = _resolve_project_id(session, project_id)
-    store = _mock_data.get(resolved_id)
-    if store is None:
-        # Check if project exists but mock not started
-        raise HTTPException(status_code=404, detail="Mock data not initialized. Start mock server from the dashboard.")
+    try:
+        resolved_id = _resolve_project_id(session, project_id)
+        store = _mock_data.get(resolved_id)
+        if store is None:
+            raise HTTPException(status_code=404, detail="Mock data not initialized. Start mock server from the dashboard.")
 
-    # Check if this is a list or detail request
-    endpoints = session.exec(
-        select(Endpoint).where(Endpoint.project_id == resolved_id)
-    ).all()
+        # Check if this is a list or detail request
+        endpoints = session.exec(
+            select(Endpoint).where(Endpoint.project_id == resolved_id)
+        ).all()
 
-    # Match the path to an endpoint
-    full_path = f"/{path.strip('/')}"
-    matched_ep = None
-    param_value = None
-    
-    print(f"[MockServer] Matching GET {full_path}")
+        # Match the path to an endpoint
+        full_path = f"/{path.strip('/')}"
+        matched_ep = None
+        param_value = None
+        
+        print(f"[MockServer] Matching GET {full_path}")
 
-    # 1. Exact path match first
-    for ep in endpoints:
-        if ep.method.upper() != "GET":
-            continue
-        if f"/{ep.path.strip('/')}" == full_path:
-            matched_ep = ep
-            break
-
-    # 2. Pattern match if no exact match (e.g. /pokemon/25)
-    if not matched_ep:
+        # 1. Exact path match first
         for ep in endpoints:
             if ep.method.upper() != "GET":
                 continue
-            ep_path = f"/{ep.path.strip('/')}"
-            if "{" in ep_path and "}" in ep_path:
-                import re
-                pattern = re.sub(r"\{[^}]+\}", r"([^/]+)", ep_path)
-                match = re.fullmatch(pattern, full_path)
-                if match:
-                    param_value = match.group(1)
-                    matched_ep = ep
-                    break
+            if f"/{ep.path.strip('/')}" == full_path:
+                matched_ep = ep
+                break
 
-    if not matched_ep:
-        raise HTTPException(
-            status_code=404, 
-            detail=f"No matching endpoint definition for GET {full_path}."
-        )
+        # 2. Pattern match if no exact match (e.g. /pokemon/25)
+        if not matched_ep:
+            import re
+            for ep in endpoints:
+                if ep.method.upper() != "GET":
+                    continue
+                ep_path = f"/{ep.path.strip('/')}"
+                if "{" in ep_path and "}" in ep_path:
+                    # Escape path characters except the placeholder
+                    # We convert {param} to a regex group
+                    pattern = re.sub(r"\{[^}]+\}", r"([^/]+)", ep_path)
+                    # We must escape the rest of the path
+                    # This is tricky, let's do a simpler match for now or use a better regex
+                    try:
+                        match = re.fullmatch(pattern, full_path)
+                        if match:
+                            param_value = match.group(1)
+                            matched_ep = ep
+                            break
+                    except Exception as re_err:
+                        print(f"[MockServer] Regex error: {re_err}")
 
-    # Use operation_type for logic
-    op_type = getattr(matched_ep, "operation_type", "custom")
+        if not matched_ep:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"No matching endpoint definition for GET {full_path}."
+            )
 
-    if op_type == "get" or param_value:
-        # Get by ID
-        target_id = param_value or path.split("/")[-1]
-        for item in store:
-            if str(item.get("_id")) == str(target_id) or str(item.get("id")) == str(target_id) or str(item.get("pokedex_id")) == str(target_id):
-                return item
-        raise HTTPException(status_code=404, detail="Item not found")
+        # Use operation_type for logic
+        op_type = getattr(matched_ep, "operation_type", "custom")
 
-    # Default to list
-    return store[skip:skip + limit]
+        if op_type == "get" or param_value:
+            # Get by ID or any matching field
+            target_id = param_value or path.split("/")[-1]
+            print(f"[MockServer] Searching for record matching: {target_id} in store of {len(store)} items")
+            
+            # 1. Try standard ID fields first
+            for item in store:
+                if not isinstance(item, dict): continue
+                if str(item.get("_id")) == str(target_id) or str(item.get("id")) == str(target_id):
+                    return item
+            
+            # 2. Try matching any string field (e.g. name, slug, pokedex_id)
+            for item in store:
+                if not isinstance(item, dict): continue
+                for key, val in item.items():
+                    if val is not None and str(val).lower() == str(target_id).lower():
+                        return item
+                        
+            print(f"[MockServer] No match found for {target_id}")
+            raise HTTPException(status_code=404, detail=f"No record found matching '{target_id}'")
+
+        # Default to list
+        return store[skip:skip + limit]
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Mock Server Error: {str(e)}")
 
 
 @router.post("/{path:path}")

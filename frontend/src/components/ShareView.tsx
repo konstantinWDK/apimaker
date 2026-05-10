@@ -30,21 +30,22 @@ interface ShareData {
   share_views: number
 }
 
-const toProjectDraft = (data: ShareData): ProjectDraft => {
+const toProjectDraft = (data: any): ProjectDraft => {
   const datasetFields = data.dataset?.fields ?? []
   return {
     id: data.project.id,
-    remoteId: data.project.slug || data.project.id,
-    slug: data.project.slug,
+    remoteId: (data.project as any).slug || data.project.id,
+    slug: (data.project as any).slug,
     name: data.project.name,
     description: data.project.description ?? undefined,
+    authMethod: 'none',
     targetStack: data.project.target_stack as 'fastapi' | 'express' | 'nest',
     dataset: data.dataset
       ? {
           id: data.dataset.id,
           name: data.dataset.name,
           sourceType: data.dataset.source_type as 'upload' | 'manual',
-          fields: datasetFields.map((f) => ({
+          fields: datasetFields.map((f: any) => ({
             id: f.name,
             name: f.name,
             type: f.type as 'string' | 'integer' | 'float' | 'boolean' | 'datetime',
@@ -53,7 +54,7 @@ const toProjectDraft = (data: ShareData): ProjectDraft => {
           sampleRows: [],
         }
       : undefined,
-    endpoints: data.endpoints.map((ep) => ({
+    endpoints: data.endpoints.map((ep: any) => ({
       id: ep.id,
       name: ep.name,
       method: ep.method as 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',

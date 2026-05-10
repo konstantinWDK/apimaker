@@ -135,11 +135,12 @@ export function DatabaseConfigPanel() {
   }
 
   const handleSync = async () => {
-    if (!confirm('¿Sincronizar todos los datos de SQLite a PostgreSQL? Los registros existentes se omitirán.')) return
+    const targetLabel = activeEnv === 'dev' ? 'Desarrollo' : 'Producción'
+    if (!confirm(`¿Sincronizar todos los datos de SQLite a PostgreSQL (${targetLabel})? Los registros existentes se omitirán.`)) return
     setSyncing(true)
     setSyncResult(null)
     try {
-      const res = await fetch(`${backendBaseUrl}/admin/sync`, {
+      const res = await fetch(`${backendBaseUrl}/admin/sync?target_env=${activeEnv}`, {
         method: 'POST',
         headers: authHeaders,
       })
@@ -340,29 +341,30 @@ export function DatabaseConfigPanel() {
           </div>
         )}
 
-        {/* Sync Section - Only in Dev when Prod is configured */}
-        {activeEnv === 'dev' && config.prod.postgres_url && (
+        {/* Sync Section - Show if current target is PG and not the active one */}
+        {currentConfig.database_type === 'postgresql' && (currentInfo?.type === 'sqlite' || activeEnv !== (systemEnv === 'production' ? 'prod' : 'dev')) && (
           <div className="sync-section">
             <div className="sync-header">
-              <h3>Sincronización de Datos</h3>
-              <p>Pasa tus datos locales (SQLite) a la base de datos de Producción.</p>
+              <h3>Migración de Datos</h3>
+              <p>Transfiere los datos de la base de datos activa ({currentInfo?.type === 'sqlite' ? 'SQLite' : 'PostgreSQL'}) al entorno de {activeEnv === 'dev' ? 'Desarrollo' : 'Producción'}.</p>
             </div>
             <div className="sync-visual">
-              <div className="badge sqlite">SQLite Local</div>
+              <div className="badge sqlite">{currentInfo?.type === 'sqlite' ? 'SQLite Actual' : 'Postgres Actual'}</div>
               <div className="arrow">→</div>
-              <div className="badge pg">PostgreSQL Producción</div>
+              <div className="badge pg">PostgreSQL {activeEnv === 'dev' ? 'Dev' : 'Prod'}</div>
             </div>
             <button className="btn-sync" onClick={handleSync} disabled={syncing}>
-              {syncing ? '⏳ Sincronizando...' : '🔄 Iniciar Sincronización Completa'}
+              {syncing ? '⏳ Sincronizando...' : `🔄 Sincronizar desde ${currentInfo?.type === 'sqlite' ? 'SQLite' : 'Postgres'} a ${activeEnv === 'dev' ? 'Desarrollo' : 'Producción'}`}
             </button>
+            <p className="sync-hint">Útil para desplegar cambios o migrar de motor sin perder tus proyectos.</p>
+          </div>
+        )}
             {syncResult && (
               <div className={`sync-result ${syncResult.success ? 'success' : 'error'}`}>
                 {syncResult.message}
               </div>
             )}
           </div>
-        )}
-      </div>
 
       <style>{`
         .db-config-panel-v2 {
@@ -547,6 +549,7 @@ export function DatabaseConfigPanel() {
         .sync-visual .sqlite { background: #dbeafe; color: #1e40af; }
         .sync-visual .pg { background: #dcfce7; color: #166534; }
         .btn-sync { width: 100%; padding: 0.6rem; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600; cursor: pointer; }
+.sync-hint { font-size: 0.72rem; color: #64748b; text-align: center; margin-top: 0.6rem; }
       `}</style>
     </div>
   )

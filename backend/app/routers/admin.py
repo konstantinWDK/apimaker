@@ -228,10 +228,11 @@ class SyncResponse(BaseModel):
 
 @router.post("/sync", status_code=status.HTTP_200_OK)
 def sync_databases(
+    target_env: str = "prod",
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(require_admin),
 ) -> SyncResponse:
-    """Sync all data from current DB (SQLite) to configured PostgreSQL database."""
+    """Sync all data from current DB (SQLite) to configured PostgreSQL database in target_env."""
     import json
     from datetime import datetime, timezone
     from uuid import uuid4
@@ -255,11 +256,14 @@ def sync_databases(
     with open(CONFIG_PATH, "r") as f:
         config = json.load(f)
 
-    postgres_url = config.get("prod", {}).get("postgres_url")
+    if target_env not in ["dev", "prod"]:
+        raise HTTPException(status_code=400, detail="Entorno de destino inválido. Usa 'dev' o 'prod'.")
+
+    postgres_url = config.get(target_env, {}).get("postgres_url")
     if not postgres_url:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="PostgreSQL de producción no configurada. Configúrala primero.",
+            detail=f"PostgreSQL de {target_env} no configurada. Configúrala primero.",
         )
 
     counts = {
@@ -371,6 +375,7 @@ def sync_databases(
                     method=ep.method,
                     path=ep.path,
                     summary=ep.summary,
+                    operation_type=ep.operation_type,
                 )
                 pg_session.add(pg_ep)
                 counts["endpoints_synced"] += 1
@@ -419,6 +424,6 @@ def sync_databases(
 
     return SyncResponse(
         success=True,
-        message=f"Sincronización completada: {total} registros transferidos a PostgreSQL ({counts['skipped']} ya existían)",
+        message=f"Sincronización completada: {total} registros transferidos a PostgreSQL ({target_env}) ({counts['skipped']} ya existían)",
         counts=counts,
     )

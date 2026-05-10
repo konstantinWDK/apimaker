@@ -54,7 +54,6 @@ export function App() {
     setGenerationResult,
     startMock,
     stopMock,
-    checkMockStatus,
     deleteProject,
     mockRunning,
     mockLoading,
@@ -72,7 +71,6 @@ export function App() {
   if (!isAuthenticated) {
     return <LoginScreen onLogin={login} error={authError ?? undefined} />
   }
-  const [loadingDemo, setLoadingDemo] = useState(false)
   const [result, setResult] = useState<GenerationResult | null>(null)
   const [generationWarning, setGenerationWarning] = useState<string | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
@@ -167,62 +165,24 @@ export function App() {
     }
   }
 
-  const handleLoadDemo = async () => {
-    setLoadingDemo(true)
-    setResult(null)
-    try {
-      const response = await fetch('/demo-project.json', { cache: 'no-store' })
-      if (!response.ok) throw new Error('No se pudo cargar el demo')
-      const demoData = (await response.json()) as ProjectDraft
-
-      // Regenerate IDs to ensure they are valid UUIDs for the backend
-      const endpointsWithValidIds = (demoData.endpoints || []).map(ep => ({
-        ...ep,
-        id: crypto.randomUUID()
-      }))
-
-      const nextProject = {
-        ...demoData,
-        id: crypto.randomUUID(),
-        slug: 'pokedex-demo',
-        endpoints: endpointsWithValidIds,
-        updatedAt: new Date().toISOString(),
-      }
-
-      // Load demo into local state immediately
-      replaceProject(nextProject)
-      
-      // Attempt background save to DB if authenticated
-      const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
-      if (token) {
-        saveProject()
-      } else {
-        refreshProjects()
-      }
-    } catch (error) {
-      console.error('Error loading demo:', error)
-      alert('Error al cargar la demo')
-    } finally {
-      setLoadingDemo(false)
-    }
-  }
-
   // Load projects from backend on mount
   useEffect(() => {
     refreshProjects()
   }, [])
 
-  // Check mock status when project changes
-  useEffect(() => {
-    if (project.id) {
-      checkMockStatus()
-    }
-  }, [project.id])
-
   useEffect(() => {
     setResult(project.lastGeneration ?? null)
     setGenerationWarning(null)
-  }, [project.id, project.lastGeneration])
+  }, [project.lastGeneration])
+
+  // Update browser title dynamically
+  useEffect(() => {
+    if (project.name) {
+      document.title = `${project.name} | API Maker Studio`
+    } else {
+      document.title = 'API Maker Studio'
+    }
+  }, [project.name])
 
   // Sync result endpoints when project endpoints change (keep "API generada" up to date)
   useEffect(() => {
@@ -349,8 +309,6 @@ export function App() {
             projects={projects}
             onSave={handleGenerate}
             onCreate={() => {
-              // We'll let replaceProject handle the defaults if we pass a partial, 
-              // but it's better to be explicit here to match createDefaultProject logic
               const id = crypto.randomUUID()
               const draft: ProjectDraft = {
                 id,
@@ -387,7 +345,7 @@ export function App() {
             onStartMock={startMock}
             onStopMock={stopMock}
             onSwitchProject={replaceProject}
-
+            onSync={saveProject}
             onDelete={deleteProject}
           />
         </div>
@@ -434,28 +392,13 @@ export function App() {
 
           {activePage === 'builder' && (
             <>
-              <header className="hero">
-                <div className="hero__content">
-                  <p className="hero__eyebrow">API Maker Studio</p>
-                  <h1 className="hero__title">Diseña y lanza APIs REST sin fricción</h1>
-                  <p className="hero__copy">Sube un CSV o Excel, ajusta el esquema y publica un sandbox listo para probar.</p>
-                </div>
-                <div className="hero__card">
-                  <div className="hero__card-header">
-                    <h2>Configura tu API</h2>
-                    <p>Define nombre, stack y contexto inicial.</p>
-                    {!project.endpoints.length && !project.dataset && (
-                      <button type="button" className="btn ghost btn-small" onClick={handleLoadDemo} disabled={loadingDemo}>
-                        {loadingDemo ? 'Cargando...' : 'Cargar demo'}
-                      </button>
-                    )}
-                    {project.dataset && project.dataset.fields.length > 0 && !project.endpoints.length && (
-                      <span className="muted-text" style={{ fontSize: '0.75rem' }}>Dataset configurado manualmente</span>
-                    )}
-                  </div>
+              <header className="app-header">
+                <div className="app-header__main">
+                  <h1 className="page-title">{project.name || 'Nuevo Proyecto'}</h1>
                   <ProjectForm project={project} onChange={updateProject} />
                 </div>
               </header>
+
 
               <div className="tabs">
                 {tabs.map((tab) => (

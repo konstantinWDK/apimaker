@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import type { ProjectDraft } from '../types/schemas'
+import { readBackendConfig } from '../lib/backendConfig'
 
 interface Props {
   project: ProjectDraft
@@ -7,6 +9,7 @@ interface Props {
   onCreate: () => void
   onSwitchProject: (project: ProjectDraft) => void
   onDelete: (id: string) => void
+  onSync: () => void
   mockRunning: boolean
   mockLoading: boolean
   mockError: string | null
@@ -21,7 +24,47 @@ const formatDate = (value?: string) => {
   return date.toLocaleDateString()
 }
 
-export function ProjectSidebar({ project, projects, onSave, onCreate, onSwitchProject, onDelete, mockRunning, mockLoading, mockError, onStartMock, onStopMock }: Props) {
+export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, onDelete, onSync, mockRunning, mockLoading, mockError, onStartMock, onStopMock }: Props) {
+  const [backendStatus, setBackendStatus] = useState<'online' | 'offline' | 'checking'>('checking')
+  const [dbStatus, setDbStatus] = useState<{ dev: string; prod: string; current: string } | null>(null)
+
+  useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const config = readBackendConfig()
+        const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
+        
+        // Check general health
+        const healthRes = await fetch(`${config.baseUrl?.replace(/\/$/, '')}/health`)
+        if (healthRes.ok) {
+          setBackendStatus('online')
+        } else {
+          setBackendStatus('offline')
+        }
+
+        // Check admin config for DBs
+        if (token) {
+          const adminRes = await fetch(`${config.baseUrl?.replace(/\/$/, '')}/admin/config`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+          if (adminRes.ok) {
+            const adminData = await adminRes.json()
+            setDbStatus({
+              dev: adminData.dev.database_type,
+              prod: adminData.prod.database_type,
+              current: adminData.environment
+            })
+          }
+        }
+      } catch (e) {
+        setBackendStatus('offline')
+      }
+    }
+    checkStatus()
+    const interval = setInterval(checkStatus, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
   const datasetName = project.dataset?.name ?? 'Sin dataset'
   const fields = project.dataset?.fields.length ?? 0
   const rows = project.dataset?.sampleRows?.length ?? 0
@@ -29,9 +72,10 @@ export function ProjectSidebar({ project, projects, onSave, onCreate, onSwitchPr
 
   return (
     <aside className="sidebar">
-      <div className="sidebar__card">
-        <p className="sidebar__title">{project.name}</p>
+      <div className="sidebar__project-header">
+        <h1 className="sidebar__h1-title">{project.name || 'Nuevo Proyecto'}</h1>
         <p className="sidebar__subtitle">Stack: {project.targetStack}</p>
+        
         <dl className="sidebar__stats">
           <div>
             <dt>Dataset</dt>
@@ -52,41 +96,102 @@ export function ProjectSidebar({ project, projects, onSave, onCreate, onSwitchPr
         </dl>
       </div>
 
-      {/* Mock server control */}
-      <div className="sidebar__card">
-        <p className="sidebar__title" style={{ fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-          Mock server
-        </p>
-        <div className="sidebar__mock-bar">
-          <span className={`sidebar__mock-dot ${mockRunning ? 'on' : 'off'}`} />
-          <span className="sidebar__mock-label">
-            {mockRunning ? 'Activo' : 'Inactivo'}
-          </span>
-        </div>
-        <div className="sidebar__mock-actions">
-          {!mockRunning ? (
-            <button
-              type="button"
-              className="btn ghost btn-small btn-full"
-              onClick={onStartMock}
-              disabled={mockLoading}
-            >
-              {mockLoading ? 'Iniciando...' : 'Iniciar mock'}
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="btn ghost btn-small btn-full"
-              onClick={onStopMock}
-              disabled={mockLoading}
-            >
-              {mockLoading ? 'Parando...' : 'Parar mock'}
-            </button>
+      {/* Monitoring & Status */}
+      <div className="sidebar__section">
+        <p className="sidebar__section-title">Status</p>
+
+        <div className="sidebar__status-card">
+          <div className="sidebar__status-indicator">
+            <span className={`sidebar__mock-dot ${backendStatus === 'online' ? 'on' : (backendStatus === 'offline' ? 'off' : 'checking')}`} />
+            <span className="sidebar__status-text">
+              {backendStatus === 'online' ? 'Backend Online' : (backendStatus === 'offline' ? 'Backend Offline' : 'Comprobando...')}
+            </span>
+          </div>
+          
+          {dbStatus && (
+            <div className="sidebar__db-status-group">
+              <div className="sidebar__status-indicator">
+                <span className={`sidebar__mock-dot ${dbStatus.current === 'development' && dbStatus.dev === 'sqlite' ? 'on' : 'idle'}`} />
+                <span className="sidebar__status-text">
+                  SQLite <span className="sidebar__status-tag">dev</span>
+                </span>
+              </div>
+              <div className="sidebar__status-indicator">
+                <span className={`sidebar__mock-dot ${dbStatus.current === 'development' && dbStatus.dev === 'postgresql' ? 'on' : 'idle'}`} />
+                <span className="sidebar__status-text">
+                  Postgres <span className="sidebar__status-tag">dev</span>
+                </span>
+              </div>
+              <div className="sidebar__status-indicator">
+                <span className={`sidebar__mock-dot ${dbStatus.current === 'production' ? 'on' : 'idle'}`} />
+                <span className="sidebar__status-text">
+                  Postgres <span className="sidebar__status-tag">prod</span>
+                </span>
+              </div>
+            </div>
           )}
         </div>
-        {mockError && (
-          <p className="sidebar__mock-error">{mockError}</p>
-        )}
+        
+        <div className="sidebar__card sidebar__card--status">
+          <div className="sidebar__status-item">
+            <div className="sidebar__mock-bar">
+              <span className={`sidebar__mock-dot ${mockRunning ? 'on' : 'off'}`} />
+              <span className="sidebar__mock-label">
+                {mockRunning ? 'Activo' : 'Inactivo'}
+              </span>
+            </div>
+            <div className="sidebar__mock-actions">
+              {!mockRunning ? (
+                <button
+                  type="button"
+                  className="btn ghost btn-small btn-full"
+                  onClick={onStartMock}
+                  disabled={mockLoading}
+                >
+                  {mockLoading ? 'Iniciando...' : 'Iniciar mock'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn ghost btn-small btn-full"
+                  onClick={onStopMock}
+                  disabled={mockLoading}
+                >
+                  {mockLoading ? 'Parando...' : 'Parar mock'}
+                </button>
+              )}
+            </div>
+            {mockError && (
+              <p className="sidebar__mock-error">{mockError}</p>
+            )}
+          </div>
+
+          <div className="sidebar__status-divider" />
+
+          <div className="sidebar__status-item">
+            <div className="sidebar__mock-bar">
+              <span className={`sidebar__mock-dot ${project.remoteId ? 'on' : 'off'}`} />
+              <span className="sidebar__mock-label">
+                {project.remoteId ? 'Sincronizado' : 'Pendiente'}
+              </span>
+            </div>
+
+            <div className="sidebar__mock-actions">
+              <button
+                type="button"
+                className="btn primary btn-small btn-full"
+                onClick={onSync}
+              >
+                {project.remoteId ? 'Actualizar en backend' : 'Sincronizar con backend'}
+              </button>
+            </div>
+            {project.remoteId && (
+              <p className="success-text" style={{ fontSize: '0.75rem', marginTop: '0.5rem' }}>
+                ✓ Proyecto sincronizado con el backend
+              </p>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="sidebar__list">

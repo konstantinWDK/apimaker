@@ -6,7 +6,7 @@ interface Props {
 }
 
 export function PreviewPanel({ project }: Props) {
-  const { columns, rows, payload } = getPreviewData(project)
+  const { columns, rows } = getPreviewData(project)
 
   return (
     <div className="preview-panel">
@@ -20,17 +20,17 @@ export function PreviewPanel({ project }: Props) {
             <thead>
               <tr>
                 {columns.length > 0 
-                  ? columns.map((field) => <th key={field.id}>{field.name || 'Sin nombre'}</th>)
+                  ? columns.map((field: any) => <th key={field.id}>{field.name || 'Sin nombre'}</th>)
                   : <th className="muted-text">Esperando columnas...</th>
                 }
               </tr>
             </thead>
             <tbody>
               {rows.length > 0 ? (
-                rows.map((row, rowIndex) => (
+                rows.map((row: any, rowIndex: number) => (
                   <tr key={rowIndex}>
-                    {columns.map((field) => (
-                      <td key={field.id}>{row[field.name] ?? '-'}</td>
+                    {columns.map((field: any) => (
+                      <td key={field.id}>{String(row[field.name] ?? '')}</td>
                     ))}
                   </tr>
                 ))
