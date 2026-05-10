@@ -252,7 +252,16 @@ export function App() {
                 <SectionCard title="Importar desde Base de Datos" subtitle="Conecta e introspecciona tablas" accent="sky" fullWidth>
                   <DatabaseImportPanel 
                     onImport={(newDatasets) => {
-                      newDatasets.forEach(upsertDataset)
+                      newDatasets.forEach((ds) => {
+                        upsertDataset(ds)
+                        // Auto-generate CRUD endpoints for each imported dataset
+                        const basePath = '/' + ds.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+                        upsertEndpoint({ id: crypto.randomUUID(), name: 'Listar ' + ds.name, method: 'GET', path: basePath, summary: 'Listar registros de ' + ds.name, operationType: 'list', targetDatasetId: ds.id })
+                        upsertEndpoint({ id: crypto.randomUUID(), name: 'Obtener ' + ds.name, method: 'GET', path: basePath + '/{id}', summary: 'Obtener un registro de ' + ds.name, operationType: 'get', targetDatasetId: ds.id })
+                        upsertEndpoint({ id: crypto.randomUUID(), name: 'Crear ' + ds.name, method: 'POST', path: basePath, summary: 'Crear registro en ' + ds.name, operationType: 'create', targetDatasetId: ds.id })
+                        upsertEndpoint({ id: crypto.randomUUID(), name: 'Actualizar ' + ds.name, method: 'PUT', path: basePath + '/{id}', summary: 'Actualizar registro de ' + ds.name, operationType: 'update', targetDatasetId: ds.id })
+                        upsertEndpoint({ id: crypto.randomUUID(), name: 'Eliminar ' + ds.name, method: 'DELETE', path: basePath + '/{id}', summary: 'Eliminar registro de ' + ds.name, operationType: 'delete', targetDatasetId: ds.id })
+                      })
                       if (newDatasets.length > 0) setSelectedDatasetId(newDatasets[0].id)
                       setIsImportingDB(false)
                     }}
@@ -281,7 +290,7 @@ export function App() {
           <SectionCard title="Endpoints REST" subtitle="CRUD base + rutas personalizadas" fullWidth>
             <EndpointDesigner
               project={project}
-              endpoints={project.endpoints}
+              endpoints={project.endpoints.filter((ep) => !selectedDatasetId || !ep.targetDatasetId || ep.targetDatasetId === selectedDatasetId)}
               onAdd={upsertEndpoint}
               onRemove={removeEndpoint}
               previewBase={localBaseUrl}
@@ -305,6 +314,7 @@ export function App() {
               onStartMock={startMock}
               mockLoading={mockLoading}
               mockError={mockError}
+              selectedDatasetId={selectedDatasetId ?? undefined}
             />
           </SectionCard>
         )
@@ -454,6 +464,11 @@ export function App() {
               </header>
 
 
+              {selectedDatasetId && project.datasets.find(d => d.id === selectedDatasetId) && (
+                <div className="dataset-badge">
+                  Dataset activo: <span className="dataset-badge__name">{project.datasets.find(d => d.id === selectedDatasetId)?.name}</span>
+                </div>
+              )}
               <div className="tabs">
                 {tabs.map((tab) => (
                   <button

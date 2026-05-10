@@ -182,20 +182,40 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
   const handleFinalImport = () => {
     const datasets: DatasetMeta[] = tables
       .filter(t => selectedTables.includes(t.name))
-      .map(t => ({
-        id: crypto.randomUUID(),
-        name: t.name,
-        sourceType: 'database' as const,
-        fields: t.columns.map(col => ({
+      .map(t => {
+        const sampleRows = generateSampleRows(t.columns, 10)
+        return {
           id: crypto.randomUUID(),
-          name: col.name,
-          type: col.type,
-          required: col.required,
-          description: col.is_primary ? 'Primary Key' : undefined,
-        })),
-        sampleRows: [],
-      }))
+          name: t.name,
+          sourceType: 'database' as const,
+          fields: t.columns.map(col => ({
+            id: crypto.randomUUID(),
+            name: col.name,
+            type: col.type,
+            required: col.required,
+            description: col.is_primary ? 'Primary Key' : undefined,
+          })),
+          sampleRows,
+        }
+      })
     onImport(datasets)
+  }
+
+  const generateSampleRows = (columns: DBTable['columns'], count: number) => {
+    const generators: Record<string, (idx: number) => any> = {
+      string: (i) => `valor_${i + 1}`,
+      integer: (i) => i + 1,
+      float: (_idx) => +(Math.random() * 100).toFixed(2),
+      boolean: (_idx) => Math.random() > 0.5,
+      datetime: () => '2025-01-15T10:30:00Z',
+    }
+    return Array.from({ length: count }, (_, rowIdx) => {
+      const row: Record<string, any> = {}
+      for (const col of columns) {
+        row[col.name] = col.is_primary ? rowIdx + 1 : (generators[col.type] ?? generators.string)(rowIdx)
+      }
+      return row
+    })
   }
 
   if (step === 'tables') {

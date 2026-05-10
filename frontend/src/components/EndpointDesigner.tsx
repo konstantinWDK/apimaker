@@ -272,6 +272,16 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
                 <div className="endpoint-item__body">
                   <p className="endpoint-item__title">{endpoint.name}</p>
                   {endpoint.summary ? <p className="endpoint-item__summary">{endpoint.summary}</p> : null}
+                  {previewBase && (
+                    <a
+                      href={previewBase + endpoint.path.replace('{id}', '1')}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="endpoint-item__url"
+                    >
+                      🔗 {previewBase}{endpoint.path}
+                    </a>
+                  )}
                 </div>
                 <div className="endpoint-item__actions">
                   <button type="button" className="endpoint-item__edit" onClick={() => handleEdit(endpoint)}>

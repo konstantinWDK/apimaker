@@ -9,6 +9,7 @@ interface Props {
   onStartMock: () => Promise<void>
   mockLoading?: boolean
   mockError?: string | null
+  selectedDatasetId?: string
 }
 
 interface ApiResponse {
@@ -21,8 +22,8 @@ interface ApiResponse {
 // ─── Sample data store (Only for demo/real data) ────────────────
 const sampleStore: Record<string, Array<Record<string, unknown>>> = {}
 
-const initStore = (project: ProjectDraft) => {
-  const defaultDataset = project.datasets[0]
+const initStore = (project: ProjectDraft, datasetId?: string) => {
+  const defaultDataset = datasetId ? project.datasets.find(d => d.id === datasetId) ?? project.datasets[0] : project.datasets[0]
   const actualRows = defaultDataset?.sampleRows
   if (actualRows && actualRows.length > 0) {
     const fields = defaultDataset?.fields ?? []
@@ -45,8 +46,9 @@ const initStore = (project: ProjectDraft) => {
 }
 
 // ─── Body generators ──────────────────────────────────────────
-const buildBodyForMethod = (project: ProjectDraft, method: string, _path: string): string => {
-  const fields = project.datasets[0]?.fields ?? []
+const buildBodyForMethod = (project: ProjectDraft, method: string, _path: string, datasetId?: string): string => {
+  const ds = datasetId ? project.datasets.find(d => d.id === datasetId) ?? project.datasets[0] : project.datasets[0]
+  const fields = ds?.fields ?? []
   if (method === 'GET') return ''
 
   const base: Record<string, unknown> = {}
@@ -86,16 +88,19 @@ const buildCurl = (method: string, url: string, body: string | null, project: Pr
 }
 
 // ─── Component ────────────────────────────────────────────────
-export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading }: Props) {
+export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, selectedDatasetId }: Props) {
+  const endpoints = selectedDatasetId
+    ? project.endpoints.filter((ep) => !ep.targetDatasetId || ep.targetDatasetId === selectedDatasetId)
+    : project.endpoints
   const backendConfig = readBackendConfig()
   const backendBaseUrl = backendConfig.baseUrl?.replace(/\/$/, '') || 'http://localhost:8000'
 
   // Initialize sample store when project changes
   useEffect(() => {
-    initStore(project)
+    initStore(project, selectedDatasetId)
   }, [project.id, project.datasets.length])
 
-  const allEndpoints = project.endpoints.length > 0 ? project.endpoints : [{ id: 'default', method: 'GET' as const, path: '/records', name: 'records', summary: '' }]
+  const allEndpoints = endpoints.length > 0 ? endpoints : [{ id: 'default', method: 'GET' as const, path: '/records', name: 'records', summary: '' }]
   const initialEndpoint = allEndpoints[0]
 
   const [selectedEndpointId, setSelectedEndpointId] = useState<string>(initialEndpoint.id)
@@ -113,17 +118,17 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading }
 
   // Reset form state when project changes
   useEffect(() => {
-    const eps = project.endpoints.length > 0 ? project.endpoints : [{ id: 'default', method: 'GET' as const, path: '/records', name: 'records', summary: '' }]
+    const eps = endpoints.length > 0 ? endpoints : [{ id: 'default', method: 'GET' as const, path: '/records', name: 'records', summary: '' }]
     const ep = eps[0]
     if (ep) {
       setSelectedEndpointId(ep.id)
       setMethod(ep.method)
       setPath(ep.path)
-      setBody(buildBodyForMethod(project, ep.method, ep.path))
+      setBody(buildBodyForMethod(project, ep.method, ep.path, selectedDatasetId))
       setResponse(null)
       
     }
-  }, [project.id, project.datasets.length, project.endpoints])
+  }, [project.id, project.datasets.length, endpoints, selectedDatasetId])
 
   const mockUrl = useMemo(() => {
     let finalPath = path.startsWith('/') ? path : `/${path}`
@@ -162,11 +167,11 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading }
       setResponse(null)
       return
     }
-    const ep = project.endpoints.find((e) => e.id === id)
+    const ep = endpoints.find((e) => e.id === id)
     if (!ep) return
     setMethod(ep.method)
     setPath(ep.path)
-    setBody(buildBodyForMethod(project, ep.method, ep.path))
+    setBody(buildBodyForMethod(project, ep.method, ep.path, selectedDatasetId))
     
     // Extract parameters from path
     const params: Record<string, string> = {}
@@ -183,7 +188,7 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading }
 
   // Initialize on project change
   useEffect(() => {
-    const first = project.endpoints[0]
+    const first = endpoints[0]
     if (!first) {
       setSelectedEndpointId('custom')
       setMethod('GET')
@@ -253,7 +258,7 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading }
 
   const handleMethodChange = (value: string) => {
     setMethod(value)
-    setBody(buildBodyForMethod(project, value, path))
+    setBody(buildBodyForMethod(project, value, path, selectedDatasetId))
     
     setResponse(null)
   }
@@ -331,7 +336,7 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading }
                   <label className="label-tiny">Endpoint predefinido</label>
                   <select className="field field-tiny" value={selectedEndpointId} onChange={(e) => selectEndpoint(e.target.value)}>
                     <option value="custom">-- Ruta personalizada --</option>
-                    {project.endpoints.map((ep) => (
+                    {endpoints.map((ep) => (
                       <option key={ep.id} value={ep.id}>{ep.method} {ep.path}</option>
                     ))}
                   </select>

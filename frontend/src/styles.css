@@ -199,6 +199,18 @@ body {
   fill: currentColor;
 }
 
+.dataset-badge {
+  font-size: 0.85rem;
+  color: #64748b;
+  font-weight: 500;
+  line-height: 1;
+  margin: 0;
+  margin-bottom: -0.3rem;
+}
+.dataset-badge__name {
+  font-weight: 700;
+  color: #1e293b;
+}
 .tabs {
   display: inline-flex;
   gap: 0.5rem;
@@ -1322,6 +1334,22 @@ input[type='password'] {
 .endpoint-item__summary {
   color: #64748b;
   font-size: 0.82rem;
+}
+.endpoint-item__url {
+  display: block;
+  font-size: 0.7rem;
+  color: #64748b;
+  text-decoration: none;
+  margin-top: 0.2rem;
+  font-family: 'SF Mono', monospace;
+  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.endpoint-item__url:hover {
+  color: #3b82f6;
+  text-decoration: underline;
 }
 
 .endpoint-item__actions {
