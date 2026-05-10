@@ -6,6 +6,7 @@ interface BuilderState {
   project: ProjectDraft
   history: ProjectDraft[]
   projects: ProjectDraft[]
+  selectedDatasetId: string | null
   mockRunning: boolean
   mockLoading: boolean
   mockError: string | null
@@ -20,6 +21,7 @@ interface BuilderState {
   removeEndpoint: (id: string) => void
   replaceProject: (project: ProjectDraft) => void
   setGenerationResult: (payload: Partial<ProjectDraft>) => void
+  setSelectedDatasetId: (id: string | null) => void
   saveSnapshot: () => void
   loadSnapshot: (id: string) => void
   deleteSnapshot: (id: string) => void
@@ -317,47 +319,58 @@ const queueSave = (fn: () => void) => {
 
 // ─── Store ─────────────────────────────────────────────────────
 // Load from localStorage on startup
-const loadFromStorage = (): ProjectDraft => {
-  if (typeof window === 'undefined') return createDefaultProject()
+const loadFromStorage = (): { project: ProjectDraft; selectedDatasetId: string | null } => {
+  if (typeof window === 'undefined') return { project: createDefaultProject(), selectedDatasetId: null }
   const raw = window.localStorage.getItem(STORAGE_KEY)
-  if (!raw) return createDefaultProject()
+  if (!raw) return { project: createDefaultProject(), selectedDatasetId: null }
   try {
-    const parsed = JSON.parse(raw) as Partial<ProjectDraft>
+    const parsed = JSON.parse(raw) as Partial<ProjectDraft> & { selectedDatasetId?: string | null }
     return {
-      ...createDefaultProject(),
-      ...parsed,
-      id: parsed.id ?? createId(),
-      endpoints: parsed.endpoints ?? [],
-      datasets: (parsed as any).datasets ? (parsed as any).datasets.map(sanitizeDataset) : ((parsed as any).dataset ? [sanitizeDataset((parsed as any).dataset)] : []),
+      project: {
+        ...createDefaultProject(),
+        ...parsed,
+        id: parsed.id ?? createId(),
+        endpoints: parsed.endpoints ?? [],
+        datasets: (parsed as any).datasets ? (parsed as any).datasets.map(sanitizeDataset) : ((parsed as any).dataset ? [sanitizeDataset((parsed as any).dataset)] : []),
+      },
+      selectedDatasetId: parsed.selectedDatasetId ?? null,
     }
   } catch {
-    return createDefaultProject()
+    return { project: createDefaultProject(), selectedDatasetId: null }
   }
 }
 
 // Persist helper
-const persist = (project: ProjectDraft) => {
+const persist = (project: ProjectDraft, selectedDatasetId: string | null) => {
   if (typeof window !== 'undefined') {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(project))
+    const data = { ...project, selectedDatasetId }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   }
 }
 
 const initialProject = loadFromStorage()
 
 export const useProjectBuilder = create<BuilderState>((set, get) => ({
-  project: initialProject,
+  project: initialProject.project,
   history: [],
   projects: [],
+  selectedDatasetId: initialProject.selectedDatasetId,
   mockRunning: false,
   mockLoading: false,
   mockError: null,
   isGenerating: false,
   setIsGenerating: (val) => set({ isGenerating: val }),
 
+  setSelectedDatasetId: (id) =>
+    set((state) => {
+      persist(state.project, id)
+      return { selectedDatasetId: id }
+    }),
+
   updateProject: (payload) =>
     set((state) => {
       const nextProject = { ...state.project, ...payload, updatedAt: new Date().toISOString() }
-      persist(nextProject)
+      persist(nextProject, state.selectedDatasetId)
 
       // Update the project in the projects list too
       const nextProjects = state.projects.map(p => p.id === nextProject.id ? nextProject : p)
@@ -390,7 +403,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
         : [...state.project.datasets, sanitizeDataset(dataset)!]
 
       const nextProject = { ...state.project, datasets: nextDatasets, updatedAt: new Date().toISOString() }
-      persist(nextProject)
+      persist(nextProject, state.selectedDatasetId)
 
       const nextProjects = state.projects.map(p => p.id === nextProject.id ? nextProject : p)
       const saveId = nextProject.remoteId || nextProject.id
@@ -406,7 +419,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
     set((state) => {
       const nextDatasets = state.project.datasets.filter((d) => d.id !== id)
       const nextProject = { ...state.project, datasets: nextDatasets, updatedAt: new Date().toISOString() }
-      persist(nextProject)
+      persist(nextProject, state.selectedDatasetId)
       const nextProjects = state.projects.map(p => p.id === nextProject.id ? nextProject : p)
       return { project: nextProject, projects: nextProjects }
     }),
@@ -417,9 +430,9 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       const nextEndpoints = exists
         ? state.project.endpoints.map((e) => (e.id === endpoint.id ? endpoint : e))
         : [...state.project.endpoints, endpoint]
-      
+
       const nextProject = { ...state.project, endpoints: nextEndpoints, updatedAt: new Date().toISOString() }
-      persist(nextProject)
+      persist(nextProject, state.selectedDatasetId)
 
       // Update the project in the projects list too
       const nextProjects = state.projects.map(p => p.id === nextProject.id ? nextProject : p)
@@ -436,7 +449,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
     set((state) => {
       const nextEndpoints = state.project.endpoints.filter((e) => e.id !== id)
       const nextProject = { ...state.project, endpoints: nextEndpoints, updatedAt: new Date().toISOString() }
-      persist(nextProject)
+      persist(nextProject, state.selectedDatasetId)
 
       // Update the project in the projects list too
       const nextProjects = state.projects.map(p => p.id === nextProject.id ? nextProject : p)
@@ -459,14 +472,14 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
         endpoints: project.endpoints ?? [],
         updatedAt: new Date().toISOString(),
       }
-      persist(next)
-      
+      persist(next, null)
+
       // Ensure the project list also reflects this new project if it's not already there
-      const projects = state.projects.find(p => p.id === next.id) 
-        ? state.projects 
+      const projects = state.projects.find(p => p.id === next.id)
+        ? state.projects
         : [next, ...state.projects]
 
-      return { project: next, projects, history: state.history, mockRunning: false }
+      return { project: next, projects, history: state.history, mockRunning: false, selectedDatasetId: null }
     }),
 
   setGenerationResult: (payload) =>
@@ -476,7 +489,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
         ...payload,
         updatedAt: new Date().toISOString(),
       }
-      persist(project)
+      persist(project, state.selectedDatasetId)
       let history = state.history.map((item) => (item.id === project.id ? { ...item, ...project } : item))
       if (!history.some((item) => item.id === project.id)) {
         history = [project, ...history]
@@ -488,7 +501,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
     set((state) => {
       const snapshot = { ...state.project, updatedAt: new Date().toISOString() }
       const history = [snapshot, ...state.history.filter((item) => item.id !== snapshot.id)]
-      persist(snapshot)
+      persist(snapshot, state.selectedDatasetId)
       // Also save to database
       const saveProject = async () => {
         if (snapshot.remoteId) {
@@ -512,7 +525,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
           const created = await api.createProject(snapshot)
           if (created) {
             // Update the project with the server-assigned ID
-            persist(created)
+            persist(created, state.selectedDatasetId)
             set((s) => ({
               project: created,
               history: [created, ...s.history.filter((item) => item.id !== snapshot.id)],
@@ -530,7 +543,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
     set((state) => {
       const found = state.history.find((item) => item.id === id)
       if (!found) return state
-      persist(found)
+      persist(found, state.selectedDatasetId)
       return { project: found }
     }),
 
@@ -539,7 +552,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       const history = state.history.filter((item) => item.id !== id)
       if (state.project.id === id) {
         const fallback = history[0] ?? createDefaultProject()
-        persist(fallback)
+        persist(fallback, state.selectedDatasetId)
         return { project: fallback, history }
       }
       return { history }
@@ -609,12 +622,12 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       await api.deleteProject(project.remoteId || project.id)
     }
     // Also clear from localStorage if it's the current project
-    const currentProject = get().project
-    if (currentProject.id === id) {
+    const state = get()
+    if (state.project.id === id) {
       const remaining = get().projects.filter(p => p.id !== id)
       const next = remaining.length > 0 ? remaining[0] : createDefaultProject()
-      persist(next)
-      set({ project: next })
+      persist(next, null)
+      set({ project: next, selectedDatasetId: null })
     }
     // Refresh projects list
     await get().refreshProjects()
@@ -649,7 +662,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
           effectiveId = created.slug || created.id
           currentProject = { ...currentProject, remoteId: effectiveId }
           set({ project: currentProject })
-          persist(currentProject)
+          persist(currentProject, get().selectedDatasetId)
         } else {
           throw new Error('Error al sincronizar el proyecto con el servidor')
         }
@@ -688,7 +701,8 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
 
       await refreshProjects()
       // Use latest from store after refresh
-      persist(get().project)
+      const currentState = get()
+      persist(currentState.project, currentState.selectedDatasetId)
       return effectiveId
     } catch (error) {
       console.error('Error saving project:', error)

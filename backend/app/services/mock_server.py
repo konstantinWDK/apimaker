@@ -16,17 +16,14 @@ from ..db import get_session
 from ..db_models import Dataset, DatasetField, Endpoint, Project
 
 
-# In-memory mock data store per project
-_mock_data: dict[str, list[dict]] = {}
+# In-memory mock data store: _mock_data[project_id][dataset_id] = list[dict]
+_mock_data: dict[str, dict[str, list[dict]]] = {}
 
 
-def init_mock_data(project_id: str, fields: list[DatasetField], count: int = 0) -> list[dict]:
-    """Initialize mock data store for a project (starts empty if no count provided)."""
-    # We no longer generate random data unless explicitly requested with a count > 0
-    # and even then, we prefer starting clean.
-    store: list[dict] = []
-    _mock_data[project_id] = store
-    return store
+def init_mock_data(project_id: str) -> dict[str, list[dict]]:
+    """Initialize mock data store for a project (empty)."""
+    _mock_data[project_id] = {}
+    return {}
 
 
 from .project_service import project_service
@@ -63,6 +60,31 @@ async def verify_mock_auth(
 router = APIRouter(prefix="/api/mock/{project_id}", tags=["mock"], dependencies=[Depends(verify_mock_auth)])
 
 
+def _find_dataset_for_endpoint(session: Session, resolved_project_id: str, matched_ep: Endpoint) -> tuple[str | None, list[dict]]:
+    """Find the correct dataset and its data for a matched endpoint.
+    
+    Returns (dataset_id, data_list). Falls back to first dataset with data.
+    """
+    # 1. Try to find dataset via endpoint's target_dataset_id
+    if matched_ep.target_dataset_id:
+        ds = session.get(Dataset, matched_ep.target_dataset_id)
+        if ds and ds.id:
+            store = _mock_data.get(resolved_project_id, {}).get(ds.id)
+            if store is not None:
+                return (ds.id, store)
+
+    # 2. Fallback: find first dataset that has data for this project
+    project_datasets = session.exec(
+        select(Dataset).where(Dataset.project_id == resolved_project_id)
+    ).all()
+    for ds in project_datasets:
+        store = _mock_data.get(resolved_project_id, {}).get(ds.id)
+        if store is not None:
+            return (ds.id, store)
+
+    return (None, [])
+
+
 @router.get("/{path:path}")
 async def mock_get(
     project_id: str,
@@ -75,8 +97,8 @@ async def mock_get(
     """Mock GET — list or get by ID."""
     try:
         resolved_id = _resolve_project_id(session, project_id)
-        store = _mock_data.get(resolved_id)
-        if store is None:
+        project_ds = _mock_data.get(resolved_id)
+        if project_ds is None or not project_ds:
             raise HTTPException(status_code=404, detail="Mock data not initialized. Start mock server from the dashboard.")
 
         # Check if this is a list or detail request
@@ -88,7 +110,7 @@ async def mock_get(
         full_path = f"/{path.strip('/')}"
         matched_ep = None
         param_value = None
-        
+
         print(f"[MockServer] Matching GET {full_path}")
 
         # 1. Exact path match first
@@ -107,11 +129,10 @@ async def mock_get(
                     continue
                 ep_path = f"/{ep.path.strip('/')}"
                 if "{" in ep_path and "}" in ep_path:
-                    # Escape path characters except the placeholder
-                    # We convert {param} to a regex group
-                    pattern = re.sub(r"\{[^}]+\}", r"([^/]+)", ep_path)
-                    # We must escape the rest of the path
-                    # This is tricky, let's do a simpler match for now or use a better regex
+                    # First escape all regex metacharacters in the path,
+                    # then convert {param} placeholders back to capture groups
+                    escaped = re.escape(ep_path)
+                    pattern = re.sub(r"\\\{[^}]+\\\}", r"([^/]+)", escaped)
                     try:
                         match = re.fullmatch(pattern, full_path)
                         if match:
@@ -123,35 +144,70 @@ async def mock_get(
 
         if not matched_ep:
             raise HTTPException(
-                status_code=404, 
+                status_code=404,
                 detail=f"No matching endpoint definition for GET {full_path}."
             )
+
+        # Find the correct dataset for this endpoint
+        ds_id, store = _find_dataset_for_endpoint(session, resolved_id, matched_ep)
 
         # Use operation_type for logic
         op_type = getattr(matched_ep, "operation_type", "custom")
 
-        if op_type == "get" or param_value:
-            # Get by ID or any matching field
-            target_id = param_value or path.split("/")[-1]
-            print(f"[MockServer] Searching for record matching: {target_id} in store of {len(store)} items")
-            
+        if param_value:
+            # Path param captured — this is a detail request
+            target_id = param_value
+            print(f"[MockServer] Searching for record matching '{target_id}' in dataset {ds_id} ({len(store)} items)")
+
             # 1. Try standard ID fields first
             for item in store:
-                if not isinstance(item, dict): continue
+                if not isinstance(item, dict):
+                    continue
                 if str(item.get("_id")) == str(target_id) or str(item.get("id")) == str(target_id):
                     return item
-            
+
             # 2. Try matching any string field (e.g. name, slug, pokedex_id)
             for item in store:
-                if not isinstance(item, dict): continue
+                if not isinstance(item, dict):
+                    continue
                 for key, val in item.items():
                     if val is not None and str(val).lower() == str(target_id).lower():
                         return item
-                        
+
             print(f"[MockServer] No match found for {target_id}")
             raise HTTPException(status_code=404, detail=f"No record found matching '{target_id}'")
 
-        # Default to list
+        if op_type == "list":
+            # Explicit list endpoint — return paginated list
+            return store[skip:skip + limit]
+
+        if op_type == "get":
+            # "get" operation without path param: check if path has multiple segments
+            path_segments = path.strip("/").split("/")
+            if len(path_segments) >= 2:
+                target_id = path_segments[-1]
+                print(f"[MockServer] Searching for record matching '{target_id}' in dataset {ds_id} ({len(store)} items)")
+
+                for item in store:
+                    if not isinstance(item, dict):
+                        continue
+                    if str(item.get("_id")) == str(target_id) or str(item.get("id")) == str(target_id):
+                        return item
+
+                for item in store:
+                    if not isinstance(item, dict):
+                        continue
+                    for key, val in item.items():
+                        if val is not None and str(val).lower() == str(target_id).lower():
+                            return item
+
+                print(f"[MockServer] No match found for {target_id}")
+                raise HTTPException(status_code=404, detail=f"No record found matching '{target_id}'")
+
+            # Single-segment path with op_type "get" — return list
+            return store[skip:skip + limit]
+
+        # Default: return list for custom operations
         return store[skip:skip + limit]
     except HTTPException:
         raise
@@ -170,22 +226,35 @@ async def mock_post(
 ) -> dict:
     """Mock POST — create a new record."""
     resolved_id = _resolve_project_id(session, project_id)
-    store = _mock_data.get(resolved_id)
-    if store is None:
+    project_ds = _mock_data.get(resolved_id)
+    if project_ds is None or not project_ds:
         raise HTTPException(status_code=404, detail="Mock server not running for this project. Start it first.")
 
-    # Validate endpoint exists
+    # Find matching POST endpoint to determine target dataset
     endpoints = session.exec(
         select(Endpoint).where(Endpoint.project_id == resolved_id)
     ).all()
-    
+
     full_path = f"/{path.strip('/')}"
-    matched = any(ep.method.upper() == "POST" and f"/{ep.path.strip('/')}" == full_path for ep in endpoints)
-    
-    if not matched:
-        # Relaxed check for POST if path is common
+    matched_ep = None
+    for ep in endpoints:
+        if ep.method.upper() == "POST" and f"/{ep.path.strip('/')}" == full_path:
+            matched_ep = ep
+            break
+
+    if not matched_ep:
         if path not in ["records", "items", "data"]:
-             raise HTTPException(status_code=404, detail=f"No matching POST endpoint for {full_path}")
+            raise HTTPException(status_code=404, detail=f"No matching POST endpoint for {full_path}")
+
+    # Find the correct dataset
+    ds_id, store = _find_dataset_for_endpoint(session, resolved_id, matched_ep) if matched_ep else (None, [])
+
+    # Use the first available store if no specific dataset found
+    if not store:
+        for ds_store in project_ds.values():
+            if ds_store:
+                store = ds_store
+                break
 
     try:
         body = await request.json()
@@ -206,8 +275,8 @@ async def mock_put(
 ) -> dict:
     """Mock PUT — update a record."""
     resolved_id = _resolve_project_id(session, project_id)
-    store = _mock_data.get(resolved_id)
-    if store is None:
+    project_ds = _mock_data.get(resolved_id)
+    if project_ds is None or not project_ds:
         raise HTTPException(status_code=404, detail="Mock data not initialized.")
 
     try:
@@ -221,10 +290,12 @@ async def mock_put(
         raise HTTPException(status_code=400, detail="ID required in path")
     item_id = parts[-1]
 
-    for i, item in enumerate(store):
-        if item.get("_id") == item_id or str(item.get("id")) == str(item_id):
-            store[i] = {"_id": item_id, **body}
-            return store[i]
+    # Search across all dataset stores for this project
+    for ds_id, store in project_ds.items():
+        for i, item in enumerate(store):
+            if item.get("_id") == item_id or str(item.get("id")) == str(item_id):
+                store[i] = {"_id": item_id, **body}
+                return store[i]
 
     raise HTTPException(status_code=404, detail="Not found")
 
@@ -237,8 +308,8 @@ async def mock_delete(
 ) -> None:
     """Mock DELETE — remove a record."""
     resolved_id = _resolve_project_id(session, project_id)
-    store = _mock_data.get(resolved_id)
-    if store is None:
+    project_ds = _mock_data.get(resolved_id)
+    if project_ds is None or not project_ds:
         raise HTTPException(status_code=404, detail="Mock data not initialized.")
 
     # Extract ID from path
@@ -247,10 +318,12 @@ async def mock_delete(
         raise HTTPException(status_code=400, detail="ID required in path")
     item_id = parts[-1]
 
-    for i, item in enumerate(store):
-        if item.get("_id") == item_id or str(item.get("id")) == str(item_id):
-            store.pop(i)
-            return
+    # Search across all dataset stores
+    for ds_id, store in project_ds.items():
+        for i, item in enumerate(store):
+            if item.get("_id") == item_id or str(item.get("id")) == str(item_id):
+                store.pop(i)
+                return
 
     raise HTTPException(status_code=404, detail="Not found")
 
@@ -259,47 +332,65 @@ async def mock_delete(
 
 
 def start_mock_server_fn(session: Session, project_id: str) -> dict:
-    """Start mock server for a project (initialize data)."""
+    """Start mock server for a project (initialize data for ALL datasets)."""
+    print(f"[MockServer] Starting mock server for project_id={project_id}")
     project = session.get(Project, str(project_id))
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    dataset = session.exec(
+    # Load ALL datasets for this project
+    datasets = session.exec(
         select(Dataset).where(Dataset.project_id == str(project_id))
-    ).first()
+    ).all()
+
+    print(f"[MockServer] Found {len(datasets)} datasets for project")
 
     fields = []
-    if dataset:
-        fields = session.exec(
-            select(DatasetField).where(DatasetField.dataset_id == dataset.id)
-        ).all()
-
     endpoints = session.exec(
         select(Endpoint).where(Endpoint.project_id == str(project_id))
     ).all()
 
-    # Load initial data from dataset sample_rows or generate if empty
-    store = []
-    if dataset and dataset.sample_rows:
-        try:
-            store = json.loads(dataset.sample_rows)
-            # Ensure every item has an _id for our mock logic
-            for item in store:
-                if "_id" not in item:
-                    item["_id"] = str(uuid4())[:8]
-            _mock_data[str(project_id)] = store
-        except Exception as e:
-            print(f"[MockServer] Error loading sample_rows: {e}")
-            store = init_mock_data(str(project_id), fields)
-    else:
-        store = init_mock_data(str(project_id), fields)
+    project_store: dict[str, list[dict]] = {}
+    total_rows = 0
+
+    for dataset in datasets:
+        ds_fields = session.exec(
+            select(DatasetField).where(DatasetField.dataset_id == dataset.id)
+        ).all()
+        fields.extend(ds_fields)
+
+        store = []
+        if dataset.sample_rows:
+            try:
+                print(f"[MockServer] Loading sample_rows for dataset '{dataset.name}' ({len(dataset.sample_rows)} chars)")
+                store = json.loads(dataset.sample_rows)
+                print(f"[MockServer]   -> Loaded {len(store)} rows")
+                if store:
+                    print(f"[MockServer]   -> First row keys: {list(store[0].keys())}")
+                # Ensure every item has an _id
+                for item in store:
+                    if "_id" not in item:
+                        item["_id"] = str(uuid4())[:8]
+                project_store[dataset.id] = store
+                total_rows += len(store)
+            except Exception as e:
+                print(f"[MockServer]   -> Error loading sample_rows: {e}")
+                import traceback
+                traceback.print_exc()
+                project_store[dataset.id] = []
+        else:
+            print(f"[MockServer]   -> No sample_rows for dataset '{dataset.name}', empty store")
+            project_store[dataset.id] = []
+
+    _mock_data[str(project_id)] = project_store
 
     return {
         "project_id": str(project_id),
         "status": "running",
         "base_url": f"/api/mock/{project_id}",
         "endpoints": [{"method": ep.method, "path": f"/api/mock/{project_id}{ep.path}"} for ep in endpoints],
-        "sample_rows": len(store),
+        "datasets": len(project_store),
+        "sample_rows": total_rows,
     }
 
 
@@ -311,12 +402,14 @@ def stop_mock_server_fn(project_id: str) -> dict:
 
 def get_mock_status_fn(project_id: str) -> dict:
     """Get mock server status."""
-    store = _mock_data.get(str(project_id))
-    if store is not None:
+    project_ds = _mock_data.get(str(project_id))
+    if project_ds is not None:
+        total = sum(len(store) for store in project_ds.values())
         return {
             "project_id": str(project_id),
             "status": "running",
             "base_url": f"/api/mock/{project_id}",
-            "sample_rows": len(store),
+            "datasets": len(project_ds),
+            "sample_rows": total,
         }
     return {"project_id": str(project_id), "status": "stopped"}

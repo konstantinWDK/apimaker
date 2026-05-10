@@ -77,11 +77,12 @@ export function App() {
   const [generationWarning, setGenerationWarning] = useState<string | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
   const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'security' | 'simulator' | 'delivery' | 'result'>('datasets')
-  const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null)
   const [isImportingDB, setIsImportingDB] = useState(false)
   const [activePage, setActivePage] = useState<'builder' | 'info' | 'usage' | 'admin'>('builder')
   const localBaseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'
   const backendBaseUrl = readBackendConfig().baseUrl?.replace(/\/$/, '') || 'http://localhost:8000'
+
+  const { selectedDatasetId, setSelectedDatasetId } = useProjectBuilder()
 
   const performLogout = () => {
     logout()
