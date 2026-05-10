@@ -75,6 +75,7 @@ export interface ProjectDraft {
   jwtSecret?: string
   rateLimit?: number // requests per minute
   targetStack: 'fastapi' | 'express' | 'nest'
+  includeData?: boolean
   datasets: DatasetMeta[]
   endpoints: ApiEndpoint[]
   updatedAt?: string

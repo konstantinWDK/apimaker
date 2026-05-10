@@ -1,178 +1,105 @@
 const express = require('express');
-const { Sequelize, DataTypes } = require('sequelize');
-const dotenv = require('dotenv');
+const bodyParser = require('body-parser');
 const jwt = require('jsonwebtoken');
-const rateLimit = require('express-rate-limit');
-
-dotenv.config();
+const fs = require('fs');
+const path = require('path');
+const swaggerUi = require('swagger-ui-express');
 
 const app = express();
-app.use(express.json());
+app.use(bodyParser.json());
 
-const DATABASE_URL = process.env.DATABASE_URL || 'sqlite:./data.db';
+// --- Configuration ---
+const PORT = process.env.PORT || 8000;
 const AUTH_METHOD = "{{ auth_method }}";
 const API_KEY = process.env.API_KEY || "{{ api_key }}";
 const JWT_SECRET = process.env.JWT_SECRET || "{{ jwt_secret }}";
-const RATE_LIMIT = parseInt(process.env.RATE_LIMIT) || {{ rate_limit or 0 }};
 
-const sequelize = new Sequelize(DATABASE_URL, {
-  logging: false,
-  define: {
-    timestamps: true,
-    underscored: true
+// --- In-memory Data (Seed support) ---
+let db = {};
+const dataPath = path.join(__dirname, 'data.json');
+
+if (fs.existsSync(dataPath)) {
+  try {
+    db = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+    console.log("✅ Database seeded with data.json");
+  } catch (e) {
+    console.error("❌ Error loading data.json", e);
+    db = {};
   }
-});
-
-// ─── Models ──────────────────────────────────────────────────────
-{% if dataset %}
-const {{ dataset.name | capitalize }} = sequelize.define('{{ dataset.name | lower }}_record', {
-{% for field in dataset.fields %}
-  {{ field.name }}: {
-    type: {% if field.type == 'integer' %}DataTypes.INTEGER{% elif field.type == 'float' %}DataTypes.FLOAT{% elif field.type == 'boolean' %}DataTypes.BOOLEAN{% elif field.type == 'datetime' %}DataTypes.DATE{% else %}DataTypes.STRING{% endif %},
-    allowNull: {{ 'false' if field.required else 'true' }}
-  },
-{% endfor %}
-});
-{% endif %}
-
-// ─── Middleware ─────────────────────────────────────────────────
-
-// Rate Limiting
-if (RATE_LIMIT > 0) {
-  const limiter = rateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    max: RATE_LIMIT,
-    message: { error: 'Rate limit exceeded' }
-  });
-  app.use(limiter);
 }
 
-// Authentication
-const authMiddleware = (req, res, next) => {
-  const publicPaths = ['/health', '/docs', '/redoc', '/openapi.json'];
-  if (publicPaths.includes(req.path)) return next();
+// Ensure each dataset has at least an empty array
+{% for ds in datasets %}
+if (!db["{{ ds.name }}"]) db["{{ ds.name }}"] = [];
+{% endfor %}
+
+// --- Middleware: Auth ---
+const verifyAuth = (req, res, next) => {
+  if (AUTH_METHOD === 'none') return next();
 
   if (AUTH_METHOD === 'apikey') {
-    const apiKey = req.headers['x-api-key'];
-    if (!apiKey || apiKey !== API_KEY) {
-      return res.status(401).json({ error: 'Invalid or missing API key' });
-    }
-  } else if (AUTH_METHOD === 'jwt') {
+    const key = req.headers['x-api-key'];
+    if (key !== API_KEY) return res.status(401).json({ error: 'Invalid API Key' });
+    return next();
+  }
+
+  if (AUTH_METHOD === 'jwt') {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-    
-    if (!token) {
-      return res.status(401).json({ error: 'Missing Bearer Token' });
-    }
+    if (!token) return res.status(401).json({ error: 'Missing token' });
 
-    try {
-      jwt.verify(token, JWT_SECRET);
-    } catch (err) {
-      return res.status(401).json({ error: 'Invalid or expired JWT' });
-    }
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+      if (err) return res.status(403).json({ error: 'Invalid token' });
+      req.user = user;
+      next();
+    });
+    return;
   }
   next();
 };
 
-app.use(authMiddleware);
-
-// ─── Endpoints ───────────────────────────────────────────────────
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    auth: AUTH_METHOD,
-    rate_limit: RATE_LIMIT
-  });
-});
-
-{% if dataset %}
-{% for ep in endpoints %}
-{# --- LIST OPERATION --- #}
-{% if ep.operation_type == "list" or (ep.method == "GET" and "{" not in ep.path and ep.operation_type == "custom") %}
-// {{ ep.summary or ep.name }}
-app.get('{{ ep.path | replace("{", ":") | replace("}", "") }}', async (req, res) => {
-  const skip = parseInt(req.query.skip) || 0;
-  const limit = parseInt(req.query.limit) || 100;
-  const records = await {{ dataset.name | capitalize }}.findAll({
-    offset: skip,
-    limit: limit
-  });
-  res.json(records);
-});
-
-{# --- GET BY ID OPERATION --- #}
-{% elif ep.operation_type == "get" or (ep.method == "GET" and "{" in ep.path and ep.operation_type == "custom") %}
-// {{ ep.summary or ep.name }}
-app.get('{{ ep.path | replace("{", ":") | replace("}", "") }}', async (req, res) => {
-  const record = await {{ dataset.name | capitalize }}.findByPk(req.params.{{ ep.path | extract_path_param }});
-  if (!record) return res.status(404).json({ error: 'Record not found' });
-  res.json(record);
-});
-
-{# --- CREATE OPERATION --- #}
-{% elif ep.operation_type == "create" or (ep.method == "POST" and ep.operation_type == "custom") %}
-// {{ ep.summary or ep.name }}
-app.post('{{ ep.path | replace("{", ":") | replace("}", "") }}', async (req, res) => {
-  try {
-    const record = await {{ dataset.name | capitalize }}.create(req.body);
-    res.status(201).json(record);
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-{# --- UPDATE OPERATION --- #}
-{% elif ep.operation_type == "update" or (ep.method in ["PUT", "PATCH"] and "{" in ep.path and ep.operation_type == "custom") %}
-// {{ ep.summary or ep.name }}
-app.{{ ep.method | lower }}('{{ ep.path | replace("{", ":") | replace("}", "") }}', async (req, res) => {
-  const record = await {{ dataset.name | capitalize }}.findByPk(req.params.{{ ep.path | extract_path_param }});
-  if (!record) return res.status(404).json({ error: 'Record not found' });
-  await record.update(req.body);
-  res.json(record);
-});
-
-{# --- DELETE OPERATION --- #}
-{% elif ep.operation_type == "delete" or (ep.method == "DELETE" and "{" in ep.path and ep.operation_type == "custom") %}
-// {{ ep.summary or ep.name }}
-app.delete('{{ ep.path | replace("{", ":") | replace("}", "") }}', async (req, res) => {
-  const record = await {{ dataset.name | capitalize }}.findByPk(req.params.{{ ep.path | extract_path_param }});
-  if (!record) return res.status(404).json({ error: 'Record not found' });
-  await record.destroy();
-  res.status(204).send();
-});
-
-{# --- CUSTOM OR FALLBACK --- #}
-{% else %}
-// {{ ep.summary or ep.name }}
-app.{{ ep.method | lower }}('{{ ep.path | replace("{", ":") | replace("}", "") }}', (req, res) => {
-  res.json({ message: "Endpoint configured as {{ ep.operation_type }}" });
-});
-{% endif %}
-{% endfor %}
-{% endif %}
-
-const PORT = process.env.PORT || 8000;
-
-sequelize.sync().then(async () => {
-  {% if dataset %}
-  const count = await {{ dataset.name | capitalize }}.count();
-  if (count === 0) {
-    try {
-      const fs = require('fs');
-      if (fs.existsSync('./data.json')) {
-        const data = JSON.parse(fs.readFileSync('./data.json', 'utf8'));
-        console.log(`Seeding database with ${data.length} records...`);
-        await {{ dataset.name | capitalize }}.bulkCreate(data);
-      }
-    } catch (error) {
-      console.error('Error seeding database:', error);
+// --- Routes & Documentation Setup ---
+const swaggerDoc = {
+  openapi: '3.0.0',
+  info: { title: '{{ project_name }}', version: '1.0.0', description: '{{ project_description }}' },
+  paths: {},
+  components: {
+    securitySchemes: {
+      ApiKeyAuth: { type: 'apiKey', in: 'header', name: 'X-API-Key' },
+      BearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }
     }
   }
-  {% endif %}
+};
 
-  app.listen(PORT, () => {
-    console.log(`{{ project_name }} running on http://localhost:${PORT}`);
-    console.log(`Auth Method: ${AUTH_METHOD}`);
-    if (RATE_LIMIT > 0) console.log(`Rate Limit: ${RATE_LIMIT} req/min`);
-  });
+{% for ds in datasets %}
+const {{ ds.name | lower | replace(" ", "_") }}Router = express.Router();
+
+// --- Resource: {{ ds.name }} ---
+{{ ds.name | lower | replace(" ", "_") }}Router.get('/', verifyAuth, (req, res) => {
+  res.json(db["{{ ds.name }}"]);
+});
+
+{{ ds.name | lower | replace(" ", "_") }}Router.post('/', verifyAuth, (req, res) => {
+  const newItem = { id: db["{{ ds.name }}"].length + 1, ...req.body, created_at: new Date() };
+  db["{{ ds.name }}"].push(newItem);
+  res.status(201).json(newItem);
+});
+
+// Registrar rutas para este recurso
+{% for ep in endpoints %}
+  {% if ep.target_dataset_id == ds.id %}
+    app.use('{{ ep.path }}', {{ ds.name | lower | replace(" ", "_") }}Router);
+  {% endif %}
+{% endfor %}
+{% endfor %}
+
+// --- Global Routes ---
+app.get('/health', (req, res) => res.json({ status: 'ok', stack: 'express' }));
+
+// --- Documentation ---
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc));
+
+app.listen(PORT, () => {
+  console.log(`🚀 {{ project_name }} running on http://localhost:${PORT}`);
+  console.log(`📚 Documentation available on http://localhost:${PORT}/docs`);
 });

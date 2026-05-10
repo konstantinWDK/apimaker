@@ -104,13 +104,21 @@ def build_openapi_document(project: Project) -> dict:
                 if ds_id == target_ds_id and ds_n in schemas:
                     ref_name = ds_n
                     break
+        elif not target_ds_id and hasattr(project, 'datasets'):
+            # Fallback: Try to match dataset by path name (e.g. /pokemon -> Pokemon)
+            path_root = endpoint.path.strip('/').split('/')[0].lower()
+            for ds in project.datasets:
+                ds_n = ds.name if hasattr(ds, 'name') else ds.get('name', '')
+                if ds_n.lower() == path_root and ds_n in schemas:
+                    ref_name = ds_n
+                    break
 
         component_ref = {"$ref": f"#/components/schemas/{ref_name}"} if ref_name in schemas else {"type": "object"}
         content_schema = {"type": "array", "items": component_ref} if is_list else component_ref
 
         operation = {
             "summary": endpoint.summary or endpoint.name,
-            "tags": [ref_name],
+            "tags": [ref_name.capitalize()],
             "responses": {
                 "200": {
                     "description": endpoint.summary or "Successful response",

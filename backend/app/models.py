@@ -61,6 +61,7 @@ class Project(BaseModel):
     jwt_secret: str | None = None
     rate_limit: int | None = None
     target_stack: Literal["fastapi", "express", "nest"] = "fastapi"
+    include_data: bool = True
     datasets: list[DatasetMeta] = Field(default_factory=list)
     endpoints: list[ApiEndpoint] = Field(default_factory=list)
     status: ProjectStatus = ProjectStatus.DRAFT
@@ -78,6 +79,7 @@ class CreateProjectRequest(BaseModel):
     jwt_secret: str | None = None
     rate_limit: int | None = None
     target_stack: Literal["fastapi", "express", "nest"] = "fastapi"
+    include_data: bool = True
     workspace_id: str | None = None
     datasets: list[DatasetMeta] = Field(default_factory=list)
 
@@ -91,6 +93,7 @@ class UpdateProjectRequest(BaseModel):
     jwt_secret: str | None = None
     rate_limit: int | None = None
     target_stack: str | None = None
+    include_data: bool | None = None
     status: str | None = None
 
 
@@ -110,6 +113,7 @@ class DefineEndpointsRequest(BaseModel):
 class GenerationRequest(BaseModel):
     include_mock_server: bool = True
     include_sdk: bool = True
+    include_data: bool = True
 
 
 class GenerationResult(BaseModel):

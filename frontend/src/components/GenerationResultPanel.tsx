@@ -23,62 +23,13 @@ export function GenerationResultPanel({ result, projectId }: Props) {
     }
   }, [])
 
-  const handleCopyShare = async () => {
-    const url = shareUrl || result.shareUrl
-    if (!url || typeof navigator === 'undefined' || !navigator.clipboard) return
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopied(true)
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
-      timeoutRef.current = setTimeout(() => setCopied(false), 2000)
-    } catch {
-      setCopied(false)
-    }
-  }
-
-  const [shareError, setShareError] = useState<string | null>(null)
-  const [sharePassword, setSharePassword] = useState<string | null>(null)
-  const [showPasswordInput, setShowPasswordInput] = useState(false)
-
-  const handleCreateShare = async () => {
-    setSharing(true)
-    setShareError(null)
-    try {
-      const { baseUrl } = readBackendConfig()
-      const cleanBase = baseUrl?.replace(/\/$/, '')
-      if (!cleanBase) {
-        setShareError('Configura la URL del backend primero')
-        return
-      }
-      let token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
-      if (!token) {
-        setShareError('No hay sesión activa. Inicia sesión primero.')
-        setSharing(false)
-        return
-      }
-      const res = await fetch(`${cleanBase}/share/projects/${projectId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ expires_days: 30, password: sharePassword || undefined }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setShareError(data.detail || 'Error al crear el enlace')
-        return
-      }
-      if (data.url) {
-        setShareUrl(`${cleanBase}${data.url}`)
-      } else {
-        setShareError('No se recibió URL del enlace')
-      }
-    } catch (err: unknown) {
-      setShareError(err instanceof Error ? err.message : 'Error de conexión')
-    } finally {
-      setSharing(false)
-    }
+  const handleCopy = (text: string) => {
+    if (typeof navigator === 'undefined' || !navigator.clipboard) return
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    timeoutRef.current = setTimeout(() => setCopied(false), 2000)
+    toast('Copiado al portapapeles', 'info')
   }
 
   const handleDownload = async () => {
@@ -90,7 +41,7 @@ export function GenerationResultPanel({ result, projectId }: Props) {
       let token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
 
       if (!token) {
-        toast('No hay sesión activa. Inicia sesión primero para descargar el bundle.', 'error')
+        toast('No hay sesión activa. Inicia sesión primero.', 'error')
         setDownloading(false)
         return
       }
@@ -100,125 +51,224 @@ export function GenerationResultPanel({ result, projectId }: Props) {
       })
 
       if (!res.ok) {
-        const errText = await res.text()
-        console.error('[Download] Download failed:', res.status, errText)
         toast(`Error al descargar: ${res.status}`, 'error')
         setDownloading(false)
         return
       }
 
       const blob = await res.blob()
-      triggerDownload(blob, `${projectId}-bundle.zip`)
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = `${projectId}-bundle.zip`
+      link.click()
+      URL.revokeObjectURL(link.href)
     } catch (err) {
-      console.error('[Download] Exception:', err)
-      toast('Error de conexión. Asegúrate de que el backend está activo.', 'error')
+      toast('Error de conexión con el backend', 'error')
     } finally {
       setDownloading(false)
     }
   }
 
-  const triggerDownload = (blob: Blob, filename: string) => {
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = filename
-    link.click()
-    URL.revokeObjectURL(link.href)
-  }
+  const baseUrl = result.apiUrl.split('/').slice(0, -1).join('/')
 
   return (
-    <div className="result-panel">
-      <div className="result-panel__highlight">
-        <div>
-          <p className="label">Sandbox URL</p>
-          <p className="result-panel__link">{result.apiUrl}</p>
-        </div>
-        <div>
-          <p className="label">Documentación</p>
-          <a className="link" href={result.docsUrl} target="_blank" rel="noreferrer">
-            Abrir Redoc
-          </a>
-        </div>
-      </div>
-
-      {/* Download button */}
-      <div className="result-panel__download">
-        <button
-          type="button"
-          className="btn primary btn-full"
-          onClick={handleDownload}
-          disabled={downloading}
-        >
-          {downloading ? 'Descargando...' : 'Descargar bundle (.zip)'}
-        </button>
-        <p className="muted-text" style={{ fontSize: '0.8rem', marginTop: '0.4rem', textAlign: 'center' }}>
-          Código {result.stack === 'fastapi' ? 'FastAPI' : result.stack === 'express' ? 'Express' : 'NestJS'} listo para desplegar con Docker o VPS
-        </p>
-      </div>
-
-      <p className="muted-text">{result.retentionNotice}</p>
-
-      {/* Share section */}
-      <div className="result-panel__share">
-        <p className="label">Enlace compartible</p>
-        {shareError && <p className="error-text" style={{ fontSize: '0.82rem' }}>{shareError}</p>}
-        {!shareUrl ? (
-          <>
-            {!showPasswordInput ? (
-              <div className="share-actions">
-                <button
-                  type="button"
-                  className="btn ghost btn-small btn-full"
-                  onClick={handleCreateShare}
-                  disabled={sharing}
-                >
-                  {sharing ? 'Creando enlace...' : 'Crear enlace público'}
-                </button>
-                <button
-                  type="button"
-                  className="btn ghost btn-small btn-full"
-                  onClick={() => setShowPasswordInput(true)}
-                  style={{ marginTop: '0.25rem' }}
-                >
-                  Con contraseña
-                </button>
+    <div className="deploy-console">
+      <div className="deploy-grid">
+        {/* Left: Main Actions */}
+        <div className="deploy-main">
+          <div className="deploy-card download-card">
+            <div className="card-header">
+              <div className="stack-badge">
+                {result.stack === 'fastapi' ? '🐍 Python' : '🟢 Node.js'}
               </div>
-            ) : (
-              <div className="share-password-form">
-                <input
-                  type="password"
-                  placeholder="Contraseña (opcional)"
-                  value={sharePassword || ''}
-                  onChange={e => setSharePassword(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleCreateShare()}
-                />
-                <button
-                  type="button"
-                  className="btn ghost btn-small btn-full"
-                  onClick={handleCreateShare}
-                  disabled={sharing}
-                >
-                  {sharing ? 'Creando enlace...' : 'Crear enlace protegido'}
-                </button>
-                <button
-                  type="button"
-                  className="btn ghost btn-small"
-                  onClick={() => { setShowPasswordInput(false); setSharePassword(null); }}
-                  style={{ fontSize: '0.8rem' }}
-                >
-                  ← Público
-                </button>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="share-input">
-            <input type="text" value={shareUrl} readOnly />
-            <button type="button" className="btn ghost btn-small" onClick={handleCopyShare}>
-              {copied ? 'Copiado' : 'Copiar'}
+              <h3>Código Fuente Completo</h3>
+            </div>
+            <p className="card-desc">Proyecto estructurado con modelos, rutas y Docker.</p>
+            <button
+              type="button"
+              className="btn primary btn-full btn-large"
+              onClick={handleDownload}
+              disabled={downloading}
+            >
+              {downloading ? 'Generando ZIP...' : '📥 Descargar Bundle (.zip)'}
             </button>
           </div>
-        )}
+
+          <div className="deploy-card sandbox-card">
+            <p className="label">Sandbox Base URL</p>
+            <div className="url-display">
+              <code>{baseUrl}/...</code>
+              <button className="copy-icon-btn" onClick={() => handleCopy(baseUrl)}>
+                {copied ? '✅' : '📋'}
+              </button>
+            </div>
+            <div className="card-footer-actions">
+              <a className="btn ghost btn-small" href={result.docsUrl} target="_blank" rel="noreferrer">
+                📚 Ver Documentación (Redoc)
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Steps */}
+        <div className="deploy-steps-panel">
+          <h4 className="steps-title">🚀 Guía de Despliegue</h4>
+          <div className="step-item">
+            <div className="step-circle">1</div>
+            <div className="step-content">
+              <strong>Descomprimir</strong>
+              <p>Extrae el ZIP en tu carpeta de proyectos.</p>
+            </div>
+          </div>
+          <div className="step-item">
+            <div className="step-circle">2</div>
+            <div className="step-content">
+              <strong>Instalar y Lanzar</strong>
+              <div className="code-block">
+                <code>./setup.sh</code>
+                <button onClick={() => handleCopy('./setup.sh')}>📋</button>
+              </div>
+              <p className="muted-text-tiny" style={{ marginTop: '4px' }}>Si falla, usa: <code>bash setup.sh</code></p>
+            </div>
+          </div>
+          <div className="step-item">
+            <div className="step-circle">3</div>
+            <div className="step-content">
+              <strong>Docker Compose</strong>
+              <div className="code-block">
+                <code>docker compose up -d</code>
+                <button onClick={() => handleCopy('docker compose up -d')}>📋</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
+
+      <style>{`
+        .deploy-console {
+          margin-top: 1rem;
+        }
+        .deploy-grid {
+          display: grid;
+          grid-template-columns: 1.2fr 1fr;
+          gap: 1.5rem;
+        }
+        .deploy-card {
+          background: white;
+          border: 1px solid #e2e8f0;
+          border-radius: 16px;
+          padding: 1.5rem;
+          margin-bottom: 1rem;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+        .card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 0.75rem;
+        }
+        .stack-badge {
+          background: #f1f5f9;
+          padding: 0.25rem 0.75rem;
+          border-radius: 999px;
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: #475569;
+        }
+        .card-desc {
+          font-size: 0.9rem;
+          color: #64748b;
+          margin-bottom: 1.5rem;
+        }
+        .btn-large {
+          padding: 1rem;
+          font-size: 1rem;
+          font-weight: 700;
+        }
+        .url-display {
+          background: #0f172a;
+          padding: 0.75rem 1rem;
+          border-radius: 10px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-top: 0.5rem;
+        }
+        .url-display code {
+          color: #38bdf8;
+          font-size: 0.85rem;
+        }
+        .copy-icon-btn {
+          background: none;
+          border: none;
+          cursor: pointer;
+          font-size: 1rem;
+        }
+        .deploy-steps-panel {
+          background: #f8fafc;
+          border-radius: 16px;
+          padding: 1.5rem;
+          border: 1px solid #e2e8f0;
+        }
+        .steps-title {
+          font-size: 1rem;
+          margin-bottom: 1.5rem;
+          color: #1e293b;
+        }
+        .step-item {
+          display: flex;
+          gap: 1rem;
+          margin-bottom: 1.5rem;
+        }
+        .step-circle {
+          width: 28px;
+          height: 28px;
+          background: #3b82f6;
+          color: white;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 800;
+          font-size: 0.8rem;
+          flex-shrink: 0;
+        }
+        .step-content strong {
+          display: block;
+          font-size: 0.9rem;
+          color: #1e293b;
+        }
+        .step-content p {
+          font-size: 0.8rem;
+          color: #64748b;
+          margin: 0.25rem 0;
+        }
+        .code-block {
+          background: #1e293b;
+          padding: 0.5rem 0.75rem;
+          border-radius: 6px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-top: 0.5rem;
+        }
+        .code-block code {
+          color: #cbd5e1;
+          font-size: 0.75rem;
+          font-family: monospace;
+        }
+        .code-block button {
+          background: none;
+          border: none;
+          color: #94a3b8;
+          cursor: pointer;
+        }
+        .card-footer-actions {
+          margin-top: 1rem;
+          display: flex;
+          gap: 0.5rem;
+        }
+      `}</style>
     </div>
   )
 }

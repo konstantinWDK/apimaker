@@ -1,33 +1,40 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Request } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 
 @Controller()
 export class AppController {
-  
+  private db: any = {};
+
+  constructor() {
+    // In a real scenario, we would use services and TypeORM
+    // For this generated bundle, we use a simple shared store initialized by main.ts
+    this.db = (global as any).apiDatabase || {};
+  }
+
   @Get('health')
+  @ApiOperation({ summary: 'Health check' })
   getHealth() {
     return { status: 'ok', stack: 'nestjs' };
   }
 
-  {% if dataset %}
-  {% for ep in endpoints %}
-  @{{ ep.method | capitalize }}('{{ ep.path | replace("{", ":") | replace("}", "") }}')
-  async {{ ep.name | lower | replace(" ", "_") }}(
-    @Body() body: any,
-    @Param() params: any,
-    @Query('skip') skip = 0,
-    @Query('limit') limit = 100,
-  ) {
-    // {{ ep.summary or ep.name }} ({{ ep.operation_type }})
-    // Implementation would use a Service and Repository in a real NestJS app
-    return { 
-      message: '{{ ep.name }} executed', 
-      operation: '{{ ep.operation_type }}',
-      data: body, 
-      params, 
-      skip, 
-      limit 
-    };
+  {% for ds in datasets %}
+  // --- Resources for {{ ds.name }} ---
+
+  @ApiTags('{{ ds.name }}')
+  @Get('{{ ds.name | lower | replace(" ", "_") }}')
+  @ApiOperation({ summary: 'List all {{ ds.name }}' })
+  list{{ ds.name | capitalize | replace(" ", "") }}() {
+    return this.db["{{ ds.name }}"] || [];
+  }
+
+  @ApiTags('{{ ds.name }}')
+  @Post('{{ ds.name | lower | replace(" ", "_") }}')
+  @ApiOperation({ summary: 'Create {{ ds.name }}' })
+  create{{ ds.name | capitalize | replace(" ", "") }}(@Body() data: any) {
+    const newItem = { id: Date.now(), ...data, created_at: new Date() };
+    if (!this.db["{{ ds.name }}"]) this.db["{{ ds.name }}"] = [];
+    this.db["{{ ds.name }}"].push(newItem);
+    return newItem;
   }
   {% endfor %}
-  {% endif %}
 }

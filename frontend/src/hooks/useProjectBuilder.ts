@@ -111,6 +111,7 @@ const api = {
       jwtSecret: p.jwt_secret || '',
       rateLimit: p.rate_limit || 0,
       targetStack: p.target_stack || 'fastapi',
+      includeData: p.include_data !== false,
       endpoints: (p.endpoints || []).map((ep: any) => ({
         id: ep.id,
         name: ep.name,
@@ -161,7 +162,8 @@ const api = {
       jwt_secret: draft.jwtSecret,
       rate_limit: draft.rateLimit,
       target_stack: draft.targetStack,
-      workspace_id: (draft as any).workspaceId,
+      include_data: draft.includeData !== false,
+      workspace_id: (draft as any).workspace_id,
     }
     if (draft.datasets && draft.datasets.length > 0) {
       body.datasets = draft.datasets.map(ds => ({
@@ -194,6 +196,7 @@ const api = {
       jwtSecret: data.jwt_secret || '',
       rateLimit: data.rate_limit || 0,
       targetStack: data.target_stack || 'fastapi',
+      includeData: data.include_data !== false,
       endpoints: (data.endpoints || []).map((ep: any) => ({
         id: ep.id,
         name: ep.name,
@@ -220,7 +223,7 @@ const api = {
     }
   },
 
-  async updateProject(id: string, updates: { name?: string; slug?: string; description?: string; auth_method?: string; api_key?: string; jwt_secret?: string; rate_limit?: number; target_stack?: string }): Promise<boolean> {
+  async updateProject(id: string, updates: { name?: string; slug?: string; description?: string; auth_method?: string; api_key?: string; jwt_secret?: string; rate_limit?: number; target_stack?: string; include_data?: boolean }): Promise<boolean> {
     const res = await fetch(`${getBaseUrl()}/projects/${id}`, {
       method: 'PATCH',
       headers: getAuthHeaders(),
@@ -400,6 +403,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
           if (payload.jwtSecret !== undefined) changes.jwt_secret = payload.jwtSecret
           if (payload.rateLimit !== undefined) changes.rate_limit = payload.rateLimit
           if (payload.targetStack !== undefined) changes.target_stack = payload.targetStack
+          if (payload.includeData !== undefined) changes.include_data = payload.includeData
           if (Object.keys(changes).length > 0) {
             await api.updateProject(saveId, changes)
           }
@@ -692,6 +696,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
           jwt_secret: currentProject.jwtSecret,
           rate_limit: currentProject.rateLimit,
           target_stack: currentProject.targetStack,
+          include_data: currentProject.includeData,
         })
       }
 

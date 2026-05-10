@@ -103,9 +103,10 @@ class Project(SQLModel, table=True):
     api_key: Optional[str] = None
     jwt_secret: Optional[str] = None
     rate_limit: Optional[int] = None
-    target_stack: str = "fastapi"
-    status: str = "draft"
-    workspace_id: Optional[str] = Field(default=None, foreign_key="workspaces.id")
+    status: str = Field(default="draft")
+    target_stack: str = Field(default="fastapi")
+    include_data: bool = Field(default=True)
+    workspace_id: str | None = Field(default=None, foreign_key="workspaces.id")
     created_by: Optional[str] = Field(default=None, foreign_key="users.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

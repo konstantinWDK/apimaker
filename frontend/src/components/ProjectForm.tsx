@@ -54,6 +54,17 @@ export function ProjectForm({ project, onChange }: Props) {
             ))}
           </div>
         </div>
+        <div className="form-group">
+          <label className="label-tiny">Opciones</label>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={project.includeData !== false}
+              onChange={(e) => onChange({ includeData: e.target.checked })}
+            />
+            Incluir datos (seeds)
+          </label>
+        </div>
       </div>
 
       <style>{`
@@ -109,10 +120,22 @@ export function ProjectForm({ project, onChange }: Props) {
           background: #f8fafc;
         }
         .stack-bubble.active {
-          background: #eff6ff;
-          color: #2563eb;
           border-color: #bfdbfe;
           box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+        }
+        .checkbox-label {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-size: 0.8rem;
+          color: #64748b;
+          height: 34px;
+          cursor: pointer;
+          user-select: none;
+        }
+        .checkbox-label input {
+          width: 16px;
+          height: 16px;
         }
       `}</style>
     </div>

@@ -135,7 +135,11 @@ export function App() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ include_mock_server: true, include_sdk: true }),
+        body: JSON.stringify({ 
+          include_mock_server: true, 
+          include_sdk: true, 
+          include_data: project.includeData !== false 
+        }),
       })
 
       if (!gr.ok) {
@@ -356,15 +360,16 @@ export function App() {
         )
       case 'result':
         return effectiveResult ? (
-          <SectionCard title="API generada" subtitle="Sandbox, docs y endpoints" accent="emerald" fullWidth>
-            <div className="api-delivery-grid">
-              <GenerationResultPanel result={effectiveResult} projectId={project.slug || project.remoteId || project.id} />
-              <EndpointGallery
-                endpoints={effectiveResult.endpoints}
-                baseUrl={effectiveResult.apiUrl}
-                authMethod={project.authMethod}
-                apiKey={project.apiKey}
+          <SectionCard title="Proyecto Generado" subtitle="Descarga el código fuente completo listo para producción" accent="emerald" fullWidth>
+            <div className="generation-result-flow">
+              <GenerationResultPanel 
+                result={effectiveResult} 
+                projectId={project.slug || project.remoteId || project.id} 
               />
+              
+              <div className="deployment-notice">
+                <p>Este bundle contiene la arquitectura completa (modelos, controladores, seguridad y Docker) para el stack <strong>{project.targetStack.toUpperCase()}</strong>.</p>
+              </div>
             </div>
           </SectionCard>
         ) : (
