@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from uuid import UUID
 
 from sqlmodel import Session, select
 
@@ -13,15 +12,39 @@ from ..db_models import Dataset, DatasetField, Endpoint, Project
 class ProjectService:
     """Database-backed project CRUD operations."""
 
+    def resolve_id(self, session: Session, project_id: str) -> str:
+        """Resolve project ID from slug or internal ID. Prioritizes slug."""
+        # 1. Try slug match (case-insensitive)
+        slug_id = project_id.lower()
+        project = session.exec(select(Project).where(Project.slug == slug_id)).first()
+        if project:
+            return project.id
+
+        # 2. Try exact ID match
+        project = session.get(Project, project_id)
+        if project:
+            return project.id
+
+        raise KeyError(f"Project '{project_id}' not found")
+
+
     def create_project(
         self,
         session: Session,
         name: str,
         description: str | None = None,
         target_stack: str = "fastapi",
+        slug: str | None = None,
     ) -> Project:
+        import re
+        if not slug:
+            slug = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
+        else:
+            slug = re.sub(r'[^a-z0-9]+', '-', slug.lower()).strip('-')
+        
         project = Project(
             name=name,
+            slug=slug,
             description=description,
             target_stack=target_stack,
         )
@@ -30,16 +53,53 @@ class ProjectService:
         session.refresh(project)
         return project
 
+    def update_project(
+        self,
+        session: Session,
+        project_id: str,
+        name: str | None = None,
+        slug: str | None = None,
+        description: str | None = None,
+        target_stack: str | None = None,
+        status: str | None = None,
+    ) -> Project:
+        project = self.get_project(session, project_id)
+        if name is not None:
+            project.name = name
+            # If slug is not set yet, auto-generate from new name
+            if not project.slug and not slug:
+                import re
+                project.slug = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
+
+        if slug:
+            import re
+            project.slug = re.sub(r'[^a-z0-9]+', '-', slug.lower()).strip('-')
+        elif slug == "" and project.name:
+            import re
+            project.slug = re.sub(r'[^a-z0-9]+', '-', project.name.lower()).strip('-')
+
+        if description is not None:
+            project.description = description
+        if target_stack is not None:
+            project.target_stack = target_stack
+        if status is not None:
+            project.status = status
+        project.updated_at = datetime.utcnow()
+        session.add(project)
+        session.commit()
+        session.refresh(project)
+        return project
+
     def list_projects(self, session: Session) -> list[Project]:
         return session.exec(select(Project)).all()
 
-    def get_project(self, session: Session, project_id: UUID) -> Project:
+    def get_project(self, session: Session, project_id: str) -> Project:
         project = session.get(Project, str(project_id))
         if project is None:
             raise KeyError("Project not found")
         return project
 
-    def get_project_with_data(self, session: Session, project_id: UUID) -> dict:
+    def get_project_with_data(self, session: Session, project_id: str) -> dict:
         """Get project with its dataset and endpoints loaded."""
         project = self.get_project(session, project_id)
 
@@ -69,10 +129,11 @@ class ProjectService:
     def attach_dataset(
         self,
         session: Session,
-        project_id: UUID,
+        project_id: str,
         name: str,
         source_type: str,
         fields: list[dict],
+        sample_rows: list[dict] | None = None,
     ) -> Project:
         project = self.get_project(session, project_id)
 
@@ -88,10 +149,12 @@ class ProjectService:
                 session.delete(f)
             session.delete(existing_dataset)
 
+        import json
         dataset = Dataset(
             project_id=str(project_id),
             name=name,
             source_type=source_type,
+            sample_rows=json.dumps(sample_rows) if sample_rows else None
         )
         session.add(dataset)
         session.flush()
@@ -116,7 +179,7 @@ class ProjectService:
     def define_endpoints(
         self,
         session: Session,
-        project_id: UUID,
+        project_id: str,
         endpoints: list[dict],
     ) -> Project:
         project = self.get_project(session, project_id)
@@ -146,7 +209,7 @@ class ProjectService:
         return project
 
     def mark_status(
-        self, session: Session, project_id: UUID, status: str
+        self, session: Session, project_id: str, status: str
     ) -> Project:
         project = self.get_project(session, project_id)
         project.status = status
@@ -156,7 +219,7 @@ class ProjectService:
         session.refresh(project)
         return project
 
-    def delete_project(self, session: Session, project_id: UUID) -> None:
+    def delete_project(self, session: Session, project_id: str) -> None:
         project = self.get_project(session, project_id)
 
         # Cascade delete related data

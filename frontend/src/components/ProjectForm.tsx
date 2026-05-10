@@ -25,6 +25,16 @@ export function ProjectForm({ project, onChange }: Props) {
         />
       </label>
       <label className="form-field">
+        <span className="label">Slug (URL amigable)</span>
+        <input
+          name="slug"
+          value={project.slug ?? ''}
+          onChange={handleInput}
+          className="field"
+          placeholder="ej: mi-pokedex"
+        />
+      </label>
+      <label className="form-field">
         <span className="label">Descripción</span>
         <textarea
           name="description"

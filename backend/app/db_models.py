@@ -71,6 +71,7 @@ class Dataset(SQLModel, table=True):
     project_id: Optional[str] = Field(default=None, foreign_key="projects.id")
     name: str
     source_type: str = "manual"
+    sample_rows: Optional[str] = Field(default=None)  # JSON-serialized sample data
 
 
 class Endpoint(SQLModel, table=True):
@@ -93,6 +94,7 @@ class Project(SQLModel, table=True):
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     name: str
+    slug: Optional[str] = Field(default=None, index=True, unique=True)
     description: Optional[str] = None
     target_stack: str = "fastapi"
     status: str = "draft"

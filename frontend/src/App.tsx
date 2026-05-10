@@ -45,16 +45,22 @@ export function App() {
   const { isAuthenticated, login, error: authError, logout, resetCredentials, authStatus } = useAuth()
   const {
     project,
-    history,
     updateProject,
     setDataset,
     upsertEndpoint,
     removeEndpoint,
     replaceProject,
     setGenerationResult,
-    saveSnapshot,
-    loadSnapshot,
-    deleteSnapshot,
+    startMock,
+    stopMock,
+    checkMockStatus,
+    deleteProject,
+    mockRunning,
+    mockLoading,
+    mockError,
+    refreshProjects,
+    projects,
+    saveProject,
   } = useProjectBuilder()
 
   if (isShareView) {
@@ -81,10 +87,11 @@ export function App() {
 
   const tabs = useMemo(
     () => [
-      { id: 'schema', label: 'Dataset & Vista previa' },
-      { id: 'endpoints', label: 'Endpoints & Simulador' },
-      { id: 'delivery', label: 'Payload & Entrega' },
-      { id: 'result', label: 'API generada' },
+      { id: 'schema', label: '1. Dataset' },
+      { id: 'endpoints', label: '2. Endpoints' },
+      { id: 'simulator', label: '3. Simulador' },
+      { id: 'delivery', label: '4. Entrega' },
+      { id: 'result', label: '5. Resultado' },
     ],
     [],
   )
@@ -105,73 +112,24 @@ export function App() {
         description: endpoint.summary || endpoint.name,
       }))
 
-      // Auto-login: try stored credentials only (no fallback to default admin/admin)
-      let token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
-      if (!token) {
-        const storedCreds = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-creds') : null
-        const creds = storedCreds ? JSON.parse(storedCreds) : null
-        if (creds) {
-          const loginRes = await fetch(`${backendBaseUrl}/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(creds),
-          })
-          if (loginRes.ok) {
-            const loginData = await loginRes.json()
-            if (loginData.access_token && typeof window !== 'undefined') {
-              window.sessionStorage.setItem('apimaker-jwt-token', loginData.access_token)
-              token = loginData.access_token
-            }
-          }
-        }
-      }
-      if (!token) {
-        alert('No hay sesión activa. Inicia sesión desde la pantalla de login antes de generar la API.')
+      // Sync with backend using the new centralized function
+      const effectiveProjectId = await saveProject()
+      if (!effectiveProjectId) {
+        alert('Error al guardar el proyecto. Asegúrate de estar autenticado.')
         return
       }
 
-      const auth = { Authorization: `Bearer ${token}` }
-
-      // Create project if doesn't exist
-      const exists = await fetch(`${backendBaseUrl}/projects/${project.id}`, { headers: auth })
-      let effectiveProjectId = project.id
-
-      if (!exists.ok) {
-        const cr = await fetch(`${backendBaseUrl}/projects`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json', ...auth },
-          body: JSON.stringify({ name: project.name, description: project.description, target_stack: project.targetStack }),
-        })
-        if (!cr.ok) { alert(`Error al crear proyecto: ${await cr.text()}`); return }
-        const createdProject = await cr.json()
-        // IMPORTANT: use the server-assigned ID, not the client-side one
-        effectiveProjectId = createdProject.id
-        if (effectiveProjectId !== project.id) {
-          replaceProject({ ...project, id: effectiveProjectId })
-        }
-
-        // Sync dataset
-        if (project.dataset) {
-          const dsRes = await fetch(`${backendBaseUrl}/projects/${effectiveProjectId}/dataset`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json', ...auth },
-            body: JSON.stringify({ name: project.dataset.name, source_type: project.dataset.sourceType, fields: project.dataset.fields.map(f => ({ name: f.name, type: f.type, required: f.required, description: f.description })) }),
-          })
-          if (!dsRes.ok) { console.error('Error syncing dataset:', await dsRes.text()) }
-        }
-        // Sync endpoints
-        if (project.endpoints.length > 0) {
-          const epRes = await fetch(`${backendBaseUrl}/projects/${effectiveProjectId}/endpoints`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json', ...auth },
-            body: JSON.stringify({ endpoints: project.endpoints.map(ep => ({ ...ep, id: crypto.randomUUID() })) }),
-          })
-          if (!epRes.ok) { console.error('Error syncing endpoints:', await epRes.text()) }
-        }
-      }
-
       // Generate bundle
+      const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
       const gr = await fetch(`${backendBaseUrl}/projects/${effectiveProjectId}/generate`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', ...auth },
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ include_mock_server: true, include_sdk: true }),
       })
+
       if (!gr.ok) {
         alert(`Error al generar bundle: ${await gr.text()}`)
         return
@@ -180,7 +138,7 @@ export function App() {
       // Build local result
       const shareId = crypto.randomUUID().slice(0, 6)
       const generationResult: GenerationResult = {
-        message: 'API generated successfully',
+        message: 'API generada con éxito',
         retentionNotice: 'Pulsa "Descargar bundle (.zip)" en la API generada para obtener el código.',
         apiUrl: `${localBaseUrl}/api/mock/${effectiveProjectId}${endpoints[0]?.path ?? '/records'}`,
         docsUrl: `${backendBaseUrl}/projects/${effectiveProjectId}/docs`,
@@ -190,6 +148,7 @@ export function App() {
       }
       setGenerationResult({ lastGeneration: generationResult, sharePath: generationResult.shareUrl })
       setResult(generationResult)
+      setActiveTab('result')
     } catch (err) {
       alert(`Error: ${err instanceof Error ? err.message : 'desconocido'}`)
     } finally {
@@ -199,18 +158,55 @@ export function App() {
 
   const handleLoadDemo = async () => {
     setLoadingDemo(true)
+    setResult(null)
     try {
       const response = await fetch('/demo-project.json', { cache: 'no-store' })
       if (!response.ok) throw new Error('No se pudo cargar el demo')
-      const data = (await response.json()) as ProjectDraft
-      replaceProject({ ...data, id: crypto.randomUUID() })
-      setResult(null)
+      const demoData = (await response.json()) as ProjectDraft
+
+      // Regenerate IDs to ensure they are valid UUIDs for the backend
+      const endpointsWithValidIds = (demoData.endpoints || []).map(ep => ({
+        ...ep,
+        id: crypto.randomUUID()
+      }))
+
+      const nextProject = {
+        ...demoData,
+        id: crypto.randomUUID(),
+        slug: 'pokedex-demo',
+        endpoints: endpointsWithValidIds,
+        updatedAt: new Date().toISOString(),
+      }
+
+      // Load demo into local state immediately
+      replaceProject(nextProject)
+      
+      // Attempt background save to DB if authenticated
+      const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
+      if (token) {
+        saveProject()
+      } else {
+        refreshProjects()
+      }
     } catch (error) {
-      console.error(error)
+      console.error('Error loading demo:', error)
+      alert('Error al cargar la demo')
     } finally {
       setLoadingDemo(false)
     }
   }
+
+  // Load projects from backend on mount
+  useEffect(() => {
+    refreshProjects()
+  }, [])
+
+  // Check mock status when project changes
+  useEffect(() => {
+    if (project.id) {
+      checkMockStatus()
+    }
+  }, [project.id])
 
   useEffect(() => {
     setResult(project.lastGeneration ?? null)
@@ -257,22 +253,23 @@ export function App() {
         )
       case 'endpoints':
         return (
-          <div className="tab-grid">
-              <SectionCard title="Endpoints REST" subtitle="CRUD base + rutas personalizadas">
-                <EndpointDesigner
-                  project={project}
-                  endpoints={project.endpoints}
-                  onAdd={upsertEndpoint}
-                  onRemove={removeEndpoint}
-                  previewBase={localBaseUrl}
-                  warningMessage={generationWarning}
-                  clearWarning={() => setGenerationWarning(null)}
-                />
-              </SectionCard>
-            <SectionCard title="Simulador" subtitle="Haz llamadas contra tu sandbox local">
-              <ApiPlayground project={project} />
-            </SectionCard>
-          </div>
+          <SectionCard title="Endpoints REST" subtitle="CRUD base + rutas personalizadas" fullWidth>
+            <EndpointDesigner
+              project={project}
+              endpoints={project.endpoints}
+              onAdd={upsertEndpoint}
+              onRemove={removeEndpoint}
+              previewBase={localBaseUrl}
+              warningMessage={generationWarning}
+              clearWarning={() => setGenerationWarning(null)}
+            />
+          </SectionCard>
+        )
+      case 'simulator':
+        return (
+          <SectionCard title="Simulador" subtitle="Haz llamadas contra tu sandbox local" accent="sky" fullWidth>
+            <ApiPlayground project={project} />
+          </SectionCard>
         )
       case 'delivery':
         return (
@@ -292,13 +289,16 @@ export function App() {
         return effectiveResult ? (
           <SectionCard title="API generada" subtitle="Sandbox, docs y endpoints" accent="emerald" fullWidth>
             <div className="api-delivery-grid">
-              <GenerationResultPanel result={effectiveResult} projectId={project.id} />
+              <GenerationResultPanel result={effectiveResult} projectId={project.slug || project.remoteId || project.id} />
               <EndpointGallery endpoints={effectiveResult.endpoints} />
             </div>
           </SectionCard>
         ) : (
           <SectionCard title="API generada" subtitle="Tu sandbox aparecerá aquí" fullWidth>
-            <p className="muted-text">Genera la API en la vista principal para ver los detalles.</p>
+            <div className="empty-state">
+              <p className="muted-text">Genera la API en la vista principal para ver los detalles.</p>
+              <button type="button" className="btn ghost btn-small" onClick={handleGenerate}>Generar ahora</button>
+            </div>
           </SectionCard>
         )
       default:
@@ -318,18 +318,27 @@ export function App() {
           />
           <ProjectSidebar
             project={project}
-            history={history}
-            onSave={saveSnapshot}
-            onSelect={loadSnapshot}
-            onDelete={deleteSnapshot}
-            onCreate={() =>
-              replaceProject({
+            projects={projects}
+            onSave={handleGenerate}
+            onCreate={() => {
+              const draft = {
                 id: crypto.randomUUID(),
                 name: 'Nueva API',
-                description: 'Describe tu dominio',
-                targetStack: 'fastapi',
+                description: 'Diseña tu API declarando datos y endpoints',
+                targetStack: 'fastapi' as const,
                 endpoints: [],
-              })}
+              }
+              // Just create local draft — DB sync happens on save or demo load
+              replaceProject(draft)
+            }}
+            mockRunning={mockRunning}
+            mockLoading={mockLoading}
+            mockError={mockError}
+            onStartMock={startMock}
+            onStopMock={stopMock}
+            onSwitchProject={replaceProject}
+
+            onDelete={deleteProject}
           />
         </div>
         <div className="app-content">
@@ -385,9 +394,14 @@ export function App() {
                   <div className="hero__card-header">
                     <h2>Configura tu API</h2>
                     <p>Define nombre, stack y contexto inicial.</p>
-                    <button type="button" className="btn ghost btn-small" onClick={handleLoadDemo} disabled={loadingDemo}>
-                      {loadingDemo ? 'Cargando...' : 'Cargar demo'}
-                    </button>
+                    {!project.endpoints.length && !project.dataset && (
+                      <button type="button" className="btn ghost btn-small" onClick={handleLoadDemo} disabled={loadingDemo}>
+                        {loadingDemo ? 'Cargando...' : 'Cargar demo'}
+                      </button>
+                    )}
+                    {project.dataset && project.dataset.fields.length > 0 && !project.endpoints.length && (
+                      <span className="muted-text" style={{ fontSize: '0.75rem' }}>Dataset configurado manualmente</span>
+                    )}
                   </div>
                   <ProjectForm project={project} onChange={updateProject} />
                 </div>
@@ -505,7 +519,16 @@ export function App() {
         </div>
       </div>
       <button type="button" className="fab" onClick={handleGenerate} disabled={isGenerating}>
-        {isGenerating ? 'Procesando...' : effectiveResult ? 'Actualizar API' : 'Generar API'}
+        {isGenerating ? (
+          <span className="fab__loading">Procesando...</span>
+        ) : (
+          <>
+            <svg className="fab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {project.remoteId ? 'Actualizar API' : 'Guardar y lanzar API'}
+          </>
+        )}
       </button>
     </div>
   )

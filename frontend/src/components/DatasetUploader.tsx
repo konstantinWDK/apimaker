@@ -23,9 +23,9 @@ const emptyField = (): FieldSchema => ({
   required: true,
 })
 
-const sampleStrings = ['Aurora Vega', 'Fabricio Costa', 'Lucía Morales', 'Zhao Lin']
-const sampleIntegers = ['12', '87', '203', '999']
-const sampleFloats = ['12.5', '87.4', '203.1', '999.9']
+const sampleStrings = ['Pikachu', 'Charizard', 'Gengar', 'Bulbasaur', 'Mewtwo']
+const sampleIntegers = ['25', '6', '94', '1', '150']
+const sampleFloats = ['0.4', '1.7', '1.5', '0.7', '2.0']
 const sampleBooleans = ['true', 'false']
 
 const sampleValue = (type: FieldSchema['type'], idx: number) => {
@@ -43,7 +43,7 @@ const sampleValue = (type: FieldSchema['type'], idx: number) => {
   }
 }
 
-const generateSampleRows = (fields: FieldSchema[], count = 3) => {
+const generateSampleRows = (fields: FieldSchema[], count = 5) => {
   if (fields.length === 0) return []
   return Array.from({ length: count }, (_, rowIndex) => {
     const row: Record<string, string> = {}
@@ -58,11 +58,21 @@ const generateSampleRows = (fields: FieldSchema[], count = 3) => {
 export function DatasetUploader({ dataset, onCommit }: Props) {
   const [name, setName] = useState(dataset?.name ?? 'Dataset principal')
   const [sourceType, setSourceType] = useState<DatasetMeta['sourceType']>(dataset?.sourceType ?? 'manual')
-  const [fields, setFields] = useState<FieldSchema[]>(dataset?.fields ?? [emptyField()])
+  const [fields, setFields] = useState<FieldSchema[]>(dataset?.fields ?? Array.from({ length: 5 }, emptyField))
   const [sampleRows, setSampleRows] = useState<Array<Record<string, string>>>(dataset?.sampleRows ?? [])
   const [uploadName, setUploadName] = useState(dataset?.uploadedFrom ?? '')
   const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  // Sync local state when dataset prop changes (e.g., demo loaded)
+  useEffect(() => {
+    if (dataset?.fields?.length) {
+      setFields(dataset.fields)
+      setSampleRows(dataset.sampleRows ?? [])
+      setName(dataset.name ?? 'Dataset principal')
+      setSourceType(dataset.sourceType ?? 'manual')
+    }
+  }, [dataset?.id, dataset?.name])  // re-sync when dataset identity changes
 
   useEffect(() => {
     if (sourceType === 'manual' && fields.length) {
@@ -121,7 +131,7 @@ export function DatasetUploader({ dataset, onCommit }: Props) {
       type: inferType(rows.map((row) => row[header] ?? '')),
       required: true,
     }))
-    setFields(fieldList.length ? fieldList : [emptyField()])
+    setFields(fieldList.length ? fieldList : Array.from({ length: 5 }, emptyField))
     setSampleRows(rows)
   }
 
@@ -271,6 +281,32 @@ export function DatasetUploader({ dataset, onCommit }: Props) {
           Guardar esquema
         </button>
       </div>
+
+      {sampleRows.length > 0 && (
+        <div className="dataset-builder__preview">
+          <p className="eyebrow">Vista previa de datos ({sampleRows.length} filas)</p>
+          <div className="preview-table-wrapper">
+            <table className="preview-table">
+              <thead>
+                <tr>
+                  {fields.map((f) => (
+                    <th key={f.id}>{f.name || 'Column'}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sampleRows.slice(0, 5).map((row, i) => (
+                  <tr key={i}>
+                    {fields.map((f) => (
+                      <td key={f.id}>{row[f.name] ?? '-'}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

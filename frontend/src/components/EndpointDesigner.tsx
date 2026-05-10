@@ -70,8 +70,8 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
     if (typeof window !== 'undefined') return window.location.origin
     return 'http://localhost:8000'
   }, [config.baseUrl, previewBase])
-  const previewProjectId = project.remoteId ?? project.id
-  const previewUrl = useMemo(() => `${resolvedBase}/api/${previewProjectId}${previewPath}`, [resolvedBase, previewPath, previewProjectId])
+  const previewProjectId = project.slug || project.remoteId || project.id
+  const previewUrl = useMemo(() => `${resolvedBase}/api/mock/${previewProjectId}${previewPath}`, [resolvedBase, previewPath, previewProjectId])
   const sizeKb = project.dataset?.sampleRows?.length
     ? `${Math.max(1, Math.round(JSON.stringify(project.dataset.sampleRows).length / 1024))} KB`
     : '1 KB'

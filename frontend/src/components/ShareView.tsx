@@ -34,7 +34,8 @@ const toProjectDraft = (data: ShareData): ProjectDraft => {
   const datasetFields = data.dataset?.fields ?? []
   return {
     id: data.project.id,
-    remoteId: data.project.id,
+    remoteId: data.project.slug || data.project.id,
+    slug: data.project.slug,
     name: data.project.name,
     description: data.project.description ?? undefined,
     targetStack: data.project.target_stack as 'fastapi' | 'express' | 'nest',
@@ -134,8 +135,8 @@ export function ShareView() {
   const datasetFields = shareData.dataset?.fields.length ?? 0
   const { baseUrl } = readBackendConfig()
   const result = {
-    apiUrl: `${baseUrl}/api/mock/${shareData.project.id}`,
-    docsUrl: `${baseUrl}/projects/${shareData.project.id}/docs`,
+    apiUrl: `${baseUrl}/api/mock/${project.slug || project.id}`,
+    docsUrl: `${baseUrl}/projects/${project.slug || project.id}/docs`,
     message: 'API mock generada y lista para probar',
     retentionNotice: 'Los datos del mock se reinician al detener el servidor',
     endpoints: shareData.endpoints.map((ep) => ({

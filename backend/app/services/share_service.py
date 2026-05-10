@@ -43,6 +43,7 @@ def create_share_snapshot(
         "project": {
             "id": project.id,
             "name": project.name,
+            "slug": project.slug,
             "description": project.description,
             "target_stack": project.target_stack,
             "status": project.status,

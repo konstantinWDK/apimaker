@@ -1,9 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { ProjectDraft } from '../types/schemas'
 import { readBackendConfig } from '../lib/backendConfig'
-
-const METHODS: Array<ProjectDraft['endpoints'][number]['method']> = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
 
 interface Props {
   project: ProjectDraft
@@ -14,105 +12,169 @@ interface ApiResponse {
   status: number
   body: unknown
   method: string
-  mode: 'mock' | 'local'
 }
 
-const buildCurlSnippet = (method: string, url: string, body: string | null) => {
+// ─── Sample data store (Only for demo/real data) ────────────────
+const sampleStore: Record<string, Array<Record<string, unknown>>> = {}
+
+const initStore = (project: ProjectDraft) => {
+  const actualRows = project.dataset?.sampleRows
+  if (actualRows && actualRows.length > 0) {
+    const fields = (project.dataset as any)?.fields ?? []
+    sampleStore[project.id] = actualRows.map((row: Record<string, string>, i: number) => {
+      const item: Record<string, unknown> = { id: i + 1 }
+      for (const f of fields) {
+        const val = row[f.name]
+        if (val !== undefined) {
+          if (f.type === 'integer') item[f.name] = parseInt(val, 10) || 0
+          else if (f.type === 'float') item[f.name] = parseFloat(val) || 0
+          else if (f.type === 'boolean') item[f.name] = String(val).toLowerCase() === 'true'
+          else item[f.name] = val
+        }
+      }
+      return item
+    })
+  } else {
+    sampleStore[project.id] = []
+  }
+}
+
+// ─── Body generators ──────────────────────────────────────────
+const buildBodyForMethod = (project: ProjectDraft, method: string, _path: string): string => {
+  const fields = project.dataset ? (project.dataset as any).fields ?? [] : []
+  if (method === 'GET') return ''
+
+  const base: Record<string, unknown> = {}
+  for (const f of fields) {
+    const n = f.name.toLowerCase()
+    if (f.type === 'string') {
+      if (n.includes('email')) base[f.name] = 'nuevo@email.com'
+      else if (n.includes('name')) base[f.name] = 'Nuevo Registro'
+      else base[f.name] = 'valor de ejemplo'
+    } else if (f.type === 'integer') base[f.name] = 42
+    else if (f.type === 'float') base[f.name] = 19.99
+    else if (f.type === 'boolean') base[f.name] = true
+    else if (f.type === 'datetime') base[f.name] = new Date().toISOString()
+    else base[f.name] = null
+  }
+
+  if (method === 'POST') return JSON.stringify(base, null, 2)
+  if (method === 'PUT' || method === 'PATCH') return JSON.stringify(base, null, 2)
+  return '{\n}'
+}
+
+// ─── Curl snippet builder ─────────────────────────────────────
+const buildCurl = (method: string, url: string, body: string | null) => {
   const parts = [`curl -X ${method} "${url}"`]
   if (body && body.trim().length > 0 && method !== 'GET') {
     parts.push('-H "Content-Type: application/json"')
     parts.push(`-d '${body.replace(/'/g, "\\'")}'`)
   }
-  return parts.join(' ')
+  return parts.join(' \\\n  ')
 }
 
-const generateLocalSample = (project: ProjectDraft): Array<Record<string, unknown>> => {
-  const fields = project.dataset?.fields ?? []
-  if (fields.length === 0) return [{ message: 'Define tu dataset para obtener datos de ejemplo.' }]
-  const rows: Array<Record<string, unknown>> = []
-  for (let i = 0; i < 5; i++) {
-    const row: Record<string, unknown> = {}
-    for (const f of fields) {
-      if (f.type === 'string') {
-        if (f.name.toLowerCase().includes('email')) row[f.name] = `user${i + 1}@example.com`
-        else if (f.name.toLowerCase().includes('name')) row[f.name] = `Item ${i + 1}`
-        else row[f.name] = `value-${i + 1}`
-      } else if (f.type === 'integer') {
-        row[f.name] = Math.floor(Math.random() * 100) + 1
-      } else if (f.type === 'float') {
-        row[f.name] = parseFloat((Math.random() * 100).toFixed(2))
-      } else if (f.type === 'boolean') {
-        row[f.name] = Math.random() > 0.5
-      } else if (f.type === 'datetime') {
-        row[f.name] = new Date(Date.now() - Math.random() * 86400000 * 365).toISOString()
-      } else {
-        row[f.name] = null
-      }
-    }
-    rows.push(row)
-  }
-  return rows
-}
-
-const initialBody = (project: ProjectDraft, method: string) => {
-  if (method === 'GET') return ''
-  const fields = project.dataset?.fields
-  if (fields?.length) {
-    const body: Record<string, unknown> = {}
-    for (const f of fields) {
-      body[f.name] = f.type === 'boolean' ? true : f.type === 'integer' ? 1 : f.type === 'float' ? 1.0 : 'example'
-    }
-    return JSON.stringify(body, null, 2)
-  }
-  return '{ }'
-}
-
+// ─── Component ────────────────────────────────────────────────
 export function ApiPlayground({ project }: Props) {
   const backendConfig = readBackendConfig()
   const backendBaseUrl = backendConfig.baseUrl?.replace(/\/$/, '') || 'http://localhost:8000'
-  const mockBaseUrl = `${backendBaseUrl}/api/mock/${project.id}`
 
-  const defaultEndpoint = project.endpoints[0]?.path ?? '/records'
-  const [method, setMethod] = useState<ProjectDraft['endpoints'][number]['method']>(project.endpoints[0]?.method ?? 'GET')
-  const [path, setPath] = useState<string>(defaultEndpoint)
-  const [body, setBody] = useState(initialBody(project, method))
-  const [selectedEndpoint, setSelectedEndpoint] = useState<string>(project.endpoints[0]?.id ?? 'custom')
+  // Initialize sample store when project changes
+  useEffect(() => {
+    initStore(project)
+  }, [project.id, project.dataset?.id])
+
+  const allEndpoints = project.endpoints.length > 0 ? project.endpoints : [{ id: 'default', method: 'GET' as const, path: '/records', name: 'records', summary: '' }]
+  const initialEndpoint = allEndpoints[0]
+
+  const [selectedEndpointId, setSelectedEndpointId] = useState<string>(initialEndpoint.id)
+  const [method, setMethod] = useState<string>(initialEndpoint.method)
+  const [path, setPath] = useState<string>(initialEndpoint.path)
+  const [body, setBody] = useState<string>(() => buildBodyForMethod(project, initialEndpoint.method, initialEndpoint.path))
   const [response, setResponse] = useState<ApiResponse | null>(null)
   const [isRunning, setIsRunning] = useState(false)
+  const [hint, setHint] = useState('')
+  const bodyRef = useRef<HTMLTextAreaElement>(null)
 
-  const resolvedUrl = useMemo(() => {
-    const normalizedPath = path.startsWith('/') ? path : `/${path}`
-    return `${mockBaseUrl}${normalizedPath}`
-  }, [mockBaseUrl, path])
+  // Reset form state when project changes
+  useEffect(() => {
+    const eps = project.endpoints.length > 0 ? project.endpoints : [{ id: 'default', method: 'GET' as const, path: '/records', name: 'records', summary: '' }]
+    const ep = eps[0]
+    if (ep) {
+      setSelectedEndpointId(ep.id)
+      setMethod(ep.method)
+      setPath(ep.path)
+      setBody(buildBodyForMethod(project, ep.method, ep.path))
+      setResponse(null)
+      setHint('')
+    }
+  }, [project.id, project.dataset?.id, project.endpoints])
 
-  const curlSnippet = useMemo(() => buildCurlSnippet(method, resolvedUrl, body), [method, resolvedUrl, body])
+  const mockUrl = useMemo(() => {
+    const normalized = path.startsWith('/') ? path : `/${path}`
+    const effectiveId = project.slug || project.remoteId || project.id
+    return `${backendBaseUrl}/api/mock/${effectiveId}${normalized}`
+  }, [backendBaseUrl, project.id, project.remoteId, project.slug, path])
 
-  const onSelectEndpoint = (id: string) => {
-    setSelectedEndpoint(id)
-    if (id === 'custom') return
-    const endpoint = project.endpoints.find((item) => item.id === id)
-    if (!endpoint) return
-    setMethod(endpoint.method)
-    setPath(endpoint.path)
-    setBody(initialBody(project, endpoint.method))
+  const curlSnippet = useMemo(() => buildCurl(method, mockUrl, body), [method, mockUrl, body])
+
+  const store = sampleStore[project.id] ?? []
+
+  // Build hint for each method
+  const updateHint = (m: string, p: string) => {
+    if (m === 'GET') {
+      if (p.includes('{')) {
+        // param needed for hint
+        const param = p.split('{')[1]?.split('}')[0] || 'id'
+        const sampleId = store.length > 0 ? store[0].id : '1'
+        setHint(`GET devuelve un solo registro. Ejemplo: ${p.replace(`{${param}}`, String(sampleId))}`)
+      } else {
+        setHint(`GET devuelve lista de registros. Total en store: ${store.length} registros.`)
+      }
+    } else if (m === 'POST') {
+      setHint('POST crea un nuevo registro. El body se añade al store con un _id automático.')
+    } else if (m === 'PUT' || m === 'PATCH') {
+      // param needed for hint
+      setHint(`${m} actualiza un registro existente. Usa un ID del store (1–${store.length}).`)
+    } else if (m === 'DELETE') {
+      // param needed for hint
+      setHint(`DELETE elimina un registro. ID a borrar: 1–${store.length}.`)
+    }
+  }
+
+  const selectEndpoint = (id: string) => {
+    setSelectedEndpointId(id)
+    if (id === 'custom') {
+      setMethod('GET')
+      setPath('/records')
+      setBody('')
+      setHint('')
+      setResponse(null)
+      return
+    }
+    const ep = project.endpoints.find((e) => e.id === id)
+    if (!ep) return
+    setMethod(ep.method)
+    setPath(ep.path)
+    setBody(buildBodyForMethod(project, ep.method, ep.path))
+    updateHint(ep.method, ep.path)
     setResponse(null)
   }
 
-  const isManual = selectedEndpoint === 'custom'
-
+  // Initialize on project change
   useEffect(() => {
     const first = project.endpoints[0]
     if (!first) {
-      setSelectedEndpoint('custom')
+      setSelectedEndpointId('custom')
       setMethod('GET')
       setPath('/records')
-      setBody(initialBody(project, 'GET'))
+      setBody('')
       return
     }
-    setSelectedEndpoint(first.id)
+    setSelectedEndpointId(first.id)
     setMethod(first.method)
     setPath(first.path)
-    setBody(initialBody(project, first.method))
+    setBody(buildBodyForMethod(project, first.method, first.path))
+    updateHint(first.method, first.path)
     setResponse(null)
   }, [project.id])
 
@@ -120,106 +182,132 @@ export function ApiPlayground({ project }: Props) {
     setIsRunning(true)
     setResponse(null)
 
-    // Always simulate locally (fast, no backend dependency)
-    await new Promise((r) => setTimeout(r, 300))
-
-    const sampleData = generateLocalSample(project)
-    let resultBody: unknown = sampleData
-
-    if (method === 'POST') {
-      try {
-        const parsed = JSON.parse(body)
-        resultBody = { _id: crypto.randomUUID(), ...parsed, created: true }
-      } catch {
-        resultBody = { _id: crypto.randomUUID(), created: true }
+    try {
+      const options: RequestInit = {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
       }
-    } else if (method === 'DELETE') {
-      resultBody = { deleted: true }
-    } else if (method === 'PUT' || method === 'PATCH') {
-      try {
-        const parsed = JSON.parse(body)
-        resultBody = { ...parsed, updated: true }
-      } catch {
-        resultBody = { updated: true }
+      
+      if (method !== 'GET' && body) {
+        options.body = body
       }
+
+      const res = await fetch(mockUrl, options)
+      const resultBody = await res.json().catch(() => ({ error: 'Respuesta no válida' }))
+      
+      setResponse({
+        url: mockUrl,
+        status: res.status,
+        body: resultBody,
+        method
+      })
+
+      // If it was a POST/PUT/DELETE and successful, we should probably update our local store
+      // though the backend now handles the truth. For now, let's just show the response.
+      
+    } catch (error) {
+      console.error('Error en simulación:', error)
+      setResponse({
+        url: mockUrl,
+        status: 500,
+        body: { error: 'Error de conexión con el servidor de simulación' },
+        method
+      })
+    } finally {
+      setIsRunning(false)
     }
-
-    setResponse({
-      url: `${backendBaseUrl}/api/mock/${project.id}${path}`,
-      status: method === 'POST' ? 201 : 200,
-      body: resultBody,
-      method,
-      mode: 'local',
-    })
-    setIsRunning(false)
   }
 
-  const handleMethodChange = (value: ProjectDraft['endpoints'][number]['method']) => {
+  const handleMethodChange = (value: string) => {
     setMethod(value)
-    if (value === 'GET') {
-      setBody('')
-    } else if (!body) {
-      setBody(initialBody(project, value))
-    }
+    setBody(buildBodyForMethod(project, value, path))
+    updateHint(value, path)
+    setResponse(null)
   }
+
+  const handlePathChange = (val: string) => {
+    setPath(val)
+    updateHint(method, val)
+    setResponse(null)
+  }
+
+  // Show only relevant methods based on selected endpoint, plus manual option
+  const availableMethods = useMemo(() => {
+    const ep = project.endpoints.find((e) => e.id === selectedEndpointId)
+    if (!ep) return METHODS
+    // Return all methods but highlight the endpoint's method
+    return METHODS
+  }, [selectedEndpointId, project.endpoints])
 
   return (
     <div className="api-playground">
       <div className="api-playground__summary">
         <p className="label">Base URL</p>
-        <p className="api-playground__base-value">{backendBaseUrl}</p>
-        <span className="api-playground__mode-badge">Simulación local</span>
+        <p className="api-playground__base-value">{backendBaseUrl}/api/mock/{project.slug || project.remoteId || project.id}</p>
+        <span className="api-playground__mode-badge">Simulación interactiva</span>
       </div>
 
       <label className="form-field">
-        <span className="label">Endpoint guardado</span>
-        <select className="field" value={selectedEndpoint} onChange={(event) => onSelectEndpoint(event.target.value)}>
-          <option value="custom">Manual</option>
-          {project.endpoints.map((endpoint) => (
-            <option key={endpoint.id} value={endpoint.id}>
-              {endpoint.method} {endpoint.path}
-            </option>
+        <span className="label">Endpoint</span>
+        <select className="field" value={selectedEndpointId} onChange={(e) => selectEndpoint(e.target.value)}>
+          {project.endpoints.length === 0 && <option value="custom">/records (default)</option>}
+          {project.endpoints.map((ep) => (
+            <option key={ep.id} value={ep.id}>{ep.method} {ep.path}</option>
           ))}
         </select>
       </label>
 
-      {isManual ? (
-        <>
-          <label className="form-field">
-            <span className="label">Endpoint path</span>
-            <input className="field" value={path} onChange={(event) => setPath(event.target.value)} placeholder="/records" />
-          </label>
-          <div className="method-pills">
-            {METHODS.map((option) => (
-              <button
-                key={option}
-                type="button"
-                className={option === method ? 'pill active' : 'pill'}
-                onClick={() => handleMethodChange(option)}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
-        </>
-      ) : (
-        <div className="api-playground__chips">
-          <span className="pill active">{method}</span>
-          <span className="api-playground__path">{path}</span>
-        </div>
-      )}
+      {/* Method selector */}
+      <div className="method-pills">
+        {availableMethods.map((opt) => (
+          <button
+            key={opt}
+            type="button"
+            className={opt === method ? 'pill active' : 'pill'}
+            onClick={() => handleMethodChange(opt)}
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
 
-      {(!isManual || method !== 'GET') ? (
+      {/* Path input */}
+      <label className="form-field">
+        <span className="label">Path</span>
+        <input className="field" value={path} onChange={(e) => handlePathChange(e.target.value)} placeholder="/records" />
+      </label>
+
+      {/* Hint */}
+      {hint && <p className="api-playground__hint">{hint}</p>}
+
+      {/* Request body (non-GET only) */}
+      {method !== 'GET' && (
         <label className="form-field">
           <span className="label">Request body</span>
-          <textarea className="field api-playground__body" rows={4} value={body} onChange={(event) => setBody(event.target.value)} />
+          <textarea
+            ref={bodyRef}
+            className="field api-playground__body"
+            rows={6}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+          />
         </label>
-      ) : null}
+      )}
+
+      {/* Store viewer */}
+      <details className="api-playground__store-viewer">
+        <summary>📋 Ver store actual ({store.length} registros)</summary>
+        <pre className="preview-json">{JSON.stringify(store.slice(0, 1000), null, 2)}</pre>
+        {store.length > 1000 && <p className="muted-text">... y {store.length - 1000} más</p>}
+      </details>
 
       <button type="button" className="btn primary" onClick={runRequest} disabled={isRunning}>
-        {isRunning ? 'Probando…' : 'Probar API local'}
+        {isRunning ? 'Ejecutando…' : `Enviar ${method}`}
       </button>
 
+      {/* Response */}
       <div className="api-playground__response">
         <p className="label">curl</p>
         <pre className="preview-json api-playground__curl">{curlSnippet}</pre>
@@ -235,9 +323,43 @@ export function ApiPlayground({ project }: Props) {
             <pre className="preview-json">{JSON.stringify(response.body, null, 2)}</pre>
           </>
         ) : (
-          <p className="muted-text">Ejecuta la petición para ver la respuesta.</p>
+          <p className="muted-text">Pulsa enviar para ejecutar la petición.</p>
         )}
       </div>
+
+      <style>{`
+        .api-playground__hint {
+          margin: 0.25rem 0 0.5rem;
+          padding: 0.4rem 0.6rem;
+          background: #f0f4ff;
+          color: #1d4ed8;
+          border-radius: 4px;
+          font-size: 0.78rem;
+          border-left: 3px solid #3b82f6;
+        }
+        .api-playground__store-viewer {
+          margin-bottom: 0.5rem;
+          border: 1px solid #e2e8f0;
+          border-radius: 6px;
+          padding: 0.5rem;
+          background: #f8fafc;
+        }
+        .api-playground__store-viewer summary {
+          cursor: pointer;
+          font-size: 0.82rem;
+          color: #475569;
+          font-weight: 500;
+          user-select: none;
+        }
+        .api-playground__store-viewer pre {
+          max-height: 200px;
+          overflow-y: auto;
+          font-size: 0.75rem;
+          margin: 0.3rem 0 0;
+        }
+      `}</style>
     </div>
   )
 }
+
+const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']

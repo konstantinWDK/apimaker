@@ -205,9 +205,10 @@ def run_generation(
             endpoints,
         )
 
-        # Save to artifacts (use absolute path from settings or cwd fallback)
+        # Save to artifacts (use slug for folder name to remove UUID traces)
         settings = get_settings()
-        artifacts_root = Path(settings.artifacts_dir) / str(project.id)
+        folder_name = project.slug or str(project.id)
+        artifacts_root = Path(settings.artifacts_dir) / folder_name
         artifacts_root.mkdir(parents=True, exist_ok=True)
 
         bundle_path = artifacts_root / f"{project.target_stack}-bundle.zip"

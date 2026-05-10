@@ -17,6 +17,7 @@ from ..services.share_service import (
     get_share_snapshot,
     list_project_shares,
 )
+from ..services.project_service import project_service
 
 
 router = APIRouter(prefix="/share", tags=["share"])
@@ -70,15 +71,16 @@ def get_shared_project(
 
 @router.post("/projects/{project_id}", response_model=ShareResponse)
 def create_share(
-    project_id: UUID,
+    project_id: str,
     payload: CreateShareRequest = CreateShareRequest(),
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
 ) -> ShareResponse:
     """Create a share snapshot for a project."""
     try:
+        resolved_id = project_service.resolve_id(session, project_id)
         snapshot = create_share_snapshot(
-            session, str(project_id), payload.password, payload.expires_days
+            session, str(resolved_id), payload.password, payload.expires_days
         )
     except KeyError:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -95,12 +97,16 @@ def create_share(
 
 @router.get("/projects/{project_id}", response_model=list[ShareResponse])
 def list_shares(
-    project_id: UUID,
+    project_id: str,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
 ) -> list[ShareResponse]:
     """List all share snapshots for a project."""
-    return list_project_shares(session, str(project_id))
+    try:
+        resolved_id = project_service.resolve_id(session, project_id)
+        return list_project_shares(session, str(resolved_id))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.delete("/{share_id}", status_code=204)

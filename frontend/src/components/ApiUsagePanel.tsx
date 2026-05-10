@@ -76,7 +76,8 @@ export function ApiUsagePanel() {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const baseUrl = getBaseUrl()
-  const mockBaseUrl = `${baseUrl}/api/mock/${project.id}`
+  const effectiveId = project.slug || project.id
+  const mockBaseUrl = `${baseUrl}/api/mock/${effectiveId}`
 
   const endpoints = project.endpoints.length > 0
     ? project.endpoints

@@ -28,6 +28,7 @@ export interface ApiEndpoint {
 export interface ProjectDraft {
   id: string
   name: string
+  slug?: string
   description?: string
   targetStack: 'fastapi' | 'express' | 'nest'
   dataset?: DatasetMeta

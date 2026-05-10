@@ -30,6 +30,7 @@ class DatasetMeta(BaseModel):
     name: str
     source_type: Literal["upload", "manual"] = "manual"
     fields: list[FieldSchema] = Field(default_factory=list)
+    sample_rows: list[dict] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -48,8 +49,9 @@ class ProjectStatus(str, Enum):
 
 
 class Project(BaseModel):
-    id: UUID = Field(default_factory=uuid4)
+    id: str = Field(default_factory=lambda: str(uuid4()))
     name: str
+    slug: str | None = None
     description: str | None = None
     target_stack: Literal["fastapi", "express", "nest"] = "fastapi"
     dataset: DatasetMeta | None = None
@@ -59,16 +61,28 @@ class Project(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+
 class CreateProjectRequest(BaseModel):
     name: str
+    slug: str | None = None
     description: str | None = None
     target_stack: Literal["fastapi", "express", "nest"] = "fastapi"
+    dataset: DatasetMeta | None = None
+
+
+class UpdateProjectRequest(BaseModel):
+    name: str | None = None
+    slug: str | None = None
+    description: str | None = None
+    target_stack: str | None = None
+    status: str | None = None
 
 
 class UploadDatasetRequest(BaseModel):
     name: str
     source_type: Literal["upload", "manual"] = "manual"
     fields: list[FieldSchema]
+    sample_rows: list[dict] | None = None
 
 
 class DefineEndpointsRequest(BaseModel):
@@ -81,7 +95,7 @@ class GenerationRequest(BaseModel):
 
 
 class GenerationResult(BaseModel):
-    project_id: UUID
+    project_id: str
     openapi_path: str
     bundle_path: str
     sdk_paths: list[str]
