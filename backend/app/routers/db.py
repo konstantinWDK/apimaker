@@ -1,6 +1,8 @@
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Body, UploadFile, File, Form
 import sqlalchemy
 from sqlalchemy.engine import make_url
+import tempfile
+import os
 
 router = APIRouter(prefix="/db", tags=["Database Introspection"])
 
@@ -32,30 +34,81 @@ def _map_sql_type(sql_type: str) -> str:
 
 
 @router.post("/test-connection")
-async def test_connection(connection_url: str = Body(..., embed=True)):
+async def test_connection(
+    connection_url: str = Body(None, embed=True),
+    file: UploadFile = File(None),
+    dialect: str = Form(None),
+):
     """
-    Test if we can connect to the provided DB URL.
+    Test if we can connect to the provided DB URL or uploaded SQLite file.
     Supports: postgresql://, mysql://, sqlite:///
     """
     try:
+        # Handle uploaded SQLite file
+        if file and dialect == 'sqlite':
+            content = await file.read()
+            with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+                tmp.write(content)
+                tmp_path = tmp.name
+
+            try:
+                url = f"sqlite:///{tmp_path}"
+                engine = sqlalchemy.create_engine(url)
+                with engine.connect() as conn:
+                    conn.execute(sqlalchemy.text("SELECT 1"))
+                engine.dispose()
+                os.unlink(tmp_path)  # Clean up temp file
+                return {"ok": True, "message": "Conexión exitosa"}
+            except Exception:
+                os.unlink(tmp_path)  # Clean up on error
+                raise
+
+        # Handle connection URL
+        if not connection_url:
+            raise HTTPException(status_code=400, detail="connection_url or file required")
+
         url = make_url(_normalize_url(connection_url))
-        engine = sqlalchemy.create_engine(url, connect_args={"connect_timeout": 8})
+        # SQLite doesn't support connect_timeout
+        connect_args = {} if url.drivername.startswith("sqlite") else {"connect_timeout": 8}
+        engine = sqlalchemy.create_engine(url, connect_args=connect_args)
         with engine.connect() as conn:
             conn.execute(sqlalchemy.text("SELECT 1"))
         engine.dispose()
         return {"ok": True, "message": "Conexión exitosa"}
+    except HTTPException:
+        raise
     except Exception as e:
         return {"ok": False, "message": str(e)}
 
 
 @router.post("/introspect")
-async def introspect_db(connection_url: str = Body(..., embed=True)):
+async def introspect_db(
+    connection_url: str = Body(None, embed=True),
+    file: UploadFile = File(None),
+    dialect: str = Form(None),
+):
     """
-    List tables and their columns from the external database.
+    List tables and their columns from the external database or uploaded SQLite file.
     """
+    tmp_path = None
     try:
+        # Handle uploaded SQLite file
+        if file and dialect == 'sqlite':
+            content = await file.read()
+            with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+                tmp.write(content)
+                tmp_path = tmp.name
+
+            connection_url = f"sqlite:///{tmp_path}"
+
+        if not connection_url:
+            raise HTTPException(status_code=400, detail="connection_url or file required")
+
         url = make_url(_normalize_url(connection_url))
-        engine = sqlalchemy.create_engine(url, connect_args={"connect_timeout": 8})
+        
+        # SQLite doesn't support connect_timeout
+        connect_args = {} if url.drivername.startswith("sqlite") else {"connect_timeout": 8}
+        engine = sqlalchemy.create_engine(url, connect_args=connect_args)
         inspector = sqlalchemy.inspect(engine)
 
         tables = []
@@ -74,6 +127,15 @@ async def introspect_db(connection_url: str = Body(..., embed=True)):
             tables.append({"name": table_name, "columns": columns})
 
         engine.dispose()
+        
+        # Clean up temp file after introspection
+        if tmp_path:
+            os.unlink(tmp_path)
+        
         return {"ok": True, "tables": tables}
+    except HTTPException:
+        raise
     except Exception as e:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
         raise HTTPException(status_code=400, detail=str(e))

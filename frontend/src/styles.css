@@ -3174,6 +3174,7 @@ input[type='password'] {
 }
 
 .datasets-header-bar {
+  flex-wrap: wrap;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -3189,8 +3190,9 @@ input[type='password'] {
   flex-direction: row;
   align-items: center;
   gap: 0.5rem;
-  overflow-x: auto;
-  flex: 1;
+  flex-wrap: wrap;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .dataset-tab {
@@ -3201,7 +3203,9 @@ input[type='password'] {
   align-items: center;
   padding-right: 0.25rem;
   transition: all 0.2s;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .dataset-tab.active {

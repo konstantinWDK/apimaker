@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import type { DatasetMeta } from '../types/schemas'
 import { readBackendConfig } from '../lib/backendConfig'
 
@@ -55,6 +55,8 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
   const [password, setPassword] = useState('')
   const [dbname, setDbname] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [sqliteFile, setSqliteFile] = useState<File | null>(null)
 
   // State machine
   const [step, setStep] = useState<Step>('connect')
@@ -71,7 +73,9 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
     [dialect, host, port, user, password, dbname],
   )
 
-  const isConnectDisabled = !dbname || (dialect !== 'sqlite' && !host)
+  const isConnectDisabled = dialect === 'sqlite'
+    ? (!sqliteFile && !dbname)
+    : !dbname || !host
 
   // Handle dialect change — update port automatically
   const handleDialectChange = (d: Dialect) => {
@@ -81,15 +85,39 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
     setTestMessage(null)
   }
 
+  // Handle file selection for SQLite
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setSqliteFile(file)
+      setDbname(`upload:${file.name}`) // Mark as uploaded file
+    }
+  }
+
   const handleTestConnection = async () => {
     setTestStatus('testing')
     setTestMessage(null)
     try {
       const { baseUrl } = readBackendConfig()
+      
+      let body: any
+      let headers: Record<string, string> = {}
+      
+      // For SQLite with uploaded file, send the file
+      if (dialect === 'sqlite' && sqliteFile) {
+        const formData = new FormData()
+        formData.append('file', sqliteFile)
+        formData.append('dialect', 'sqlite')
+        body = formData
+      } else {
+        headers['Content-Type'] = 'application/json'
+        body = JSON.stringify({ connection_url: connectionUrl })
+      }
+      
       const res = await fetch(`${baseUrl}/db/test-connection`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ connection_url: connectionUrl }),
+        headers,
+        body,
       })
       const data = await res.json()
       if (data.ok) {
@@ -110,10 +138,25 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
     setError(null)
     try {
       const { baseUrl } = readBackendConfig()
+      
+      let body: any
+      let headers: Record<string, string> = {}
+      
+      // For SQLite with uploaded file, send the file
+      if (dialect === 'sqlite' && sqliteFile) {
+        const formData = new FormData()
+        formData.append('file', sqliteFile)
+        formData.append('dialect', 'sqlite')
+        body = formData
+      } else {
+        headers['Content-Type'] = 'application/json'
+        body = JSON.stringify({ connection_url: connectionUrl })
+      }
+      
       const res = await fetch(`${baseUrl}/db/introspect`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ connection_url: connectionUrl }),
+        headers,
+        body,
       })
       const data = await res.json()
       if (data.ok) {
@@ -283,8 +326,32 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
         </>
       ) : (
         <div className="dbi__field-group">
-          <label className="dbi__label">Ruta del archivo SQLite</label>
-          <input className="field" value={dbname} onChange={e => setDbname(e.target.value)} placeholder="/ruta/al/archivo.db" />
+          <label className="dbi__label">Archivo SQLite</label>
+          <div className="dbi__file-selector">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".db,.sqlite,.sqlite3"
+              onChange={handleFileSelect}
+              style={{ display: 'none' }}
+            />
+            <button
+              type="button"
+              className="btn ghost btn-sm dbi__file-btn"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              📁 Seleccionar archivo
+            </button>
+            {sqliteFile && <span className="dbi__file-name">{sqliteFile.name}</span>}
+          </div>
+          <p className="dbi__sqlite-hint">O escribe una ruta absoluta del servidor:</p>
+          <input
+            className="field"
+            value={dbname.startsWith('upload:') ? '' : dbname}
+            onChange={e => { setDbname(e.target.value); setSqliteFile(null) }}
+            placeholder="/ruta/al/archivo.db"
+            style={{ marginTop: '0.5rem' }}
+          />
         </div>
       )}
 
@@ -328,7 +395,7 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
 }
 
 const styles = `
-.dbi { display: flex; flex-direction: column; gap: 1rem; padding: 0.25rem 0; }
+.dbi { display: flex; flex-direction: column; gap: 1rem; padding: 0.25rem 0; max-width: 100%; overflow-x: hidden; box-sizing: border-box; }
 .dbi__title { font-size: 0.95rem; font-weight: 700; color: #1e293b; margin: 0; display: flex; align-items: center; gap: 0.5rem; }
 .dbi__subtitle { font-size: 0.8rem; color: #64748b; margin: -0.5rem 0 0; }
 .dbi__label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; display: block; margin-bottom: 0.3rem; }
@@ -347,24 +414,28 @@ const styles = `
 .dbi__test-row { display: flex; align-items: center; gap: 0.75rem; }
 .dbi__test-ok { font-size: 0.8rem; color: #16a34a; font-weight: 500; }
 .dbi__test-error { font-size: 0.8rem; color: #dc2626; font-weight: 500; }
+.dbi__file-selector { display: flex; align-items: center; gap: 0.75rem; }
+.dbi__file-btn { white-space: nowrap; }
+.dbi__file-name { font-size: 0.82rem; color: #475569; font-family: monospace; background: #f1f5f9; padding: 0.3rem 0.6rem; border-radius: 4px; }
+.dbi__sqlite-hint { font-size: 0.72rem; color: #94a3b8; margin: 0.5rem 0 0; }
 .dbi__actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.25rem; }
 
 /* Tables step */
-.dbi__tables-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+.dbi__tables-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; max-width: 100%; }
 .dbi__back { flex-shrink: 0; }
 .dbi__tables-header .dbi__title { flex: 1; }
-.dbi__table-list { display: flex; flex-direction: column; gap: 0.4rem; max-height: 380px; overflow-y: auto; }
-.dbi__table-row { border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; transition: all 0.15s; }
+.dbi__table-list { display: flex; flex-direction: column; gap: 0.4rem; max-height: 380px; overflow-y: auto; max-width: 100%; box-sizing: border-box; }
+.dbi__table-row { border: 1px solid #e2e8f0; border-radius: 8px; transition: all 0.15s; }
 .dbi__table-row.selected { border-color: #93c5fd; background: #eff6ff; }
-.dbi__table-row-main { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.9rem; }
+.dbi__table-row-main { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.9rem; max-width: 100%; box-sizing: border-box; }
 .dbi__table-check-label { display: flex; align-items: center; gap: 0.6rem; cursor: pointer; flex: 1; }
 .dbi__table-name { font-size: 0.88rem; font-weight: 600; color: #1e293b; }
 .dbi__table-meta { font-size: 0.72rem; color: #94a3b8; }
 .dbi__table-expand { flex-shrink: 0; font-size: 0.72rem; }
-.dbi__columns { padding: 0.5rem 0.9rem 0.75rem; border-top: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 0.3rem; }
-.dbi__column { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; }
-.dbi__col-name { color: #334155; font-weight: 500; min-width: 120px; }
-.dbi__col-type { color: #7c3aed; font-size: 0.72rem; font-family: monospace; background: #f3f0ff; padding: 0.1rem 0.4rem; border-radius: 4px; }
+.dbi__columns { padding: 0.5rem 0.9rem 0.75rem; border-top: 1px solid #e2e8f0; display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.dbi__column { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.35rem 0.5rem; min-width: 0; flex: 1 1 180px; max-width: 100%; }
+.dbi__col-name { color: #334155; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.dbi__col-type { color: #7c3aed; font-size: 0.68rem; font-family: monospace; background: #f3f0ff; padding: 0.1rem 0.35rem; border-radius: 4px; white-space: nowrap; flex-shrink: 0; }
 .dbi__col-pk { color: #b45309; font-size: 0.68rem; font-weight: 700; background: #fef3c7; padding: 0.1rem 0.4rem; border-radius: 4px; }
 .dbi__col-req { color: #6b7280; font-size: 0.68rem; }
 `
