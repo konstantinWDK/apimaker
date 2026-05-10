@@ -11,7 +11,7 @@ export interface FieldSchema {
 export interface DatasetMeta {
   id: string
   name: string
-  sourceType: 'upload' | 'manual'
+  sourceType: 'upload' | 'manual' | 'database'
   fields: FieldSchema[]
   sampleRows: Array<Record<string, string>>
   uploadedFrom?: string
@@ -24,6 +24,7 @@ export interface ApiEndpoint {
   path: string
   summary?: string
   operationType?: 'list' | 'get' | 'create' | 'update' | 'delete' | 'custom'
+  targetDatasetId?: string // Link to a specific dataset in the project
 }
 
 export interface ProjectDraft {
@@ -36,7 +37,7 @@ export interface ProjectDraft {
   jwtSecret?: string
   rateLimit?: number // requests per minute
   targetStack: 'fastapi' | 'express' | 'nest'
-  dataset?: DatasetMeta
+  datasets: DatasetMeta[]
   endpoints: ApiEndpoint[]
   updatedAt?: string
   sharePath?: string

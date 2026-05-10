@@ -53,10 +53,9 @@ const ensureBaseUrl = (): string => {
   return cleanBaseUrl(baseUrl)
 }
 
-const toDatasetPayload = (project: ProjectDraft) => {
-  const dataset = project.dataset
-  if (!dataset) return null
-  return {
+const toDatasetsPayload = (project: ProjectDraft) => {
+  return project.datasets.map((dataset) => ({
+    id: dataset.id,
     name: dataset.name,
     source_type: dataset.sourceType ?? 'manual',
     fields: dataset.fields.map((field) => ({
@@ -65,7 +64,8 @@ const toDatasetPayload = (project: ProjectDraft) => {
       required: field.required,
       description: field.description,
     })),
-  }
+    sample_rows: dataset.sampleRows || [],
+  }))
 }
 
 const isUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
@@ -117,12 +117,12 @@ export const syncProjectWithBackend = async (project: ProjectDraft): Promise<Syn
     throw new Error('No se pudo obtener el identificador remoto del proyecto')
   }
 
-  const datasetPayload = toDatasetPayload(project)
-  if (datasetPayload) {
+  const datasetsPayload = toDatasetsPayload(project)
+  for (const dsPayload of datasetsPayload) {
     const datasetResponse = await fetch(`${baseUrl}/projects/${remoteId}/dataset`, {
       method: 'POST',
       headers,
-      body: JSON.stringify(datasetPayload),
+      body: JSON.stringify(dsPayload),
     })
     await handleResponse(datasetResponse)
   }
@@ -161,15 +161,13 @@ export const fetchRemoteProjects = async (): Promise<ProjectDraft[]> => {
     description: item.description,
     authMethod: (item.auth_method as any) || 'none',
     targetStack: item.target_stack,
-    dataset: item.dataset
-      ? {
-          id: item.dataset.id,
-          name: item.dataset.name,
-          sourceType: item.dataset.source_type,
-          fields: item.dataset.fields,
-          sampleRows: item.dataset.sampleRows || [],
-        }
-      : undefined,
+    datasets: (item.datasets || []).map((ds: any) => ({
+      id: ds.id,
+      name: ds.name,
+      sourceType: ds.source_type,
+      fields: ds.fields || [],
+      sampleRows: ds.sample_rows || [],
+    })),
     endpoints: item.endpoints || [],
     updatedAt: item.updated_at,
   }))
@@ -199,15 +197,13 @@ export const createRemoteProject = async (
     description: data.project.description,
     authMethod: (data.project.auth_method as any) || 'none',
     targetStack: data.project.target_stack,
-    dataset: data.dataset
-      ? {
-          id: data.dataset.id,
-          name: data.dataset.name,
-          sourceType: data.dataset.source_type,
-          fields: data.fields,
-          sampleRows: [],
-        }
-      : undefined,
+    datasets: (data.datasets || []).map((ds: any) => ({
+      id: ds.id,
+      name: ds.name,
+      sourceType: ds.source_type,
+      fields: ds.fields || [],
+      sampleRows: ds.sample_rows || [],
+    })),
     endpoints: data.endpoints || [],
     updatedAt: data.project.updated_at,
   }
@@ -241,15 +237,13 @@ export const fetchRemoteProject = async (projectId: string): Promise<ProjectDraf
     description: data.project.description,
     authMethod: (data.project.auth_method as any) || 'none',
     targetStack: data.project.target_stack,
-    dataset: data.dataset
-      ? {
-          id: data.dataset.id,
-          name: data.dataset.name,
-          sourceType: data.dataset.source_type,
-          fields: data.fields,
-          sampleRows: [],
-        }
-      : undefined,
+    datasets: (data.datasets || []).map((ds: any) => ({
+      id: ds.id,
+      name: ds.name,
+      sourceType: ds.source_type,
+      fields: ds.fields || [],
+      sampleRows: ds.sample_rows || [],
+    })),
     endpoints: data.endpoints || [],
     updatedAt: data.project.updated_at,
   }

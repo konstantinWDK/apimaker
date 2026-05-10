@@ -14,7 +14,8 @@ interface BuilderState {
   checkMockStatus: () => Promise<void>
   deleteProject: (id: string) => Promise<void>
   updateProject: (payload: Partial<ProjectDraft>) => void
-  setDataset: (dataset: DatasetMeta) => void
+  upsertDataset: (dataset: DatasetMeta) => void
+  removeDataset: (id: string) => void
   upsertEndpoint: (endpoint: ApiEndpoint) => void
   removeEndpoint: (id: string) => void
   replaceProject: (project: ProjectDraft) => void
@@ -41,26 +42,21 @@ const createDefaultProject = (): ProjectDraft => {
     description: 'Diseña tu API declarando datos y endpoints',
     authMethod: 'none',
     targetStack: 'fastapi',
-    endpoints: [
+    endpoints: [],
+    datasets: [
       {
         id: createId(),
-        name: 'Listar registros',
-        method: 'GET',
-        path: '/records',
-        summary: 'Obtiene la lista de elementos del dataset'
+        name: 'Usuarios',
+        sourceType: 'manual',
+        fields: [
+          { id: createId(), name: 'nombre', type: 'string', required: true, description: 'Nombre del usuario' },
+          { id: createId(), name: 'email', type: 'string', required: true, description: 'Correo electrónico' }
+        ],
+        sampleRows: [
+          { nombre: 'Juan Perez', email: 'juan@example.com' }
+        ]
       }
-    ],
-    dataset: {
-      id: createId(),
-      name: 'Dataset principal',
-      sourceType: 'manual',
-      fields: [
-        { id: createId(), name: 'nombre', type: 'string', required: true, description: 'Nombre del elemento' }
-      ],
-      sampleRows: [
-        { nombre: 'Ejemplo 1' }
-      ]
-    }
+    ]
   }
 }
 
@@ -115,7 +111,19 @@ const api = {
         summary: ep.summary || '',
         operationType: ep.operation_type || 'custom',
       })),
-      dataset: p.dataset ? sanitizeDataset({
+      datasets: p.datasets ? p.datasets.map((d: any) => sanitizeDataset({
+        id: d.id,
+        name: d.name,
+        sourceType: d.source_type,
+        fields: (d.fields || []).map((f: any) => ({
+          id: createId(),
+          name: f.name,
+          type: f.type,
+          required: f.required,
+          description: f.description,
+        })),
+        sampleRows: d.sample_rows || [],
+      })) : (p.dataset ? [sanitizeDataset({
         id: p.dataset.id,
         name: p.dataset.name,
         sourceType: p.dataset.source_type,
@@ -127,7 +135,7 @@ const api = {
           description: f.description,
         })),
         sampleRows: p.dataset.sample_rows || [],
-      }) : undefined,
+      })!] : []),
       remoteId: p.slug || p.id,
     }))
   },
@@ -143,17 +151,19 @@ const api = {
       rate_limit: draft.rateLimit,
       target_stack: draft.targetStack,
     }
-    if (draft.dataset) {
-      body.dataset = {
-        name: draft.dataset.name,
-        source_type: draft.dataset.sourceType || 'manual',
-        fields: (draft.dataset.fields || []).map(f => ({
+    if (draft.datasets && draft.datasets.length > 0) {
+      body.datasets = draft.datasets.map(ds => ({
+        id: ds.id,
+        name: ds.name,
+        source_type: ds.sourceType || 'manual',
+        fields: (ds.fields || []).map(f => ({
           name: f.name,
           type: f.type,
           required: f.required ?? true,
           description: f.description,
         })),
-      }
+        sample_rows: ds.sampleRows || [],
+      }))
     }
     const res = await fetch(`${getBaseUrl()}/projects`, {
       method: 'POST',
@@ -179,19 +189,19 @@ const api = {
         summary: ep.summary || '',
         operationType: ep.operation_type || 'custom',
       })),
-      dataset: data.dataset ? {
-        id: data.dataset.id,
-        name: data.dataset.name,
-        sourceType: data.dataset.source_type,
-        fields: (data.dataset.fields || []).map((f: any) => ({
+      datasets: (data.datasets || []).map((d: any) => ({
+        id: d.id,
+        name: d.name,
+        sourceType: d.source_type,
+        fields: (d.fields || []).map((f: any) => ({
           id: createId(),
           name: f.name,
           type: f.type,
           required: f.required,
           description: f.description,
         })),
-        sampleRows: data.dataset.sample_rows || [],
-      } : undefined,
+        sampleRows: d.sample_rows || [],
+      })),
       remoteId: data.slug || data.id,
     }
   },
@@ -210,6 +220,7 @@ const api = {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({
+        id: dataset.id,
         name: dataset.name,
         source_type: dataset.sourceType,
         fields: (dataset.fields || []).map(f => ({
@@ -236,6 +247,7 @@ const api = {
           path: ep.path,
           summary: ep.summary,
           operation_type: ep.operationType || 'custom',
+          target_dataset_id: ep.targetDatasetId,
         })),
       }),
     })
@@ -316,7 +328,7 @@ const loadFromStorage = (): ProjectDraft => {
       ...parsed,
       id: parsed.id ?? createId(),
       endpoints: parsed.endpoints ?? [],
-      dataset: sanitizeDataset(parsed.dataset),
+      datasets: (parsed as any).datasets ? (parsed as any).datasets.map(sanitizeDataset) : ((parsed as any).dataset ? [sanitizeDataset((parsed as any).dataset)] : []),
     }
   } catch {
     return createDefaultProject()
@@ -370,19 +382,32 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       return { project: nextProject, projects: nextProjects }
     }),
 
-  setDataset: (dataset) =>
+  upsertDataset: (dataset) =>
     set((state) => {
-      const nextProject = { ...state.project, dataset: sanitizeDataset(dataset), updatedAt: new Date().toISOString() }
+      const exists = state.project.datasets.find((d) => d.id === dataset.id)
+      const nextDatasets = exists
+        ? state.project.datasets.map((d) => (d.id === dataset.id ? sanitizeDataset(dataset)! : d))
+        : [...state.project.datasets, sanitizeDataset(dataset)!]
+
+      const nextProject = { ...state.project, datasets: nextDatasets, updatedAt: new Date().toISOString() }
       persist(nextProject)
 
-      // Update the project in the projects list too
       const nextProjects = state.projects.map(p => p.id === nextProject.id ? nextProject : p)
-
-      // Queue API save
       const saveId = nextProject.remoteId || nextProject.id
       queueSave(async () => {
+        // For now, we still use syncDataset but we'll need to update it to handle multiple
+        // Or send the first one as primary for compatibility
         await api.syncDataset(saveId, dataset)
       })
+      return { project: nextProject, projects: nextProjects }
+    }),
+
+  removeDataset: (id) =>
+    set((state) => {
+      const nextDatasets = state.project.datasets.filter((d) => d.id !== id)
+      const nextProject = { ...state.project, datasets: nextDatasets, updatedAt: new Date().toISOString() }
+      persist(nextProject)
+      const nextProjects = state.projects.map(p => p.id === nextProject.id ? nextProject : p)
       return { project: nextProject, projects: nextProjects }
     }),
 
@@ -430,7 +455,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
         ...createDefaultProject(),
         ...project,
         id: project.id ?? createId(),
-        dataset: sanitizeDataset(project.dataset),
+        datasets: (project as any).datasets ? (project as any).datasets.map(sanitizeDataset) : ((project as any).dataset ? [sanitizeDataset((project as any).dataset)] : []),
         endpoints: project.endpoints ?? [],
         updatedAt: new Date().toISOString(),
       }
@@ -474,8 +499,10 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
             target_stack: snapshot.targetStack,
           })
           // Sync dataset and endpoints
-          if (snapshot.dataset && snapshot.dataset.fields.length > 0) {
-            await api.syncDataset(snapshot.remoteId, snapshot.dataset)
+          if (snapshot.datasets && snapshot.datasets.length > 0) {
+            for (const ds of snapshot.datasets) {
+              await api.syncDataset(snapshot.remoteId, ds)
+            }
           }
           if (snapshot.endpoints.length > 0) {
             await api.syncEndpoints(snapshot.remoteId, snapshot.endpoints)
@@ -639,10 +666,12 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
         })
       }
 
-      // Sync dataset and endpoints
+      // Sync datasets and endpoints
       if (effectiveId) {
-        if (currentProject.dataset) {
-          await api.syncDataset(effectiveId, currentProject.dataset)
+        if (currentProject.datasets.length > 0) {
+          for (const ds of currentProject.datasets) {
+            await api.syncDataset(effectiveId, ds)
+          }
         }
         if (currentProject.endpoints.length > 0) {
           await api.syncEndpoints(effectiveId, currentProject.endpoints)

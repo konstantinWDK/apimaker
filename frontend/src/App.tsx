@@ -6,6 +6,7 @@ import { BackendSyncCard } from './components/BackendSyncCard'
 import { CredentialPanel } from './components/CredentialPanel'
 import { DatabaseConfigPanel } from './components/DatabaseConfigPanel'
 import { DatasetUploader } from './components/DatasetUploader'
+import { DatabaseImportPanel } from './components/DatabaseImportPanel'
 import { EndpointDesigner } from './components/EndpointDesigner'
 import { EndpointGallery } from './components/EndpointGallery'
 import { GenerationResultPanel } from './components/GenerationResultPanel'
@@ -47,7 +48,8 @@ export function App() {
   const {
     project,
     updateProject,
-    setDataset,
+    upsertDataset,
+    removeDataset,
     upsertEndpoint,
     removeEndpoint,
     replaceProject,
@@ -74,7 +76,9 @@ export function App() {
   const [result, setResult] = useState<GenerationResult | null>(null)
   const [generationWarning, setGenerationWarning] = useState<string | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
-  const [activeTab, setActiveTab] = useState<'schema' | 'endpoints' | 'security' | 'simulator' | 'delivery' | 'result'>('schema')
+  const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'security' | 'simulator' | 'delivery' | 'result'>('datasets')
+  const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null)
+  const [isImportingDB, setIsImportingDB] = useState(false)
   const [activePage, setActivePage] = useState<'builder' | 'info' | 'usage' | 'admin'>('builder')
   const localBaseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'
   const backendBaseUrl = readBackendConfig().baseUrl?.replace(/\/$/, '') || 'http://localhost:8000'
@@ -88,12 +92,12 @@ export function App() {
 
   const tabs = useMemo(
     () => [
-      { id: 'schema', label: '1. Dataset' },
-      { id: 'endpoints', label: '2. Endpoints' },
-      { id: 'security', label: '3. Seguridad' },
-      { id: 'simulator', label: '4. Simulador' },
-      { id: 'delivery', label: '5. Entrega' },
-      { id: 'result', label: '6. Resultado' },
+      { id: 'datasets', label: 'Datasets' },
+      { id: 'endpoints', label: 'Endpoints' },
+      { id: 'security', label: 'Seguridad' },
+      { id: 'simulator', label: 'Simulador' },
+      { id: 'delivery', label: 'Cómo usarla' },
+      { id: 'result', label: 'API generada' },
     ],
     [],
   )
@@ -209,18 +213,68 @@ export function App() {
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'schema':
+      case 'datasets':
+        const currentDataset = project.datasets.find(d => d.id === selectedDatasetId) || project.datasets[0]
         return (
-          <SectionCard title="Dataset y vista previa" subtitle="Carga datos y valida la tabla resultante" accent="emerald" fullWidth>
-            <div className="split-panel">
-              <div className="split-panel__cell">
-                <DatasetUploader dataset={project.dataset} onCommit={setDataset} />
+          <div className="datasets-tab-layout-vertical">
+            <div className="datasets-header-bar">
+              <div className="datasets-tabs">
+                {project.datasets.map(ds => (
+                  <div key={ds.id} className={`dataset-tab ${ds.id === (selectedDatasetId || project.datasets[0]?.id) ? 'active' : ''}`}>
+                    <button type="button" onClick={() => { setSelectedDatasetId(ds.id); setIsImportingDB(false); }}>
+                      {ds.name}
+                      <span className="badge-xs">{ds.sourceType}</span>
+                    </button>
+                    <button type="button" className="btn-remove-ds" onClick={() => removeDataset(ds.id)}>×</button>
+                  </div>
+                ))}
               </div>
-              <div className="split-panel__cell">
-                <PreviewPanel project={project} />
+              <div className="dropdown">
+                <button type="button" className="btn ghost btn-sm">+ Nueva tabla</button>
+                <div className="dropdown-content">
+                  <button type="button" onClick={() => {
+                    const newId = crypto.randomUUID()
+                    upsertDataset({
+                      id: newId,
+                      name: `Tabla ${project.datasets.length + 1}`,
+                      sourceType: 'manual',
+                      fields: [{ id: crypto.randomUUID(), name: 'id', type: 'integer', required: true }],
+                      sampleRows: []
+                    })
+                    setSelectedDatasetId(newId)
+                  }}>Manual / CSV</button>
+                  <button type="button" onClick={() => setIsImportingDB(true)}>Base de datos</button>
+                </div>
               </div>
             </div>
-          </SectionCard>
+            <div className="datasets-main">
+              {isImportingDB ? (
+                <SectionCard title="Importar desde Base de Datos" subtitle="Conecta e introspecciona tablas" accent="sky" fullWidth>
+                  <DatabaseImportPanel 
+                    onImport={(newDatasets) => {
+                      newDatasets.forEach(upsertDataset)
+                      if (newDatasets.length > 0) setSelectedDatasetId(newDatasets[0].id)
+                      setIsImportingDB(false)
+                    }}
+                    onCancel={() => setIsImportingDB(false)}
+                  />
+                </SectionCard>
+              ) : currentDataset ? (
+                <SectionCard title={`${currentDataset.name}`} subtitle="Configuración de la tabla y datos" accent="emerald" fullWidth>
+                  <div className="split-panel">
+                    <div className="split-panel__cell">
+                      <DatasetUploader dataset={currentDataset} onCommit={upsertDataset} />
+                    </div>
+                    <div className="split-panel__cell">
+                      <PreviewPanel project={project} datasetId={currentDataset.id} />
+                    </div>
+                  </div>
+                </SectionCard>
+              ) : (
+                <div className="empty-state">No hay datasets. Crea uno para empezar.</div>
+              )}
+            </div>
+          </div>
         )
       case 'endpoints':
         return (
@@ -325,7 +379,7 @@ export function App() {
                     summary: 'Obtiene la lista de elementos del dataset'
                   }
                 ],
-                dataset: {
+                datasets: [{
                   id: crypto.randomUUID(),
                   name: 'Dataset principal',
                   sourceType: 'manual',
@@ -335,7 +389,7 @@ export function App() {
                   sampleRows: [
                     { nombre: 'Ejemplo 1' }
                   ]
-                }
+                }]
               }
               replaceProject(draft)
             }}

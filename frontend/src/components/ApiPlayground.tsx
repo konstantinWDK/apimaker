@@ -22,9 +22,10 @@ interface ApiResponse {
 const sampleStore: Record<string, Array<Record<string, unknown>>> = {}
 
 const initStore = (project: ProjectDraft) => {
-  const actualRows = project.dataset?.sampleRows
+  const defaultDataset = project.datasets[0]
+  const actualRows = defaultDataset?.sampleRows
   if (actualRows && actualRows.length > 0) {
-    const fields = (project.dataset as any)?.fields ?? []
+    const fields = defaultDataset?.fields ?? []
     sampleStore[project.id] = actualRows.map((row: Record<string, string>, i: number) => {
       const item: Record<string, unknown> = { id: i + 1 }
       for (const f of fields) {
@@ -45,7 +46,7 @@ const initStore = (project: ProjectDraft) => {
 
 // ─── Body generators ──────────────────────────────────────────
 const buildBodyForMethod = (project: ProjectDraft, method: string, _path: string): string => {
-  const fields = project.dataset ? (project.dataset as any).fields ?? [] : []
+  const fields = project.datasets[0]?.fields ?? []
   if (method === 'GET') return ''
 
   const base: Record<string, unknown> = {}
@@ -92,7 +93,7 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading }
   // Initialize sample store when project changes
   useEffect(() => {
     initStore(project)
-  }, [project.id, project.dataset?.id])
+  }, [project.id, project.datasets.length])
 
   const allEndpoints = project.endpoints.length > 0 ? project.endpoints : [{ id: 'default', method: 'GET' as const, path: '/records', name: 'records', summary: '' }]
   const initialEndpoint = allEndpoints[0]
@@ -122,7 +123,7 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading }
       setResponse(null)
       
     }
-  }, [project.id, project.dataset?.id, project.endpoints])
+  }, [project.id, project.datasets.length, project.endpoints])
 
   const mockUrl = useMemo(() => {
     let finalPath = path.startsWith('/') ? path : `/${path}`

@@ -100,19 +100,23 @@ class ProjectService:
         return project
 
     def get_project_with_data(self, session: Session, project_id: str) -> dict:
-        """Get project with its dataset and endpoints loaded."""
+        """Get project with its datasets and endpoints loaded."""
         project = self.get_project(session, project_id)
 
-        # Load dataset
-        dataset = session.exec(
+        # Load datasets
+        datasets = session.exec(
             select(Dataset).where(Dataset.project_id == str(project_id))
-        ).first()
+        ).all()
 
-        fields = []
-        if dataset:
+        datasets_with_fields = []
+        for ds in datasets:
             fields = session.exec(
-                select(DatasetField).where(DatasetField.dataset_id == dataset.id)
+                select(DatasetField).where(DatasetField.dataset_id == ds.id)
             ).all()
+            datasets_with_fields.append({
+                "dataset": ds,
+                "fields": fields
+            })
 
         # Load endpoints
         endpoints = session.exec(
@@ -121,8 +125,7 @@ class ProjectService:
 
         return {
             "project": project,
-            "dataset": dataset,
-            "fields": fields,
+            "datasets": datasets_with_fields,
             "endpoints": endpoints,
         }
 
@@ -134,28 +137,44 @@ class ProjectService:
         source_type: str,
         fields: list[dict],
         sample_rows: list[dict] | None = None,
+        dataset_id: str | None = None,
     ) -> Project:
         project = self.get_project(session, project_id)
 
-        # Remove existing dataset if any
-        existing_dataset = session.exec(
-            select(Dataset).where(Dataset.project_id == str(project_id))
-        ).first()
-        if existing_dataset:
+        # If dataset_id is provided, check if it exists
+        dataset = None
+        if dataset_id:
+            dataset = session.get(Dataset, str(dataset_id))
+        
+        # If not found by ID, try finding by name for the same project
+        if not dataset:
+            dataset = session.exec(
+                select(Dataset).where(Dataset.project_id == str(project_id), Dataset.name == name)
+            ).first()
+
+        # If found, update. Otherwise create.
+        if dataset:
+            # Clear old fields
             existing_fields = session.exec(
-                select(DatasetField).where(DatasetField.dataset_id == existing_dataset.id)
+                select(DatasetField).where(DatasetField.dataset_id == dataset.id)
             ).all()
             for f in existing_fields:
                 session.delete(f)
-            session.delete(existing_dataset)
-
-        import json
-        dataset = Dataset(
-            project_id=str(project_id),
-            name=name,
-            source_type=source_type,
-            sample_rows=json.dumps(sample_rows) if sample_rows else None
-        )
+            
+            dataset.name = name
+            dataset.source_type = sourceType if 'sourceType' in locals() else source_type
+            import json
+            dataset.sample_rows = json.dumps(sample_rows) if sample_rows else None
+        else:
+            import json
+            dataset = Dataset(
+                id=dataset_id if dataset_id else str(uuid4()),
+                project_id=str(project_id),
+                name=name,
+                source_type=source_type,
+                sample_rows=json.dumps(sample_rows) if sample_rows else None
+            )
+        
         session.add(dataset)
         session.flush()
 
@@ -194,12 +213,14 @@ class ProjectService:
         for ep in endpoints:
             session.add(
                 Endpoint(
+                    id=ep.get("id") or str(uuid4()),
                     project_id=str(project_id),
                     name=ep["name"],
                     method=ep["method"],
                     path=ep["path"],
                     summary=ep.get("summary"),
                     operation_type=ep.get("operation_type", "custom"),
+                    target_dataset_id=ep.get("target_dataset_id"),
                 )
             )
 

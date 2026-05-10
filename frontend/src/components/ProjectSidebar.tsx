@@ -65,9 +65,11 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
     return () => clearInterval(interval)
   }, [])
 
-  const datasetName = project.dataset?.name ?? 'Sin dataset'
-  const fields = project.dataset?.fields.length ?? 0
-  const rows = project.dataset?.sampleRows?.length ?? 0
+  const datasetsCount = project.datasets.length
+  const fieldsCount = project.datasets.reduce((acc, ds) => acc + ds.fields.length, 0)
+  const rowsCount = project.datasets.reduce((acc, ds) => acc + (ds.sampleRows?.length ?? 0), 0)
+  const sizeBytes = project.datasets.reduce((acc, ds) => acc + (ds.sampleRows ? JSON.stringify(ds.sampleRows).length : 0), 0)
+  const sizeKb = sizeBytes > 0 ? `${Math.max(1, Math.round(sizeBytes / 1024))} KB` : '0 KB'
   const endpoints = project.endpoints.length
 
   return (
@@ -76,24 +78,34 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
         <h1 className="sidebar__h1-title">{project.name || 'Nuevo Proyecto'}</h1>
         <p className="sidebar__subtitle">Stack: {project.targetStack}</p>
         
-        <dl className="sidebar__stats">
-          <div>
-            <dt>Dataset</dt>
-            <dd>{datasetName}</dd>
-          </div>
-          <div>
-            <dt>Campos</dt>
-            <dd>{fields}</dd>
-          </div>
-          <div>
-            <dt>Filas</dt>
-            <dd>{rows}</dd>
-          </div>
-          <div>
-            <dt>Endpoints</dt>
-            <dd>{endpoints}</dd>
-          </div>
-        </dl>
+      </div>
+
+      <div className="sidebar__section">
+        <p className="sidebar__section-title">Información del Proyecto</p>
+        <div className="sidebar__status-card" style={{ padding: '1rem' }}>
+          <dl className="sidebar__stats" style={{ margin: 0 }}>
+            <div>
+              <dt>Tablas</dt>
+              <dd>{datasetsCount}</dd>
+            </div>
+            <div>
+              <dt>Campos</dt>
+              <dd>{fieldsCount}</dd>
+            </div>
+            <div>
+              <dt>Filas</dt>
+              <dd>{rowsCount}</dd>
+            </div>
+            <div>
+              <dt>Peso</dt>
+              <dd>{sizeKb}</dd>
+            </div>
+            <div>
+              <dt>Endpoints</dt>
+              <dd>{endpoints}</dd>
+            </div>
+          </dl>
+        </div>
       </div>
 
       {/* Monitoring & Status */}

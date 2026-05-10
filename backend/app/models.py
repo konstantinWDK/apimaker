@@ -28,7 +28,7 @@ class FieldSchema(BaseModel):
 class DatasetMeta(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     name: str
-    source_type: Literal["upload", "manual"] = "manual"
+    source_type: Literal["upload", "manual", "database"] = "manual"
     fields: list[FieldSchema] = Field(default_factory=list)
     sample_rows: list[dict] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -41,6 +41,7 @@ class ApiEndpoint(BaseModel):
     path: str
     summary: str | None = None
     operation_type: Literal["list", "get", "create", "update", "delete", "custom"] = "custom"
+    target_dataset_id: str | None = None
 
 
 class ProjectStatus(str, Enum):
@@ -59,7 +60,7 @@ class Project(BaseModel):
     jwt_secret: str | None = None
     rate_limit: int | None = None
     target_stack: Literal["fastapi", "express", "nest"] = "fastapi"
-    dataset: DatasetMeta | None = None
+    datasets: list[DatasetMeta] = Field(default_factory=list)
     endpoints: list[ApiEndpoint] = Field(default_factory=list)
     status: ProjectStatus = ProjectStatus.DRAFT
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -76,7 +77,7 @@ class CreateProjectRequest(BaseModel):
     jwt_secret: str | None = None
     rate_limit: int | None = None
     target_stack: Literal["fastapi", "express", "nest"] = "fastapi"
-    dataset: DatasetMeta | None = None
+    datasets: list[DatasetMeta] = Field(default_factory=list)
 
 
 class UpdateProjectRequest(BaseModel):
@@ -92,8 +93,9 @@ class UpdateProjectRequest(BaseModel):
 
 
 class UploadDatasetRequest(BaseModel):
+    id: str | None = None
     name: str
-    source_type: Literal["upload", "manual"] = "manual"
+    source_type: Literal["upload", "manual", "database"] = "manual"
     fields: list[FieldSchema]
     sample_rows: list[dict] | None = None
 

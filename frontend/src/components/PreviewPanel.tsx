@@ -3,10 +3,11 @@ import { getPreviewData } from '../lib/preview'
 
 interface Props {
   project: ProjectDraft
+  datasetId?: string
 }
 
-export function PreviewPanel({ project }: Props) {
-  const { columns, rows } = getPreviewData(project)
+export function PreviewPanel({ project, datasetId }: Props) {
+  const { columns, rows } = getPreviewData(project, datasetId)
 
   return (
     <div className="preview-panel">

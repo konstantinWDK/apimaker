@@ -86,6 +86,7 @@ class Endpoint(SQLModel, table=True):
     path: str
     summary: Optional[str] = None
     operation_type: str = "custom"
+    target_dataset_id: Optional[str] = Field(default=None, foreign_key="datasets.id")
 
 
 class Project(SQLModel, table=True):

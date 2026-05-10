@@ -18,12 +18,12 @@ interface ShareData {
     target_stack: string
     status: string
   }
-  dataset: {
+  datasets: Array<{
     id: string
     name: string
     source_type: string
     fields: Array<{ name: string; type: string; required: boolean; description: string | null }>
-  } | null
+  }>
   endpoints: Array<{ id: string; name: string; method: string; path: string; summary: string | null }>
   share_id: string
   share_slug: string
@@ -31,7 +31,6 @@ interface ShareData {
 }
 
 const toProjectDraft = (data: any): ProjectDraft => {
-  const datasetFields = data.dataset?.fields ?? []
   return {
     id: data.project.id,
     remoteId: (data.project as any).slug || data.project.id,
@@ -40,20 +39,18 @@ const toProjectDraft = (data: any): ProjectDraft => {
     description: data.project.description ?? undefined,
     authMethod: 'none',
     targetStack: data.project.target_stack as 'fastapi' | 'express' | 'nest',
-    dataset: data.dataset
-      ? {
-          id: data.dataset.id,
-          name: data.dataset.name,
-          sourceType: data.dataset.source_type as 'upload' | 'manual',
-          fields: datasetFields.map((f: any) => ({
-            id: f.name,
-            name: f.name,
-            type: f.type as 'string' | 'integer' | 'float' | 'boolean' | 'datetime',
-            required: f.required,
-          })),
-          sampleRows: [],
-        }
-      : undefined,
+    datasets: (data.datasets || []).map((ds: any) => ({
+      id: ds.id,
+      name: ds.name,
+      sourceType: ds.source_type as 'upload' | 'manual' | 'database',
+      fields: (ds.fields || []).map((f: any) => ({
+        id: f.name,
+        name: f.name,
+        type: f.type as 'string' | 'integer' | 'float' | 'boolean' | 'datetime',
+        required: f.required,
+      })),
+      sampleRows: [],
+    })),
     endpoints: data.endpoints.map((ep: any) => ({
       id: ep.id,
       name: ep.name,
@@ -133,7 +130,7 @@ export function ShareView() {
   }
 
   const project = toProjectDraft(shareData)
-  const datasetFields = shareData.dataset?.fields.length ?? 0
+  const datasetFields = shareData.datasets?.reduce((acc, ds) => acc + (ds.fields?.length ?? 0), 0) ?? 0
   const { baseUrl } = readBackendConfig()
   const result = {
     apiUrl: `${baseUrl}/api/mock/${project.slug || project.id}`,

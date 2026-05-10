@@ -15,13 +15,14 @@ interface Props {
   clearWarning: () => void
 }
 
-const emptyEndpoint = (): ApiEndpoint => ({
+const emptyEndpoint = (datasetId?: string): ApiEndpoint => ({
   id: crypto.randomUUID(),
   name: '',
   method: 'GET',
   path: '',
   summary: '',
   operationType: 'custom',
+  targetDatasetId: datasetId,
 })
 
 const OPERATION_OPTIONS: Array<{ value: ApiEndpoint['operationType']; label: string }> = [
@@ -51,7 +52,7 @@ const METHOD_CLASS: Record<ApiEndpoint['method'], string> = {
 }
 
 export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewBase, warningMessage, clearWarning }: Props) {
-  const [draft, setDraft] = useState<ApiEndpoint>(emptyEndpoint())
+  const [draft, setDraft] = useState<ApiEndpoint>(emptyEndpoint(project.datasets[0]?.id))
   const [editDraft, setEditDraft] = useState<ApiEndpoint | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -60,7 +61,7 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     onAdd(draft)
-    setDraft(emptyEndpoint())
+    setDraft(emptyEndpoint(draft.targetDatasetId))
     setError(null)
     clearWarning()
   }
@@ -89,14 +90,16 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
   }
 
   const handleOperationChange = (opType: ApiEndpoint['operationType']) => {
-    const datasetName = project.dataset?.name || 'items'
+    const ds = project.datasets.find(d => d.id === draft.targetDatasetId) || project.datasets[0]
+    const datasetName = ds?.name || 'items'
     const updates = getOperationUpdates(opType, datasetName)
     setDraft(prev => ({ ...prev, ...updates, operationType: opType }))
   }
 
   const handleEditOperationChange = (opType: ApiEndpoint['operationType']) => {
     if (!editDraft) return
-    const datasetName = project.dataset?.name || 'items'
+    const ds = project.datasets.find(d => d.id === editDraft.targetDatasetId) || project.datasets[0]
+    const datasetName = ds?.name || 'items'
     const updates = getOperationUpdates(opType, datasetName)
     setEditDraft(prev => prev ? ({ ...prev, ...updates, operationType: opType }) : null)
   }
@@ -119,8 +122,9 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
     }
   }
 
-  const rowsCount = project.dataset?.sampleRows?.length ?? 0
-  const datasetName = project.dataset?.name ?? 'Sin dataset'
+  const selectedDs = project.datasets.find(d => d.id === draft.targetDatasetId) || project.datasets[0]
+  const rowsCount = selectedDs?.sampleRows?.length ?? 0
+  const datasetName = selectedDs?.name ?? 'Sin dataset'
   const previewPath = endpoints[0]?.path ?? '/records'
   const resolvedBase = useMemo(() => {
     if (config.baseUrl?.trim()) return config.baseUrl.replace(/\/$/, '')
@@ -130,35 +134,13 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
   }, [config.baseUrl, previewBase])
   const previewProjectId = project.slug || project.remoteId || project.id
   const previewUrl = useMemo(() => `${resolvedBase}/api/mock/${previewProjectId}${previewPath}`, [resolvedBase, previewPath, previewProjectId])
-  const sizeKb = project.dataset?.sampleRows?.length
-    ? `${Math.max(1, Math.round(JSON.stringify(project.dataset.sampleRows).length / 1024))} KB`
-    : '1 KB'
 
   return (
     <div className="endpoint-designer">
-      <div className="endpoint-summary">
-        <div className="endpoint-summary__item">
-          <p className="label">API Name</p>
-          <p>{project.name}</p>
-        </div>
-        <div className="endpoint-summary__item">
-          <p className="label">Dataset</p>
-          <p>{datasetName}</p>
-        </div>
-        <div className="endpoint-summary__item">
-          <p className="label"># Rows</p>
-          <p>{rowsCount}</p>
-        </div>
-        <div className="endpoint-summary__item">
-          <p className="label">Size</p>
-          <p>{sizeKb}</p>
-        </div>
-        <div className="endpoint-summary__preview">
-          <p className="label">Preview</p>
-          <a className="endpoint-preview__link" href={previewUrl} target="_blank" rel="noreferrer">
-            {previewUrl}
-          </a>
-        </div>
+      <div className="endpoint-summary endpoint-summary--compact" style={{ padding: '0.5rem', background: 'transparent', border: 'none' }}>
+        <a className="endpoint-preview__link" href={previewUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem', textDecoration: 'none' }}>
+          <span className="icon">🔗</span> {previewUrl}
+        </a>
       </div>
 
       {error ? <p className="error-text">{error}</p> : null}
@@ -170,6 +152,16 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
           {METHOD_DESCRIPTIONS[draft.method]}
         </p>
         <div className="endpoint-form__row">
+          <select
+            value={draft.targetDatasetId}
+            className="field endpoint-form__dataset-select"
+            onChange={(event) => setDraft({ ...draft, targetDatasetId: event.target.value })}
+          >
+            {project.datasets.map((ds) => (
+              <option key={ds.id} value={ds.id}>{ds.name}</option>
+            ))}
+          </select>
+
           <select
             value={draft.operationType}
             className="field endpoint-form__operation-select"
