@@ -199,6 +199,7 @@ class ProjectService:
                     method=ep["method"],
                     path=ep["path"],
                     summary=ep.get("summary"),
+                    operation_type=ep.get("operation_type", "custom"),
                 )
             )
 

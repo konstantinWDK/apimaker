@@ -113,6 +113,7 @@ const api = {
         method: ep.method,
         path: ep.path,
         summary: ep.summary || '',
+        operationType: ep.operation_type || 'custom',
       })),
       dataset: p.dataset ? sanitizeDataset({
         id: p.dataset.id,
@@ -176,6 +177,7 @@ const api = {
         method: ep.method,
         path: ep.path,
         summary: ep.summary || '',
+        operationType: ep.operation_type || 'custom',
       })),
       dataset: data.dataset ? {
         id: data.dataset.id,
@@ -233,6 +235,7 @@ const api = {
           method: ep.method,
           path: ep.path,
           summary: ep.summary,
+          operation_type: ep.operationType || 'custom',
         })),
       }),
     })

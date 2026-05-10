@@ -85,6 +85,7 @@ class Endpoint(SQLModel, table=True):
     method: str = "GET"
     path: str
     summary: Optional[str] = None
+    operation_type: str = "custom"
 
 
 class Project(SQLModel, table=True):

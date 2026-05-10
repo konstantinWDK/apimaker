@@ -78,6 +78,7 @@ def _build_context(
             "method": ep.method,
             "path": ep.path,
             "summary": ep.summary,
+            "operation_type": ep.operation_type or "custom",
         }
         for ep in endpoints
     ]
@@ -297,7 +298,14 @@ def run_generation(
             target_stack=project.target_stack,
             dataset=None,
             endpoints=[
-                {"id": ep.id, "name": ep.name, "method": ep.method, "path": ep.path, "summary": ep.summary}
+                {
+                    "id": ep.id,
+                    "name": ep.name,
+                    "method": ep.method,
+                    "path": ep.path,
+                    "summary": ep.summary,
+                    "operation_type": ep.operation_type or "custom"
+                }
                 for ep in endpoints
             ],
             status=project.status,

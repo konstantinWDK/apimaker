@@ -1071,6 +1071,23 @@ input[type='password'] {
   word-break: break-all;
 }
 
+
+.endpoint-item--editing {
+  background: #fff;
+  border-color: #0ea5e9;
+  box-shadow: 0 10px 25px rgba(14, 165, 233, 0.1);
+  padding: 0;
+  overflow: hidden;
+}
+
+.endpoint-form--inline {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 1.25rem;
+  box-shadow: none;
+}
+
 .endpoint-form {
   border-radius: 10px;
   border: 1px solid rgba(15, 23, 42, 0.08);
@@ -1082,14 +1099,33 @@ input[type='password'] {
 }
 
 .endpoint-form__row {
-  display: grid;
-  grid-template-columns: minmax(90px, 0.6fr) minmax(0, 1.3fr) minmax(0, 1fr);
+  display: flex;
   gap: 0.6rem;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+.endpoint-form__row > .field {
+  flex: 1;
+  min-width: 120px;
+}
+
+.endpoint-form__operation-select {
+  flex: 0 0 160px !important;
 }
 
 .endpoint-form__method-select {
-  min-width: 90px;
+  flex: 0 0 90px !important;
+}
+
+.endpoint-form__summary-field {
+  flex: 1 1 100% !important;
+}
+
+.endpoint-form__actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
 }
 
 .method-hint {
@@ -1123,15 +1159,15 @@ input[type='password'] {
 }
 
 .endpoint-item {
-  padding: 0.55rem 0.85rem;
   border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.92);
-  display: grid;
-  grid-template-columns: 1fr auto;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(255, 255, 255, 0.8);
+  padding: 1rem 1.25rem;
+  display: flex;
   align-items: center;
-  gap: 0.4rem 0.6rem;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+  gap: 1.5rem;
+  transition: all 0.2s ease;
+  position: relative;
 }
 
 .endpoint-item__header {
@@ -1176,8 +1212,21 @@ input[type='password'] {
 
 .endpoint-item__route {
   font-family: 'Space Grotesk', monospace;
-  font-size: 0.78rem;
+  font-size: 0.9rem;
+  font-weight: 600;
   color: #0f172a;
+}
+
+.endpoint-item__type-badge {
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  margin-right: 0.5rem;
 }
 
 .endpoint-item__body {
@@ -1193,6 +1242,28 @@ input[type='password'] {
 .endpoint-item__summary {
   color: #64748b;
   font-size: 0.82rem;
+}
+
+.endpoint-item__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
+}
+
+.endpoint-item__edit {
+  background: none;
+  border: none;
+  color: #0284c7;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.endpoint-item__edit:hover {
+  background: rgba(2, 132, 199, 0.1);
 }
 
 .endpoint-item__remove {

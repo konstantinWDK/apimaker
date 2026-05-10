@@ -17,11 +17,21 @@ interface Props {
 
 const emptyEndpoint = (): ApiEndpoint => ({
   id: crypto.randomUUID(),
-  name: 'Nuevo recurso',
+  name: '',
   method: 'GET',
-  path: '/items',
+  path: '',
   summary: '',
+  operationType: 'custom',
 })
+
+const OPERATION_OPTIONS: Array<{ value: ApiEndpoint['operationType']; label: string }> = [
+  { value: 'list', label: 'Listar (GET)' },
+  { value: 'get', label: 'Obtener uno (GET)' },
+  { value: 'create', label: 'Crear (POST)' },
+  { value: 'update', label: 'Actualizar (PUT)' },
+  { value: 'delete', label: 'Eliminar (DELETE)' },
+  { value: 'custom', label: 'Personalizado' },
+]
 
 const METHOD_OPTIONS: ApiEndpoint['method'][] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
 const METHOD_DESCRIPTIONS: Record<ApiEndpoint['method'], string> = {
@@ -42,23 +52,71 @@ const METHOD_CLASS: Record<ApiEndpoint['method'], string> = {
 
 export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewBase, warningMessage, clearWarning }: Props) {
   const [draft, setDraft] = useState<ApiEndpoint>(emptyEndpoint())
+  const [editDraft, setEditDraft] = useState<ApiEndpoint | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const { config } = useBackendConfig()
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!draft.name.trim()) {
-      setError('El endpoint necesita un nombre')
-      return
-    }
-    if (!draft.path.trim()) {
-      setError('Indica un path para el endpoint')
-      return
-    }
     onAdd(draft)
     setDraft(emptyEndpoint())
     setError(null)
     clearWarning()
+  }
+
+  const handleEditSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!editDraft) return
+    if (!editDraft.name.trim() || !editDraft.path.trim()) {
+      setError('Nombre y path son obligatorios')
+      return
+    }
+    onAdd(editDraft)
+    setEditDraft(null)
+    setEditingId(null)
+    setError(null)
+  }
+
+  const handleEdit = (endpoint: ApiEndpoint) => {
+    setEditDraft({ ...endpoint })
+    setEditingId(endpoint.id)
+  }
+
+  const cancelEdit = () => {
+    setEditDraft(null)
+    setEditingId(null)
+  }
+
+  const handleOperationChange = (opType: ApiEndpoint['operationType']) => {
+    const datasetName = project.dataset?.name || 'items'
+    const updates = getOperationUpdates(opType, datasetName)
+    setDraft(prev => ({ ...prev, ...updates, operationType: opType }))
+  }
+
+  const handleEditOperationChange = (opType: ApiEndpoint['operationType']) => {
+    if (!editDraft) return
+    const datasetName = project.dataset?.name || 'items'
+    const updates = getOperationUpdates(opType, datasetName)
+    setEditDraft(prev => prev ? ({ ...prev, ...updates, operationType: opType }) : null)
+  }
+
+  const getOperationUpdates = (opType: ApiEndpoint['operationType'], datasetName: string): Partial<ApiEndpoint> => {
+    const resourcePath = `/${datasetName.toLowerCase().replace(/\s+/g, '-')}`
+    switch (opType) {
+      case 'list':
+        return { method: 'GET', path: resourcePath, name: `Listar ${datasetName}`, summary: `Obtiene la lista de ${datasetName}` }
+      case 'get':
+        return { method: 'GET', path: `${resourcePath}/{id}`, name: `Detalle ${datasetName}`, summary: `Obtiene un ${datasetName} por su ID` }
+      case 'create':
+        return { method: 'POST', path: resourcePath, name: `Crear ${datasetName}`, summary: `Registra un nuevo ${datasetName}` }
+      case 'update':
+        return { method: 'PUT', path: `${resourcePath}/{id}`, name: `Actualizar ${datasetName}`, summary: `Modifica un ${datasetName} existente` }
+      case 'delete':
+        return { method: 'DELETE', path: `${resourcePath}/{id}`, name: `Borrar ${datasetName}`, summary: `Elimina un ${datasetName}` }
+      default:
+        return {}
+    }
   }
 
   const rowsCount = project.dataset?.sampleRows?.length ?? 0
@@ -113,14 +171,26 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
         </p>
         <div className="endpoint-form__row">
           <select
-            value={draft.method}
-            className="field endpoint-form__method-select"
-            onChange={(event) => setDraft({ ...draft, method: event.target.value as ApiEndpoint['method'] })}
+            value={draft.operationType}
+            className="field endpoint-form__operation-select"
+            onChange={(event) => handleOperationChange(event.target.value as ApiEndpoint['operationType'])}
           >
-            {METHOD_OPTIONS.map((method) => (
-              <option key={method}>{method}</option>
+            {OPERATION_OPTIONS.map((op) => (
+              <option key={op.value} value={op.value}>{op.label}</option>
             ))}
           </select>
+
+          {draft.operationType === 'custom' && (
+            <select
+              value={draft.method}
+              className="field endpoint-form__method-select"
+              onChange={(event) => setDraft({ ...draft, method: event.target.value as ApiEndpoint['method'] })}
+            >
+              {METHOD_OPTIONS.map((method) => (
+                <option key={method}>{method}</option>
+              ))}
+            </select>
+          )}
           <input
             value={draft.path}
             className="field"
@@ -134,31 +204,96 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
             placeholder="Nombre corto"
           />
         </div>
-        <input
-          value={draft.summary}
-          className="field"
-          onChange={(event) => setDraft({ ...draft, summary: event.target.value })}
-          placeholder="Descripción"
-        />
-        <button type="submit" className="btn primary">
-          Añadir endpoint
-        </button>
+        <div className="endpoint-form__row">
+          <input
+            value={draft.summary}
+            className="field endpoint-form__summary-field"
+            onChange={(event) => setDraft({ ...draft, summary: event.target.value })}
+            placeholder="Descripción del endpoint (opcional)"
+          />
+        </div>
+        <div className="endpoint-form__actions">
+          <button type="submit" className="btn primary">
+            Añadir endpoint
+          </button>
+        </div>
       </form>
 
       <div className="endpoint-list">
         {endpoints.map((endpoint) => (
-          <div key={endpoint.id} className="endpoint-item">
-            <div className="endpoint-item__header">
-              <span className={clsx('endpoint-item__method', METHOD_CLASS[endpoint.method])}>{endpoint.method}</span>
-              <code className="endpoint-item__route">{endpoint.path}</code>
-            </div>
-            <div className="endpoint-item__body">
-              <p className="endpoint-item__title">{endpoint.name}</p>
-              {endpoint.summary ? <p className="endpoint-item__summary">{endpoint.summary}</p> : null}
-            </div>
-            <button type="button" className="endpoint-item__remove" onClick={() => onRemove(endpoint.id)} aria-label={`Eliminar ${endpoint.name}`}>
-              ×
-            </button>
+          <div key={endpoint.id} className={clsx('endpoint-item', editingId === endpoint.id && 'endpoint-item--editing')}>
+            {editingId === endpoint.id && editDraft ? (
+              <form onSubmit={handleEditSubmit} className="endpoint-form endpoint-form--inline">
+                <div className="endpoint-form__row">
+                  <select
+                    value={editDraft.operationType}
+                    className="field"
+                    onChange={(event) => handleEditOperationChange(event.target.value as ApiEndpoint['operationType'])}
+                  >
+                    {OPERATION_OPTIONS.map((op) => (
+                      <option key={op.value} value={op.value}>{op.label}</option>
+                    ))}
+                  </select>
+                  {editDraft.operationType === 'custom' && (
+                    <select
+                      value={editDraft.method}
+                      className="field"
+                      onChange={(event) => setEditDraft({ ...editDraft, method: event.target.value as ApiEndpoint['method'] })}
+                    >
+                      {METHOD_OPTIONS.map((method) => (
+                        <option key={method}>{method}</option>
+                      ))}
+                    </select>
+                  )}
+                  <input
+                    value={editDraft.path}
+                    className="field"
+                    onChange={(event) => setEditDraft({ ...editDraft, path: event.target.value })}
+                    placeholder="/resource"
+                  />
+                  <input
+                    value={editDraft.name}
+                    className="field"
+                    onChange={(event) => setEditDraft({ ...editDraft, name: event.target.value })}
+                    placeholder="Nombre"
+                  />
+                </div>
+                <div className="endpoint-form__row">
+                  <input
+                    value={editDraft.summary}
+                    className="field endpoint-form__summary-field"
+                    onChange={(event) => setEditDraft({ ...editDraft, summary: event.target.value })}
+                    placeholder="Descripción"
+                  />
+                </div>
+                <div className="endpoint-form__actions">
+                  <button type="submit" className="btn primary btn-small">Guardar</button>
+                  <button type="button" className="btn subtle btn-small" onClick={cancelEdit}>Cancelar</button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <div className="endpoint-item__header">
+                  <span className={clsx('endpoint-item__method', METHOD_CLASS[endpoint.method])}>{endpoint.method}</span>
+                  <code className="endpoint-item__route">{endpoint.path}</code>
+                  {endpoint.operationType && endpoint.operationType !== 'custom' && (
+                    <span className="endpoint-item__type-badge">{endpoint.operationType}</span>
+                  )}
+                </div>
+                <div className="endpoint-item__body">
+                  <p className="endpoint-item__title">{endpoint.name}</p>
+                  {endpoint.summary ? <p className="endpoint-item__summary">{endpoint.summary}</p> : null}
+                </div>
+                <div className="endpoint-item__actions">
+                  <button type="button" className="endpoint-item__edit" onClick={() => handleEdit(endpoint)}>
+                    Editar
+                  </button>
+                  <button type="button" className="endpoint-item__remove" onClick={() => onRemove(endpoint.id)} aria-label={`Eliminar ${endpoint.name}`}>
+                    ×
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         ))}
         {endpoints.length === 0 ? <p className="endpoint-empty">Añade al menos un endpoint para generar la API.</p> : null}

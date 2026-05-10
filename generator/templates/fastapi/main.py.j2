@@ -164,7 +164,8 @@ def startup():
 # ─── Endpoints ───────────────────────────────────────────────────
 {% if dataset %}
 {% for ep in endpoints %}
-{% if ep.method == "GET" and "{" not in ep.path %}
+{# --- LIST OPERATION --- #}
+{% if ep.operation_type == "list" or (ep.method == "GET" and "{" not in ep.path and ep.operation_type == "custom") %}
 @app.get("{{ ep.path }}", response_model=list[{{ dataset.name | capitalize }}Response], dependencies=[Depends(verify_auth)])
 async def {{ ep.name | lower | replace(" ", "_") }}(
     skip: int = Query(0, ge=0),
@@ -174,7 +175,8 @@ async def {{ ep.name | lower | replace(" ", "_") }}(
     with get_db() as db:
         return db.query({{ dataset.name | capitalize }}Record).offset(skip).limit(limit).all()
 
-{% elif ep.method == "GET" and "{" in ep.path %}
+{# --- GET BY ID OPERATION --- #}
+{% elif ep.operation_type == "get" or (ep.method == "GET" and "{" in ep.path and ep.operation_type == "custom") %}
 @app.get("{{ ep.path }}", response_model={{ dataset.name | capitalize }}Response, dependencies=[Depends(verify_auth)])
 async def {{ ep.name | lower | replace(" ", "_") }}({{ ep.path | extract_path_param }}: int):
     """{{ ep.summary or ep.name }}"""
@@ -184,7 +186,8 @@ async def {{ ep.name | lower | replace(" ", "_") }}({{ ep.path | extract_path_pa
             raise HTTPException(status_code=404, detail="Record not found")
         return record
 
-{% elif ep.method == "POST" %}
+{# --- CREATE OPERATION --- #}
+{% elif ep.operation_type == "create" or (ep.method == "POST" and ep.operation_type == "custom") %}
 @app.post("{{ ep.path }}", response_model={{ dataset.name | capitalize }}Response, status_code=201, dependencies=[Depends(verify_auth)])
 async def {{ ep.name | lower | replace(" ", "_") }}(data: {{ dataset.name | capitalize }}Create):
     """{{ ep.summary or ep.name }}"""
@@ -195,8 +198,9 @@ async def {{ ep.name | lower | replace(" ", "_") }}(data: {{ dataset.name | capi
         db.refresh(record)
         return record
 
-{% elif ep.method == "PUT" and "{" in ep.path %}
-@app.put("{{ ep.path }}", response_model={{ dataset.name | capitalize }}Response, dependencies=[Depends(verify_auth)])
+{# --- UPDATE OPERATION --- #}
+{% elif ep.operation_type == "update" or (ep.method in ["PUT", "PATCH"] and "{" in ep.path and ep.operation_type == "custom") %}
+@app.{{ ep.method | lower }}("{{ ep.path }}", response_model={{ dataset.name | capitalize }}Response, dependencies=[Depends(verify_auth)])
 async def {{ ep.name | lower | replace(" ", "_") }}({{ ep.path | extract_path_param }}: int, data: {{ dataset.name | capitalize }}Update):
     """{{ ep.summary or ep.name }}"""
     with get_db() as db:
@@ -210,7 +214,8 @@ async def {{ ep.name | lower | replace(" ", "_") }}({{ ep.path | extract_path_pa
         db.refresh(record)
         return record
 
-{% elif ep.method == "DELETE" and "{" in ep.path %}
+{# --- DELETE OPERATION --- #}
+{% elif ep.operation_type == "delete" or (ep.method == "DELETE" and "{" in ep.path and ep.operation_type == "custom") %}
 @app.delete("{{ ep.path }}", status_code=204, dependencies=[Depends(verify_auth)])
 async def {{ ep.name | lower | replace(" ", "_") }}({{ ep.path | extract_path_param }}: int):
     """{{ ep.summary or ep.name }}"""
@@ -221,6 +226,12 @@ async def {{ ep.name | lower | replace(" ", "_") }}({{ ep.path | extract_path_pa
         db.delete(record)
         db.commit()
 
+{# --- CUSTOM OR FALLBACK --- #}
+{% else %}
+@app.{{ ep.method | lower }}("{{ ep.path }}", dependencies=[Depends(verify_auth)])
+async def {{ ep.name | lower | replace(" ", "_") }}():
+    """{{ ep.summary or ep.name }}"""
+    return {"message": "Endpoint configured as {{ ep.operation_type }}"}
 {% endif %}
 {% endfor %}
 {% endif %}

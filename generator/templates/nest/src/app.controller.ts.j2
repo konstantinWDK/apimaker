@@ -17,9 +17,16 @@ export class AppController {
     @Query('skip') skip = 0,
     @Query('limit') limit = 100,
   ) {
-    // {{ ep.summary or ep.name }}
+    // {{ ep.summary or ep.name }} ({{ ep.operation_type }})
     // Implementation would use a Service and Repository in a real NestJS app
-    return { message: '{{ ep.name }} executed', data: body, params, skip, limit };
+    return { 
+      message: '{{ ep.name }} executed', 
+      operation: '{{ ep.operation_type }}',
+      data: body, 
+      params, 
+      skip, 
+      limit 
+    };
   }
   {% endfor %}
   {% endif %}

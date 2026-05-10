@@ -59,23 +59,29 @@ def _wrap_body(method: str, dataset_schema: dict | None) -> dict | None:
 def build_openapi_document(project: Project) -> dict:
     dataset_schema = _dataset_schema(project)
     component_schema = None
+    dataset_name = project.dataset.name if project.dataset else "items"
     if dataset_schema:
         component_schema = {"$ref": "#/components/schemas/Record"}
 
     paths: dict[str, dict[str, object]] = {}
     for endpoint in project.endpoints:
         method = endpoint.method.lower()
-        response_schema = dataset_schema if method == "get" else dataset_schema
+        op_type = getattr(endpoint, "operation_type", "custom")
+        
+        # Determine if response is a list or a single item
+        is_list = op_type == "list" or (method == "get" and "{" not in endpoint.path and op_type == "custom")
+        
         content_schema = component_schema or {"type": "object"}
         response_content = {
             "application/json": {
                 "schema": {"type": "array", "items": content_schema}
-                if method == "get" and "{" not in endpoint.path
+                if is_list
                 else content_schema
             }
         }
         operation = {
             "summary": endpoint.summary or endpoint.name,
+            "tags": [dataset_name] if dataset_name else ["default"],
             "responses": {
                 "200": {
                     "description": endpoint.summary or "Successful response",

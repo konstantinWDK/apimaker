@@ -40,6 +40,7 @@ class ApiEndpoint(BaseModel):
     method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"] = "GET"
     path: str
     summary: str | None = None
+    operation_type: Literal["list", "get", "create", "update", "delete", "custom"] = "custom"
 
 
 class ProjectStatus(str, Enum):

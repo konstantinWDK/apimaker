@@ -108,42 +108,48 @@
       "name": "List pokemon",
       "method": "GET",
       "path": "/pokemon",
-      "summary": "Lista paginada de Pokémon"
+      "summary": "Lista paginada de Pokémon",
+      "operationType": "list"
     },
     {
       "id": "ep-2",
       "name": "Search pokemon",
       "method": "GET",
       "path": "/pokemon/search",
-      "summary": "Filtra por nombre, región o tipo"
+      "summary": "Filtra por nombre, región o tipo",
+      "operationType": "custom"
     },
     {
       "id": "ep-3",
       "name": "Pokemon detail",
       "method": "GET",
       "path": "/pokemon/{id}",
-      "summary": "Obtiene el detalle de un Pokémon"
+      "summary": "Obtiene el detalle de un Pokémon",
+      "operationType": "get"
     },
     {
       "id": "ep-4",
       "name": "Create pokemon",
       "method": "POST",
       "path": "/pokemon",
-      "summary": "Registra un nuevo Pokémon descubierto"
+      "summary": "Registra un nuevo Pokémon descubierto",
+      "operationType": "create"
     },
     {
       "id": "ep-5",
       "name": "Update pokemon",
       "method": "PUT",
       "path": "/pokemon/{id}",
-      "summary": "Actualiza stats o metadatos de un Pokémon"
+      "summary": "Actualiza stats o metadatos de un Pokémon",
+      "operationType": "update"
     },
     {
       "id": "ep-6",
       "name": "Delete pokemon",
       "method": "DELETE",
       "path": "/pokemon/{id}",
-      "summary": "Elimina registros duplicados o erróneos"
+      "summary": "Elimina registros duplicados o erróneos",
+      "operationType": "delete"
     }
   ]
 }

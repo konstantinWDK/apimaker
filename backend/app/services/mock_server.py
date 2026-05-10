@@ -88,50 +88,50 @@ async def mock_get(
     full_path = f"/{path.strip('/')}"
     matched_ep = None
     param_value = None
-    param_name = None
+    
+    print(f"[MockServer] Matching GET {full_path}")
 
-    print(f"[MockServer] Matching path: {full_path} against {len(endpoints)} endpoints")
-
+    # 1. Exact path match first
     for ep in endpoints:
         if ep.method.upper() != "GET":
             continue
-            
-        ep_path = f"/{ep.path.strip('/')}"
-        
-        if ep_path == full_path:
+        if f"/{ep.path.strip('/')}" == full_path:
             matched_ep = ep
             break
-            
-        # Try path pattern like /products/{id}
-        if "{" in ep_path and "}" in ep_path:
-            # Simple matching: replace {param} with a wildcard
-            import re
-            pattern = re.sub(r"\{[^}]+\}", r"([^/]+)", ep_path)
-            match = re.fullmatch(pattern, full_path)
-            if match:
-                param_value = match.group(1)
-                matched_ep = ep
-                break
+
+    # 2. Pattern match if no exact match (e.g. /pokemon/25)
+    if not matched_ep:
+        for ep in endpoints:
+            if ep.method.upper() != "GET":
+                continue
+            ep_path = f"/{ep.path.strip('/')}"
+            if "{" in ep_path and "}" in ep_path:
+                import re
+                pattern = re.sub(r"\{[^}]+\}", r"([^/]+)", ep_path)
+                match = re.fullmatch(pattern, full_path)
+                if match:
+                    param_value = match.group(1)
+                    matched_ep = ep
+                    break
 
     if not matched_ep:
-        # Fallback: if there's only one GET endpoint and path is similar, or just allow common list paths
-        if not path or path == "records":
-            # Just return the store if no specific endpoints match common patterns
-            return store[skip:skip + limit]
-            
         raise HTTPException(
             status_code=404, 
-            detail=f"No matching endpoint definition for GET {full_path}. Available: {[e.path for e in endpoints]}"
+            detail=f"No matching endpoint definition for GET {full_path}."
         )
 
-    if param_value:
-        # Get by ID
-        for item in store:
-            if item.get("_id") == param_value or str(item.get("id")) == str(param_value):
-                return [item] if isinstance(item, dict) else item
-        raise HTTPException(status_code=404, detail="Not found")
+    # Use operation_type for logic
+    op_type = getattr(matched_ep, "operation_type", "custom")
 
-    # List
+    if op_type == "get" or param_value:
+        # Get by ID
+        target_id = param_value or path.split("/")[-1]
+        for item in store:
+            if str(item.get("_id")) == str(target_id) or str(item.get("id")) == str(target_id) or str(item.get("pokedex_id")) == str(target_id):
+                return item
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    # Default to list
     return store[skip:skip + limit]
 
 

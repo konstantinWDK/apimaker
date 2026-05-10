@@ -23,6 +23,7 @@ export interface ApiEndpoint {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   path: string
   summary?: string
+  operationType?: 'list' | 'get' | 'create' | 'update' | 'delete' | 'custom'
 }
 
 export interface ProjectDraft {

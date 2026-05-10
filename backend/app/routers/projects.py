@@ -61,6 +61,7 @@ def _db_to_pydantic(db_project, dataset=None, fields=None, endpoints=None) -> Py
             "method": ep.method,
             "path": ep.path,
             "summary": ep.summary,
+            "operation_type": ep.operation_type or "custom",
         })
 
     return PydanticProject(

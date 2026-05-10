@@ -87,7 +87,8 @@ app.get('/health', (req, res) => {
 
 {% if dataset %}
 {% for ep in endpoints %}
-{% if ep.method == "GET" and "{" not in ep.path %}
+{# --- LIST OPERATION --- #}
+{% if ep.operation_type == "list" or (ep.method == "GET" and "{" not in ep.path and ep.operation_type == "custom") %}
 // {{ ep.summary or ep.name }}
 app.get('{{ ep.path | replace("{", ":") | replace("}", "") }}', async (req, res) => {
   const skip = parseInt(req.query.skip) || 0;
@@ -99,7 +100,8 @@ app.get('{{ ep.path | replace("{", ":") | replace("}", "") }}', async (req, res)
   res.json(records);
 });
 
-{% elif ep.method == "GET" and "{" in ep.path %}
+{# --- GET BY ID OPERATION --- #}
+{% elif ep.operation_type == "get" or (ep.method == "GET" and "{" in ep.path and ep.operation_type == "custom") %}
 // {{ ep.summary or ep.name }}
 app.get('{{ ep.path | replace("{", ":") | replace("}", "") }}', async (req, res) => {
   const record = await {{ dataset.name | capitalize }}.findByPk(req.params.{{ ep.path | extract_path_param }});
@@ -107,7 +109,8 @@ app.get('{{ ep.path | replace("{", ":") | replace("}", "") }}', async (req, res)
   res.json(record);
 });
 
-{% elif ep.method == "POST" %}
+{# --- CREATE OPERATION --- #}
+{% elif ep.operation_type == "create" or (ep.method == "POST" and ep.operation_type == "custom") %}
 // {{ ep.summary or ep.name }}
 app.post('{{ ep.path | replace("{", ":") | replace("}", "") }}', async (req, res) => {
   try {
@@ -118,16 +121,18 @@ app.post('{{ ep.path | replace("{", ":") | replace("}", "") }}', async (req, res
   }
 });
 
-{% elif ep.method == "PUT" and "{" in ep.path %}
+{# --- UPDATE OPERATION --- #}
+{% elif ep.operation_type == "update" or (ep.method in ["PUT", "PATCH"] and "{" in ep.path and ep.operation_type == "custom") %}
 // {{ ep.summary or ep.name }}
-app.put('{{ ep.path | replace("{", ":") | replace("}", "") }}', async (req, res) => {
+app.{{ ep.method | lower }}('{{ ep.path | replace("{", ":") | replace("}", "") }}', async (req, res) => {
   const record = await {{ dataset.name | capitalize }}.findByPk(req.params.{{ ep.path | extract_path_param }});
   if (!record) return res.status(404).json({ error: 'Record not found' });
   await record.update(req.body);
   res.json(record);
 });
 
-{% elif ep.method == "DELETE" and "{" in ep.path %}
+{# --- DELETE OPERATION --- #}
+{% elif ep.operation_type == "delete" or (ep.method == "DELETE" and "{" in ep.path and ep.operation_type == "custom") %}
 // {{ ep.summary or ep.name }}
 app.delete('{{ ep.path | replace("{", ":") | replace("}", "") }}', async (req, res) => {
   const record = await {{ dataset.name | capitalize }}.findByPk(req.params.{{ ep.path | extract_path_param }});
@@ -136,6 +141,12 @@ app.delete('{{ ep.path | replace("{", ":") | replace("}", "") }}', async (req, r
   res.status(204).send();
 });
 
+{# --- CUSTOM OR FALLBACK --- #}
+{% else %}
+// {{ ep.summary or ep.name }}
+app.{{ ep.method | lower }}('{{ ep.path | replace("{", ":") | replace("}", "") }}', (req, res) => {
+  res.json({ message: "Endpoint configured as {{ ep.operation_type }}" });
+});
 {% endif %}
 {% endfor %}
 {% endif %}
