@@ -122,9 +122,6 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
     }
   }
 
-  const selectedDs = project.datasets.find(d => d.id === draft.targetDatasetId) || project.datasets[0]
-  const rowsCount = selectedDs?.sampleRows?.length ?? 0
-  const datasetName = selectedDs?.name ?? 'Sin dataset'
   const previewPath = endpoints[0]?.path ?? '/records'
   const resolvedBase = useMemo(() => {
     if (config.baseUrl?.trim()) return config.baseUrl.replace(/\/$/, '')
