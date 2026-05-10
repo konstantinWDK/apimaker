@@ -73,7 +73,8 @@
       "Bash(f.write)",
       "Bash(print)",
       "Bash(file *)",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(lsof *)"
     ]
   },
   "$version": 4
