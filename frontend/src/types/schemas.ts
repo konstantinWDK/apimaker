@@ -30,6 +30,10 @@ export interface ProjectDraft {
   name: string
   slug?: string
   description?: string
+  authMethod: 'none' | 'apikey' | 'jwt'
+  apiKey?: string
+  jwtSecret?: string
+  rateLimit?: number // requests per minute
   targetStack: 'fastapi' | 'express' | 'nest'
   dataset?: DatasetMeta
   endpoints: ApiEndpoint[]

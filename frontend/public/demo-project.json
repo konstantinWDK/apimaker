@@ -2,6 +2,7 @@
   "id": "demo-project-001",
   "name": "Pokédex demo",
   "description": "API en memoria para listar, registrar y actualizar Pokémon favoritos",
+  "authMethod": "none",
   "targetStack": "fastapi",
   "dataset": {
     "id": "dataset-demo-001",

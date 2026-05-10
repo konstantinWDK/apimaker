@@ -605,6 +605,10 @@ textarea.field {
   border-color: #bae6fd;
 }
 
+.section-card--amber {
+  border-color: #f59e0b;
+}
+
 .section-card--emerald {
   border-color: #bbf7d0;
 }
@@ -1827,10 +1831,34 @@ input[type='password'] {
   flex-direction: column;
   gap: 1rem;
 }
-.fab {
+.fab-container {
   position: fixed;
-  right: 2.5rem;
-  bottom: 2.5rem;
+  bottom: 2rem;
+  right: 2rem;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.fab-success-msg {
+  background: #10b981;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  animation: fabMsgIn 0.3s ease-out forwards;
+}
+
+@keyframes fabMsgIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fab {
   border: none;
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
   color: #f8fafc;
@@ -2175,6 +2203,7 @@ input[type='password'] {
   gap: 0.4rem;
   margin: 0.5rem 0;
 }
+
 
 .tutorial__field {
   display: flex;

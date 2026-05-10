@@ -39,6 +39,10 @@ def _extract_path_param(path: str) -> str:
 def _build_context(
     project_name: str,
     project_description: str | None,
+    auth_method: str,
+    api_key: str | None,
+    jwt_secret: str | None,
+    rate_limit: int | None,
     dataset: Dataset | None,
     fields: list[DatasetField],
     endpoints: list[Endpoint],
@@ -81,6 +85,10 @@ def _build_context(
     return {
         "project_name": project_name,
         "project_description": project_description or "",
+        "auth_method": auth_method,
+        "api_key": api_key or "",
+        "jwt_secret": jwt_secret or "",
+        "rate_limit": rate_limit,
         "dataset": dataset_context,
         "endpoints": endpoints_context,
     }
@@ -90,6 +98,10 @@ def render_bundle(
     stack: str,
     project_name: str,
     project_description: str | None,
+    auth_method: str,
+    api_key: str | None,
+    jwt_secret: str | None,
+    rate_limit: int | None,
     dataset: Dataset | None,
     fields: list[DatasetField],
     endpoints: list[Endpoint],
@@ -110,7 +122,9 @@ def render_bundle(
     env.filters["replace"] = lambda s, old, new: s.replace(old, new) if s else ""
     env.filters["extract_path_param"] = _extract_path_param
 
-    context = _build_context(project_name, project_description, dataset, fields, endpoints)
+    context = _build_context(
+        project_name, project_description, auth_method, api_key, jwt_secret, rate_limit, dataset, fields, endpoints
+    )
 
     buf = BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -254,6 +268,10 @@ def run_generation(
             project.target_stack or "fastapi",
             project.name,
             project.description,
+            project.auth_method,
+            project.api_key,
+            project.jwt_secret,
+            project.rate_limit,
             dataset,
             fields,
             endpoints,

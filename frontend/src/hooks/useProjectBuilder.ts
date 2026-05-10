@@ -25,6 +25,8 @@ interface BuilderState {
   loadProjects: (projects: ProjectDraft[]) => void
   refreshProjects: () => Promise<void>
   saveProject: () => Promise<string | null>
+  isGenerating: boolean
+  setIsGenerating: (val: boolean) => void
 }
 
 const STORAGE_KEY = 'apimaker-project'
@@ -37,6 +39,7 @@ const createDefaultProject = (): ProjectDraft => {
     id,
     name: 'Nueva API',
     description: 'Diseña tu API declarando datos y endpoints',
+    authMethod: 'none',
     targetStack: 'fastapi',
     endpoints: [
       {
@@ -99,6 +102,10 @@ const api = {
       name: p.name,
       slug: p.slug,
       description: p.description || '',
+      authMethod: p.auth_method || 'none',
+      apiKey: p.api_key || '',
+      jwtSecret: p.jwt_secret || '',
+      rateLimit: p.rate_limit || 0,
       targetStack: p.target_stack || 'fastapi',
       endpoints: (p.endpoints || []).map((ep: any) => ({
         id: ep.id,
@@ -129,6 +136,10 @@ const api = {
       name: draft.name,
       slug: draft.slug,
       description: draft.description,
+      auth_method: draft.authMethod || 'none',
+      api_key: draft.apiKey,
+      jwt_secret: draft.jwtSecret,
+      rate_limit: draft.rateLimit,
       target_stack: draft.targetStack,
     }
     if (draft.dataset) {
@@ -154,6 +165,10 @@ const api = {
       id: data.id,
       name: data.name,
       description: data.description || '',
+      authMethod: data.auth_method || 'none',
+      apiKey: data.api_key || '',
+      jwtSecret: data.jwt_secret || '',
+      rateLimit: data.rate_limit || 0,
       targetStack: data.target_stack || 'fastapi',
       endpoints: (data.endpoints || []).map((ep: any) => ({
         id: ep.id,
@@ -179,7 +194,7 @@ const api = {
     }
   },
 
-  async updateProject(id: string, updates: { name?: string; slug?: string; description?: string; target_stack?: string }): Promise<boolean> {
+  async updateProject(id: string, updates: { name?: string; slug?: string; description?: string; auth_method?: string; api_key?: string; jwt_secret?: string; rate_limit?: number; target_stack?: string }): Promise<boolean> {
     const res = await fetch(`${getBaseUrl()}/projects/${id}`, {
       method: 'PATCH',
       headers: getAuthHeaders(),
@@ -321,6 +336,8 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
   mockRunning: false,
   mockLoading: false,
   mockError: null,
+  isGenerating: false,
+  setIsGenerating: (val) => set({ isGenerating: val }),
 
   updateProject: (payload) =>
     set((state) => {
@@ -337,6 +354,10 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
           const changes: any = {}
           if (payload.name !== undefined) changes.name = payload.name
           if (payload.description !== undefined) changes.description = payload.description
+          if (payload.authMethod !== undefined) changes.auth_method = payload.authMethod
+          if (payload.apiKey !== undefined) changes.api_key = payload.apiKey
+          if (payload.jwtSecret !== undefined) changes.jwt_secret = payload.jwtSecret
+          if (payload.rateLimit !== undefined) changes.rate_limit = payload.rateLimit
           if (payload.targetStack !== undefined) changes.target_stack = payload.targetStack
           if (Object.keys(changes).length > 0) {
             await api.updateProject(saveId, changes)
@@ -607,6 +628,10 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
           name: currentProject.name,
           slug: currentProject.slug,
           description: currentProject.description,
+          auth_method: currentProject.authMethod,
+          api_key: currentProject.apiKey,
+          jwt_secret: currentProject.jwtSecret,
+          rate_limit: currentProject.rateLimit,
           target_stack: currentProject.targetStack,
         })
       }

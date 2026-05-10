@@ -36,7 +36,31 @@ def _resolve_project_id(session: Session, project_id: str) -> str:
     return project_service.resolve_id(session, project_id)
 
 
-router = APIRouter(prefix="/api/mock/{project_id}", tags=["mock"])
+async def verify_mock_auth(
+    project_id: str,
+    request: Request,
+    session: Session = Depends(get_session)
+):
+    """Verify auth headers if the project has authentication enabled."""
+    resolved_id = project_service.resolve_id(session, project_id)
+    project = session.get(Project, resolved_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if project.auth_method == "apikey":
+        api_key = request.headers.get("X-API-Key")
+        if not api_key or api_key != project.api_key:
+            raise HTTPException(status_code=401, detail="Invalid or missing API Key")
+    elif project.auth_method == "jwt":
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Missing or invalid Bearer Token")
+        # NOTE: In the sandbox, we just check for presence of a Bearer token
+        # to allow easy testing without complex token generation.
+    return True
+
+
+router = APIRouter(prefix="/api/mock/{project_id}", tags=["mock"], dependencies=[Depends(verify_mock_auth)])
 
 
 @router.get("/{path:path}")

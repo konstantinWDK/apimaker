@@ -53,6 +53,10 @@ class Project(BaseModel):
     name: str
     slug: str | None = None
     description: str | None = None
+    auth_method: Literal["none", "apikey", "jwt"] = "none"
+    api_key: str | None = None
+    jwt_secret: str | None = None
+    rate_limit: int | None = None
     target_stack: Literal["fastapi", "express", "nest"] = "fastapi"
     dataset: DatasetMeta | None = None
     endpoints: list[ApiEndpoint] = Field(default_factory=list)
@@ -66,6 +70,10 @@ class CreateProjectRequest(BaseModel):
     name: str
     slug: str | None = None
     description: str | None = None
+    auth_method: Literal["none", "apikey", "jwt"] = "none"
+    api_key: str | None = None
+    jwt_secret: str | None = None
+    rate_limit: int | None = None
     target_stack: Literal["fastapi", "express", "nest"] = "fastapi"
     dataset: DatasetMeta | None = None
 
@@ -74,6 +82,10 @@ class UpdateProjectRequest(BaseModel):
     name: str | None = None
     slug: str | None = None
     description: str | None = None
+    auth_method: str | None = None
+    api_key: str | None = None
+    jwt_secret: str | None = None
+    rate_limit: int | None = None
     target_stack: str | None = None
     status: str | None = None
 

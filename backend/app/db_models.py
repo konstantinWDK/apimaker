@@ -96,6 +96,10 @@ class Project(SQLModel, table=True):
     name: str
     slug: Optional[str] = Field(default=None, index=True, unique=True)
     description: Optional[str] = None
+    auth_method: str = "none" # none | apikey | jwt
+    api_key: Optional[str] = None
+    jwt_secret: Optional[str] = None
+    rate_limit: Optional[int] = None
     target_stack: str = "fastapi"
     status: str = "draft"
     workspace_id: Optional[str] = Field(default=None, foreign_key="workspaces.id")

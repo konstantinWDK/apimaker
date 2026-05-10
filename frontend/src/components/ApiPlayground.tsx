@@ -5,6 +5,10 @@ import { readBackendConfig } from '../lib/backendConfig'
 
 interface Props {
   project: ProjectDraft
+  mockRunning: boolean
+  onStartMock: () => Promise<void>
+  mockLoading?: boolean
+  mockError?: string | null
 }
 
 interface ApiResponse {
@@ -64,8 +68,15 @@ const buildBodyForMethod = (project: ProjectDraft, method: string, _path: string
 }
 
 // ─── Curl snippet builder ─────────────────────────────────────
-const buildCurl = (method: string, url: string, body: string | null) => {
+const buildCurl = (method: string, url: string, body: string | null, project: ProjectDraft) => {
   const parts = [`curl -X ${method} "${url}"`]
+  
+  if (project.authMethod === 'apikey' && project.apiKey) {
+    parts.push(`-H "X-API-Key: ${project.apiKey}"`)
+  } else if (project.authMethod === 'jwt') {
+    parts.push(`-H "Authorization: Bearer <TOKEN>"`)
+  }
+
   if (body && body.trim().length > 0 && method !== 'GET') {
     parts.push('-H "Content-Type: application/json"')
     parts.push(`-d '${body.replace(/'/g, "\\'")}'`)
@@ -74,7 +85,7 @@ const buildCurl = (method: string, url: string, body: string | null) => {
 }
 
 // ─── Component ────────────────────────────────────────────────
-export function ApiPlayground({ project }: Props) {
+export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, mockError }: Props) {
   const backendConfig = readBackendConfig()
   const backendBaseUrl = backendConfig.baseUrl?.replace(/\/$/, '') || 'http://localhost:8000'
 
@@ -115,7 +126,7 @@ export function ApiPlayground({ project }: Props) {
     return `${backendBaseUrl}/api/mock/${effectiveId}${normalized}`
   }, [backendBaseUrl, project.id, project.remoteId, project.slug, path])
 
-  const curlSnippet = useMemo(() => buildCurl(method, mockUrl, body), [method, mockUrl, body])
+  const curlSnippet = useMemo(() => buildCurl(method, mockUrl, body, project), [method, mockUrl, body, project])
 
   const store = sampleStore[project.id] ?? []
 
@@ -183,11 +194,21 @@ export function ApiPlayground({ project }: Props) {
     setResponse(null)
 
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+
+      if (project.authMethod === 'apikey' && project.apiKey) {
+        headers['X-API-Key'] = project.apiKey
+      } else if (project.authMethod === 'jwt') {
+        // For testing in sandbox, we send a dummy bearer token 
+        // as the backend verify_mock_auth just checks for presence
+        headers['Authorization'] = 'Bearer sim-token-123'
+      }
+
       const options: RequestInit = {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
       }
       
       if (method !== 'GET' && body) {
@@ -204,9 +225,6 @@ export function ApiPlayground({ project }: Props) {
         method
       })
 
-      // If it was a POST/PUT/DELETE and successful, we should probably update our local store
-      // though the backend now handles the truth. For now, let's just show the response.
-      
     } catch (error) {
       console.error('Error en simulación:', error)
       setResponse({
@@ -237,16 +255,35 @@ export function ApiPlayground({ project }: Props) {
   const availableMethods = useMemo(() => {
     const ep = project.endpoints.find((e) => e.id === selectedEndpointId)
     if (!ep) return METHODS
-    // Return all methods but highlight the endpoint's method
     return METHODS
   }, [selectedEndpointId, project.endpoints])
 
   return (
     <div className="api-playground">
       <div className="api-playground__summary">
-        <p className="label">Base URL</p>
-        <p className="api-playground__base-value">{backendBaseUrl}/api/mock/{project.slug || project.remoteId || project.id}</p>
-        <span className="api-playground__mode-badge">Simulación interactiva</span>
+        <div className="api-playground__summary-top">
+          <div>
+            <p className="label">Base URL</p>
+            <p className="api-playground__base-value">{backendBaseUrl}/api/mock/{project.slug || project.remoteId || project.id}</p>
+          </div>
+          <div className="api-playground__status-chip">
+            <span className={`status-dot ${mockRunning ? 'active' : ''}`} />
+            <span className="status-text">{mockRunning ? 'Servidor Mock Activo' : 'Servidor Mock Detenido'}</span>
+          </div>
+        </div>
+        
+        {!mockRunning && (
+          <div className="api-playground__warning">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" strokeWidth="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01" />
+            </svg>
+            <span>Es necesario activar el servidor mock para probar la API mientras la construyes.</span>
+            <button type="button" className="btn primary btn-small" onClick={onStartMock} disabled={mockLoading}>
+              {mockLoading ? 'Iniciando...' : 'Activar ahora'}
+            </button>
+          </div>
+        )}
+        {mockError && <p className="error-text" style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>{mockError}</p>}
       </div>
 
       <label className="form-field">
@@ -328,6 +365,56 @@ export function ApiPlayground({ project }: Props) {
       </div>
 
       <style>{`
+        .api-playground__summary-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 1rem;
+        }
+        .api-playground__status-chip {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.4rem 0.75rem;
+          background: #f1f5f9;
+          border-radius: 9999px;
+          border: 1px solid #e2e8f0;
+        }
+        .status-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #94a3b8;
+        }
+        .status-dot.active {
+          background: #10b981;
+          box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+          animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+          0% { opacity: 1; }
+          50% { opacity: 0.5; }
+          100% { opacity: 1; }
+        }
+        .status-text {
+          font-size: 0.75rem;
+          font-weight: 600;
+          color: #475569;
+        }
+        .api-playground__warning {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.75rem 1rem;
+          background: #fff7ed;
+          border: 1px solid #fed7aa;
+          border-radius: 8px;
+          color: #9a3412;
+          font-size: 0.85rem;
+        }
+        .api-playground__warning span {
+          flex: 1;
+        }
         .api-playground__hint {
           margin: 0.25rem 0 0.5rem;
           padding: 0.4rem 0.6rem;

@@ -15,6 +15,7 @@ import { PreviewPanel } from './components/PreviewPanel'
 import { ProjectForm } from './components/ProjectForm'
 import { ProjectSidebar } from './components/ProjectSidebar'
 import { SectionCard } from './components/SectionCard'
+import { SecurityConfigPanel } from './components/SecurityConfigPanel'
 import { ShareView } from './components/ShareView'
 import { UserCard } from './components/UserCard'
 import { useProjectBuilder } from './hooks/useProjectBuilder'
@@ -61,6 +62,8 @@ export function App() {
     refreshProjects,
     projects,
     saveProject,
+    isGenerating,
+    setIsGenerating,
   } = useProjectBuilder()
 
   if (isShareView) {
@@ -69,11 +72,11 @@ export function App() {
   if (!isAuthenticated) {
     return <LoginScreen onLogin={login} error={authError ?? undefined} />
   }
-  const [isGenerating, setIsGenerating] = useState(false)
   const [loadingDemo, setLoadingDemo] = useState(false)
   const [result, setResult] = useState<GenerationResult | null>(null)
   const [generationWarning, setGenerationWarning] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'schema' | 'endpoints' | 'delivery' | 'result'>('schema')
+  const [showSuccess, setShowSuccess] = useState(false)
+  const [activeTab, setActiveTab] = useState<'schema' | 'endpoints' | 'security' | 'simulator' | 'delivery' | 'result'>('schema')
   const [activePage, setActivePage] = useState<'builder' | 'info' | 'usage' | 'admin'>('builder')
   const localBaseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'
   const backendBaseUrl = readBackendConfig().baseUrl?.replace(/\/$/, '') || 'http://localhost:8000'
@@ -89,9 +92,10 @@ export function App() {
     () => [
       { id: 'schema', label: '1. Dataset' },
       { id: 'endpoints', label: '2. Endpoints' },
-      { id: 'simulator', label: '3. Simulador' },
-      { id: 'delivery', label: '4. Entrega' },
-      { id: 'result', label: '5. Resultado' },
+      { id: 'security', label: '3. Seguridad' },
+      { id: 'simulator', label: '4. Simulador' },
+      { id: 'delivery', label: '5. Entrega' },
+      { id: 'result', label: '6. Resultado' },
     ],
     [],
   )
@@ -149,7 +153,13 @@ export function App() {
       }
       setGenerationResult({ lastGeneration: generationResult, sharePath: generationResult.shareUrl })
       setResult(generationResult)
-      setActiveTab('result')
+      
+      if (!project.remoteId) {
+        setActiveTab('result')
+      } else {
+        setShowSuccess(true)
+        setTimeout(() => setShowSuccess(false), 3000)
+      }
     } catch (err) {
       alert(`Error: ${err instanceof Error ? err.message : 'desconocido'}`)
     } finally {
@@ -266,10 +276,22 @@ export function App() {
             />
           </SectionCard>
         )
+      case 'security':
+        return (
+          <SectionCard title="Configuración de Seguridad" subtitle="Protege tus endpoints y limita el tráfico" accent="amber" fullWidth>
+            <SecurityConfigPanel project={project} onChange={updateProject} />
+          </SectionCard>
+        )
       case 'simulator':
         return (
           <SectionCard title="Simulador" subtitle="Haz llamadas contra tu sandbox local" accent="sky" fullWidth>
-            <ApiPlayground project={project} />
+            <ApiPlayground
+              project={project}
+              mockRunning={mockRunning}
+              onStartMock={startMock}
+              mockLoading={mockLoading}
+              mockError={mockError}
+            />
           </SectionCard>
         )
       case 'delivery':
@@ -291,7 +313,12 @@ export function App() {
           <SectionCard title="API generada" subtitle="Sandbox, docs y endpoints" accent="emerald" fullWidth>
             <div className="api-delivery-grid">
               <GenerationResultPanel result={effectiveResult} projectId={project.slug || project.remoteId || project.id} />
-              <EndpointGallery endpoints={effectiveResult.endpoints} />
+              <EndpointGallery
+                endpoints={effectiveResult.endpoints}
+                baseUrl={effectiveResult.apiUrl}
+                authMethod={project.authMethod}
+                apiKey={project.apiKey}
+              />
             </div>
           </SectionCard>
         ) : (
@@ -329,6 +356,7 @@ export function App() {
                 id,
                 name: 'Nueva API',
                 description: 'Diseña tu API declarando datos y endpoints',
+                authMethod: 'none',
                 targetStack: 'fastapi',
                 endpoints: [
                   {
@@ -540,18 +568,25 @@ export function App() {
 
         </div>
       </div>
-      <button type="button" className="fab" onClick={handleGenerate} disabled={isGenerating}>
-        {isGenerating ? (
-          <span className="fab__loading">Procesando...</span>
-        ) : (
-          <>
-            <svg className="fab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            {project.remoteId ? 'Actualizar API' : 'Guardar y lanzar API'}
-          </>
+      <div className="fab-container">
+        {showSuccess && (
+          <div className="fab-success-msg">
+            ¡API actualizada con éxito!
+          </div>
         )}
-      </button>
+        <button type="button" className="fab" onClick={handleGenerate} disabled={isGenerating}>
+          {isGenerating ? (
+            <span className="fab__loading">Procesando...</span>
+          ) : (
+            <>
+              <svg className="fab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              {project.remoteId ? 'Actualizar API' : 'Guardar y lanzar API'}
+            </>
+          )}
+        </button>
+      </div>
     </div>
   )
 }

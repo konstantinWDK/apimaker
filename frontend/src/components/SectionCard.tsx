@@ -4,7 +4,7 @@ import { clsx } from 'clsx'
 interface Props extends PropsWithChildren {
   title: string
   subtitle?: string
-  accent?: 'sky' | 'emerald' | 'slate'
+  accent?: 'sky' | 'emerald' | 'slate' | 'amber'
   fullWidth?: boolean
 }
 

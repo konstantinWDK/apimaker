@@ -7,24 +7,37 @@ Production-ready with SQLAlchemy + SQLite/PostgreSQL.
 from __future__ import annotations
 
 import os
+import time
 from contextlib import contextmanager
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import datetime, timezone, timedelta
+from typing import Optional, Annotated
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request, Depends, Security
+from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+import jwt
 
 # ─── Configuration ───────────────────────────────────────────────
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data.db")
-API_KEY = os.getenv("API_KEY", "")
+AUTH_METHOD = "{{ auth_method }}"
+API_KEY = os.getenv("API_KEY", "{{ api_key }}")
+JWT_SECRET = os.getenv("JWT_SECRET", "{{ jwt_secret }}")
+RATE_LIMIT = int(os.getenv("RATE_LIMIT", "{{ rate_limit or 0 }}"))
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 Base = DeclarativeBase()
 
+# ─── Security Schemes ───────────────────────────────────────────
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+security_jwt = HTTPBearer(auto_error=False)
 
+# Simple in-memory rate limiting store
+request_counts = {}
+
+# ─── Database ──────────────────────────────────────────────────
 @contextmanager
 def get_db():
     """Get a database session."""
@@ -37,7 +50,6 @@ def get_db():
         raise
     finally:
         session.close()
-
 
 # ─── Models ──────────────────────────────────────────────────────
 {% if dataset %}
@@ -52,18 +64,15 @@ class {{ dataset.name | capitalize }}Record(Base):
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
-
 class {{ dataset.name | capitalize }}Create(BaseModel):
 {% for field in dataset.fields %}
     {{ field.name }}: {{ field.python_type }}{% if not field.required %} | None = None{% endif %}
 {% endfor %}
 
-
 class {{ dataset.name | capitalize }}Update(BaseModel):
 {% for field in dataset.fields %}
     {{ field.name }}: {{ field.python_type }}{% if not field.required %} | None = None{% endif %}
 {% endfor %}
-
 
 class {{ dataset.name | capitalize }}Response(BaseModel):
     id: int
@@ -72,26 +81,25 @@ class {{ dataset.name | capitalize }}Response(BaseModel):
 {% endfor %}
     created_at: datetime
     updated_at: datetime
-
     model_config = {"from_attributes": True}
 {% endif %}
 
-# ─── API Key Middleware ─────────────────────────────────────────
-from fastapi import Request
-from starlette.middleware.base import BaseHTTPMiddleware
-
-
-class APIKeyMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        if API_KEY:
-            # Skip auth for health and docs
-            if request.url.path in ("/health", "/docs", "/redoc", "/openapi.json"):
-                return await call_next(request)
-            api_key = request.headers.get("X-API-Key")
-            if api_key != API_KEY:
-                raise HTTPException(status_code=401, detail="Invalid API key")
-        return await call_next(request)
-
+# ─── Dependencies ───────────────────────────────────────────────
+async def verify_auth(
+    api_key: Optional[str] = Security(api_key_header),
+    token: Optional[HTTPAuthorizationCredentials] = Security(security_jwt)
+):
+    if AUTH_METHOD == "apikey":
+        if not api_key or api_key != API_KEY:
+            raise HTTPException(status_code=401, detail="Invalid or missing API Key")
+    elif AUTH_METHOD == "jwt":
+        if not token:
+            raise HTTPException(status_code=401, detail="Missing Bearer Token")
+        try:
+            jwt.decode(token.credentials, JWT_SECRET, algorithms=["HS256"])
+        except Exception:
+            raise HTTPException(status_code=401, detail="Invalid or expired JWT")
+    return True
 
 # ─── Application ─────────────────────────────────────────────────
 app = FastAPI(
@@ -99,30 +107,44 @@ app = FastAPI(
     description="""{{ project_description }}
 
 ## Authentication
-{% raw %}If the `API_KEY` environment variable is set, all endpoints require an `X-API-Key` header.{% endraw %}
+Currently using: **{{ auth_method }}**
+{% if auth_method == 'apikey' %}Requires `X-API-Key` header.{% elif auth_method == 'jwt' %}Requires `Authorization: Bearer <token>` header.{% else %}No authentication required (Public).{% endif %}
 
-## Database
-{% raw %}Configured via `DATABASE_URL`. Defaults to SQLite (`./data.db`).{% endraw %}
+## Rate Limiting
+{% if rate_limit and rate_limit > 0 %}Limited to **{{ rate_limit }}** requests per minute per IP.{% else %}No rate limiting configured.{% endif %}
 """,
     version="0.1.0",
 )
 
-app.add_middleware(APIKeyMiddleware)
-
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    if RATE_LIMIT > 0:
+        client_ip = request.client.host
+        current_minute = int(time.time() / 60)
+        key = f"{client_ip}:{current_minute}"
+        
+        count = request_counts.get(key, 0)
+        if count >= RATE_LIMIT:
+            return HTTPException(status_code=429, detail="Rate limit exceeded").__call__(request)
+        
+        request_counts[key] = count + 1
+        
+        # Cleanup old entries (simple)
+        if len(request_counts) > 1000:
+            request_counts.clear()
+            
+    return await call_next(request)
 
 @app.on_event("startup")
 def startup():
     """Create database tables and seed initial data on startup."""
     Base.metadata.create_all(bind=engine)
-    
-    # Optional: Seed initial data from data.json if the table is empty
     {% if dataset %}
     import json
     from pathlib import Path
     data_path = Path("data.json")
     if data_path.exists():
         with get_db() as db:
-            # Check if table is empty
             count = db.query({{ dataset.name | capitalize }}Record).count()
             if count == 0:
                 print(f"Seeding database with data from {data_path}...")
@@ -130,7 +152,6 @@ def startup():
                     with open(data_path, "r", encoding="utf-8") as f:
                         items = json.load(f)
                         for item in items:
-                            # Filter keys to match model (in case JSON has extra fields)
                             valid_data = {k: v for k, v in item.items() if k in {{ dataset.name | capitalize }}Record.__table__.columns}
                             db.add({{ dataset.name | capitalize }}Record(**valid_data))
                     db.commit()
@@ -140,12 +161,11 @@ def startup():
                     db.rollback()
     {% endif %}
 
-
 # ─── Endpoints ───────────────────────────────────────────────────
 {% if dataset %}
 {% for ep in endpoints %}
 {% if ep.method == "GET" and "{" not in ep.path %}
-@app.get("{{ ep.path }}", response_model=list[{{ dataset.name | capitalize }}Response])
+@app.get("{{ ep.path }}", response_model=list[{{ dataset.name | capitalize }}Response], dependencies=[Depends(verify_auth)])
 async def {{ ep.name | lower | replace(" ", "_") }}(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, le=1000),
@@ -155,7 +175,7 @@ async def {{ ep.name | lower | replace(" ", "_") }}(
         return db.query({{ dataset.name | capitalize }}Record).offset(skip).limit(limit).all()
 
 {% elif ep.method == "GET" and "{" in ep.path %}
-@app.get("{{ ep.path }}", response_model={{ dataset.name | capitalize }}Response)
+@app.get("{{ ep.path }}", response_model={{ dataset.name | capitalize }}Response, dependencies=[Depends(verify_auth)])
 async def {{ ep.name | lower | replace(" ", "_") }}({{ ep.path | extract_path_param }}: int):
     """{{ ep.summary or ep.name }}"""
     with get_db() as db:
@@ -165,7 +185,7 @@ async def {{ ep.name | lower | replace(" ", "_") }}({{ ep.path | extract_path_pa
         return record
 
 {% elif ep.method == "POST" %}
-@app.post("{{ ep.path }}", response_model={{ dataset.name | capitalize }}Response, status_code=201)
+@app.post("{{ ep.path }}", response_model={{ dataset.name | capitalize }}Response, status_code=201, dependencies=[Depends(verify_auth)])
 async def {{ ep.name | lower | replace(" ", "_") }}(data: {{ dataset.name | capitalize }}Create):
     """{{ ep.summary or ep.name }}"""
     with get_db() as db:
@@ -176,7 +196,7 @@ async def {{ ep.name | lower | replace(" ", "_") }}(data: {{ dataset.name | capi
         return record
 
 {% elif ep.method == "PUT" and "{" in ep.path %}
-@app.put("{{ ep.path }}", response_model={{ dataset.name | capitalize }}Response)
+@app.put("{{ ep.path }}", response_model={{ dataset.name | capitalize }}Response, dependencies=[Depends(verify_auth)])
 async def {{ ep.name | lower | replace(" ", "_") }}({{ ep.path | extract_path_param }}: int, data: {{ dataset.name | capitalize }}Update):
     """{{ ep.summary or ep.name }}"""
     with get_db() as db:
@@ -191,7 +211,7 @@ async def {{ ep.name | lower | replace(" ", "_") }}({{ ep.path | extract_path_pa
         return record
 
 {% elif ep.method == "DELETE" and "{" in ep.path %}
-@app.delete("{{ ep.path }}", status_code=204)
+@app.delete("{{ ep.path }}", status_code=204, dependencies=[Depends(verify_auth)])
 async def {{ ep.name | lower | replace(" ", "_") }}({{ ep.path | extract_path_param }}: int):
     """{{ ep.summary or ep.name }}"""
     with get_db() as db:
@@ -203,18 +223,15 @@ async def {{ ep.name | lower | replace(" ", "_") }}({{ ep.path | extract_path_pa
 
 {% endif %}
 {% endfor %}
-{% else %}
-# No dataset defined — add your models and endpoints here
-pass
 {% endif %}
 
 @app.get("/health")
 def health() -> dict:
     return {
         "status": "ok",
-        "database": "postgresql" if DATABASE_URL.startswith("postgresql") else "sqlite",
+        "auth": AUTH_METHOD,
+        "rate_limit": RATE_LIMIT
     }
-
 
 if __name__ == "__main__":
     import uvicorn
