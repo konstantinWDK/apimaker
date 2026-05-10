@@ -211,9 +211,10 @@ class ProjectService:
             session.delete(ep)
 
         for ep in endpoints:
+            ep_id = ep.get("id")
             session.add(
                 Endpoint(
-                    id=ep.get("id") or str(uuid4()),
+                    id=str(ep_id) if ep_id else str(uuid4()),
                     project_id=str(project_id),
                     name=ep["name"],
                     method=ep["method"],

@@ -16,18 +16,32 @@ FIELD_TYPE_MAP: dict[FieldType, dict[str, str]] = {
 }
 
 
-def _dataset_schema(project: Project) -> dict | None:
-    dataset = project.dataset
-    if not dataset or not dataset.fields:
+def _dataset_schema(fields: list) -> dict | None:
+    if not fields:
         return None
     properties: dict[str, dict[str, str]] = {}
     required: list[str] = []
-    for field in dataset.fields:
-        properties[field.name] = FIELD_TYPE_MAP.get(field.type, {"type": "string"}).copy()
-        if field.description:
-            properties[field.name]["description"] = field.description
-        if field.required:
-            required.append(field.name)
+    for field in fields:
+        # Support both Pydantic models and plain dicts
+        if isinstance(field, dict):
+            fname = field.get('name')
+            ftype = field.get('type')
+            fdesc = field.get('description')
+            freq = field.get('required', False)
+        else:
+            fname = getattr(field, 'name', None)
+            ftype = getattr(field, 'type', None)
+            fdesc = getattr(field, 'description', None)
+            freq = getattr(field, 'required', False)
+
+        if not fname:
+            continue
+
+        properties[fname] = FIELD_TYPE_MAP.get(ftype, {"type": "string"}).copy()
+        if fdesc:
+            properties[fname]["description"] = fdesc
+        if freq:
+            required.append(fname)
     schema: dict[str, object] = {"type": "object", "properties": properties}
     if required:
         schema["required"] = required
@@ -57,39 +71,55 @@ def _wrap_body(method: str, dataset_schema: dict | None) -> dict | None:
 
 
 def build_openapi_document(project: Project) -> dict:
-    dataset_schema = _dataset_schema(project)
-    component_schema = None
-    dataset_name = project.dataset.name if project.dataset else "items"
-    if dataset_schema:
-        component_schema = {"$ref": "#/components/schemas/Record"}
+    schemas = {}
+    dataset_name = "items"
+    
+    if hasattr(project, 'datasets') and project.datasets:
+        for ds in project.datasets:
+            ds_name = ds.name if hasattr(ds, 'name') else ds.get('name')
+            ds_fields = ds.fields if hasattr(ds, 'fields') else ds.get('fields')
+            if ds_fields:
+                schema = _dataset_schema(ds_fields)
+                if schema:
+                    schemas[ds_name] = schema
+        # Fallback to the first dataset name
+        first = project.datasets[0]
+        dataset_name = first.name if hasattr(first, 'name') else first.get('name', 'items')
 
     paths: dict[str, dict[str, object]] = {}
     for endpoint in project.endpoints:
         method = endpoint.method.lower()
         op_type = getattr(endpoint, "operation_type", "custom")
-        
-        # Determine if response is a list or a single item
+
+        # List vs single-item heuristic
         is_list = op_type == "list" or (method == "get" and "{" not in endpoint.path and op_type == "custom")
-        
-        content_schema = component_schema or {"type": "object"}
-        response_content = {
-            "application/json": {
-                "schema": {"type": "array", "items": content_schema}
-                if is_list
-                else content_schema
-            }
-        }
+
+        # Resolve dataset schema for this endpoint via target_dataset_id
+        ref_name = dataset_name
+        target_ds_id = getattr(endpoint, "target_dataset_id", None)
+        if target_ds_id and hasattr(project, 'datasets'):
+            for ds in project.datasets:
+                ds_id = ds.id if hasattr(ds, 'id') else ds.get('id')
+                ds_n = ds.name if hasattr(ds, 'name') else ds.get('name')
+                if ds_id == target_ds_id and ds_n in schemas:
+                    ref_name = ds_n
+                    break
+
+        component_ref = {"$ref": f"#/components/schemas/{ref_name}"} if ref_name in schemas else {"type": "object"}
+        content_schema = {"type": "array", "items": component_ref} if is_list else component_ref
+
         operation = {
             "summary": endpoint.summary or endpoint.name,
-            "tags": [dataset_name] if dataset_name else ["default"],
+            "tags": [ref_name],
             "responses": {
                 "200": {
                     "description": endpoint.summary or "Successful response",
-                    "content": response_content,
+                    "content": {"application/json": {"schema": content_schema}},
                 }
             },
         }
-        request_body = _wrap_body(endpoint.method, component_schema or dataset_schema)
+        body_schema = schemas.get(ref_name)
+        request_body = _wrap_body(endpoint.method, body_schema)
         if request_body:
             operation["requestBody"] = request_body
         paths.setdefault(endpoint.path, {})[method] = operation
@@ -102,11 +132,8 @@ def build_openapi_document(project: Project) -> dict:
             "version": project.updated_at.isoformat() if project.updated_at else "1.0.0",
         },
         "paths": paths or {"/": {"get": {"responses": {"200": {"description": "OK"}}}}},
-        "components": {},
+        "components": {"schemas": schemas} if schemas else {},
         "servers": [{"url": "http://localhost"}],
     }
-
-    if dataset_schema:
-        document["components"] = {"schemas": {"Record": dataset_schema}}
 
     return document

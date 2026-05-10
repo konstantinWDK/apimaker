@@ -303,8 +303,12 @@ def project_openapi(
 ) -> dict:
     try:
         resolved_id = project_service.resolve_id(session, project_id)
-        db_project = project_service.get_project(session, resolved_id)
-        pydantic_project = _db_to_pydantic(db_project)
+        data = project_service.get_project_with_data(session, resolved_id)
+        pydantic_project = _db_to_pydantic(
+            data["project"],
+            datasets_with_fields=data["datasets"],
+            endpoints=data["endpoints"],
+        )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return build_openapi_document(pydantic_project)
