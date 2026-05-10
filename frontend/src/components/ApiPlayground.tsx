@@ -354,6 +354,12 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading }
                 )}
               </div>
 
+              {/* cURL Preview (compact) */}
+              <div className="playground-curl-preview">
+                <span className="label-tiny">cURL</span>
+                <pre className="curl-text-compact">{curlSnippet}</pre>
+              </div>
+
               {/* Tabs for Params, Headers, Body */}
               <div className="playground-tabs">
                 <button 
@@ -481,14 +487,6 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading }
             </div>
           </div>
 
-          <div className="playground-card curl-card">
-            <div className="playground-card__header">
-              <h4>cURL</h4>
-            </div>
-            <div className="playground-card__body">
-              <pre className="preview-json api-playground__curl">{curlSnippet}</pre>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -560,6 +558,28 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading }
           width: 60px;
           color: #1e40af;
           outline: none;
+        }
+
+        .playground-curl-preview {
+          margin-bottom: 0.75rem;
+          padding: 0.4rem 0.6rem;
+          background: #f8fafc;
+          border-radius: 6px;
+          border: 1px solid #e2e8f0;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+        .playground-curl-preview .label-tiny { margin-bottom: 0; }
+        .curl-text-compact {
+          margin: 0;
+          font-family: monospace;
+          font-size: 0.65rem;
+          color: #64748b;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          flex: 1;
         }
 
         .params-section {
