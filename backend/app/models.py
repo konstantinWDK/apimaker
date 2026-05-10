@@ -31,6 +31,7 @@ class DatasetMeta(BaseModel):
     source_type: Literal["upload", "manual", "database"] = "manual"
     fields: list[FieldSchema] = Field(default_factory=list)
     sample_rows: list[dict] = Field(default_factory=list)
+    saved_requests: list[dict] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -99,6 +100,7 @@ class UploadDatasetRequest(BaseModel):
     source_type: Literal["upload", "manual", "database"] = "manual"
     fields: list[FieldSchema]
     sample_rows: list[dict] | None = None
+    saved_requests: list[dict] | None = None
 
 
 class DefineEndpointsRequest(BaseModel):

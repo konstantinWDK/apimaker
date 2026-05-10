@@ -48,12 +48,18 @@ def _db_to_pydantic(db_project, datasets_with_fields=None, endpoints=None) -> Py
         except Exception:
             sample_rows = []
 
+        try:
+            saved_requests = json.loads(ds.saved_requests) if ds.saved_requests else []
+        except Exception:
+            saved_requests = []
+
         datasets_data.append({
             "id": ds.id,
             "name": ds.name,
             "source_type": ds.source_type,
             "fields": fields_data,
             "sample_rows": sample_rows,
+            "saved_requests": saved_requests,
             "created_at": ds.created_at if hasattr(ds, 'created_at') else db_project.created_at,
         })
 
@@ -230,6 +236,7 @@ def upload_dataset(
             source_type=payload.source_type,
             fields=fields_data,
             sample_rows=payload.sample_rows,
+            saved_requests=payload.saved_requests,
             dataset_id=payload.id
         )
         

@@ -277,14 +277,25 @@ async def mock_post(
 
     full_path = f"/{path.strip('/')}"
     matched_ep = None
+    
+    # 1. Look for exact POST endpoint match
     for ep in endpoints:
         if ep.method.upper() == "POST" and f"/{ep.path.strip('/')}" == full_path:
             matched_ep = ep
             break
 
+    # 2. If no POST match, look for a GET match on the same path (Smart Fallback)
+    if not matched_ep:
+        for ep in endpoints:
+            if ep.method.upper() == "GET" and f"/{ep.path.strip('/')}" == full_path:
+                matched_ep = ep
+                # We found a GET endpoint on the same path, we'll assume the user
+                # wants to POST to the same dataset.
+                break
+
     if not matched_ep:
         if path not in ["records", "items", "data"]:
-            raise HTTPException(status_code=404, detail=f"No matching POST endpoint for {full_path}")
+            raise HTTPException(status_code=404, detail=f"No matching endpoint (POST or GET) found for {full_path}. Create the endpoint in the designer first.")
 
     # Find the correct dataset
     ds_id, store = _find_dataset_for_endpoint(session, resolved_id, matched_ep) if matched_ep else (None, [])

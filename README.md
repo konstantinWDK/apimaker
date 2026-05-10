@@ -40,17 +40,8 @@ npm install
 npm run dev
 ```
 
-## Características recientes
+## Próximos pasos
 
-- **Arquitectura Multi-Dataset**: Posibilidad de gestionar múltiples tablas (datasets) por proyecto.
-- **Introspección de Base de Datos**: Importación automática de esquemas de tablas externas directamente en el API builder.
-- **Base de Datos Relacional**: Migración desde JSON plano a una base de datos SQLite manejada mediante SQLModel y Alembic.
-- **Simulador API Integrado**: Mock server en tiempo real e interactivo para todas las rutas generadas.
-- **Documentación Dinámica**: Documentación autónoma por proyecto en `/projects/{slug}/docs` (Redoc) alimentada por `/projects/{slug}/openapi.json`.
-- **Vista de Compartir**: URLs públicas `(/share/...)` de solo lectura generadas automáticamente para proyectos API.
-
-## Próximos pasos sugeridos
-
-1. Implementar el generador real (plantillas Jinja + empaquetado Docker/CI) que compile y suba la API real al cloud.
-2. Añadir autenticación multiusuario con roles y control de espacios de trabajo para instalaciones compartidas en equipos.
-3. Soporte para más dialectos de conexión a bases de datos remotas.
+1. **Generador de Código Real**: Implementar plantillas Jinja2 para exportar el diseño a repositorios listos para producción.
+2. **Sistema de Equipos**: Roles de Editor y Viewer (inspirado en Apiary) para colaboración profesional.
+3. **Webhooks**: Permitir que el servidor mock notifique a servicios externos cuando cambien los datos.

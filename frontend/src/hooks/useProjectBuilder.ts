@@ -68,12 +68,14 @@ const sanitizeDataset = (dataset?: DatasetMeta): DatasetMeta | undefined => {
   if (!dataset) return undefined
   // Explicitly preserve sampleRows from the source dataset
   const sampleRows = (dataset as any).sampleRows ?? dataset.sampleRows ?? []
+  const savedRequests = (dataset as any).savedRequests ?? (dataset as any).saved_requests ?? dataset.savedRequests ?? []
   return {
     id: dataset.id,
     name: dataset.name,
     sourceType: dataset.sourceType ?? 'manual',
     fields: dataset.fields ?? [],
     sampleRows,
+    savedRequests,
     uploadedFrom: (dataset as any).uploadedFrom,
   }
 }
@@ -129,6 +131,7 @@ const api = {
           description: f.description,
         })),
         sampleRows: d.sample_rows || [],
+        savedRequests: d.saved_requests || [],
       })) : (p.dataset ? [sanitizeDataset({
         id: p.dataset.id,
         name: p.dataset.name,
@@ -141,6 +144,7 @@ const api = {
           description: f.description,
         })),
         sampleRows: p.dataset.sample_rows || [],
+        savedRequests: p.dataset.saved_requests || [],
       })!] : []),
       remoteId: p.slug || p.id,
       workspaceId: p.workspace_id,
@@ -171,6 +175,7 @@ const api = {
           description: f.description,
         })),
         sample_rows: ds.sampleRows || [],
+        saved_requests: ds.savedRequests || [],
       }))
     }
     const res = await fetch(`${getBaseUrl()}/projects`, {
@@ -209,6 +214,7 @@ const api = {
           description: f.description,
         })),
         sampleRows: d.sample_rows || [],
+        savedRequests: d.saved_requests || [],
       })),
       remoteId: data.slug || data.id,
     }
@@ -238,6 +244,7 @@ const api = {
           description: f.description,
         })),
         sample_rows: dataset.sampleRows,
+        saved_requests: dataset.savedRequests,
       }),
     })
     return res.ok

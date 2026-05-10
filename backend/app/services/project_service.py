@@ -148,6 +148,7 @@ class ProjectService:
         fields: list[dict],
         sample_rows: list[dict] | None = None,
         dataset_id: str | None = None,
+        saved_requests: list[dict] | None = None,
     ) -> Project:
         project = self.get_project(session, project_id)
 
@@ -163,6 +164,7 @@ class ProjectService:
             ).first()
 
         # If found, update. Otherwise create.
+        import json
         if dataset:
             # Clear old fields
             existing_fields = session.exec(
@@ -172,17 +174,17 @@ class ProjectService:
                 session.delete(f)
             
             dataset.name = name
-            dataset.source_type = sourceType if 'sourceType' in locals() else source_type
-            import json
+            dataset.source_type = source_type
             dataset.sample_rows = json.dumps(sample_rows) if sample_rows else None
+            dataset.saved_requests = json.dumps(saved_requests) if saved_requests else None
         else:
-            import json
             dataset = Dataset(
                 id=dataset_id if dataset_id else str(uuid4()),
                 project_id=str(project_id),
                 name=name,
                 source_type=source_type,
-                sample_rows=json.dumps(sample_rows) if sample_rows else None
+                sample_rows=json.dumps(sample_rows) if sample_rows else None,
+                saved_requests=json.dumps(saved_requests) if saved_requests else None
             )
         
         session.add(dataset)

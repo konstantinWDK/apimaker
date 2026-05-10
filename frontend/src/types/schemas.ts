@@ -3,6 +3,16 @@ export type FieldType = 'string' | 'integer' | 'float' | 'boolean' | 'datetime' 
 /** Fake data generator category for each field type */
 export type FakerCategory = 'name' | 'email' | 'company' | 'address' | 'phone' | 'product' | 'date' | 'number' | 'boolean' | 'text' | 'uuid' | 'auto'
 
+export interface SavedRequest {
+  id: string
+  name: string
+  method: string
+  path: string
+  params: Array<{ key: string, value: string }>
+  headers: Array<{ key: string, value: string }>
+  body: string
+}
+
 export interface FieldSchema {
   id: string
   name: string
@@ -41,6 +51,8 @@ export interface DatasetMeta {
   description?: string
   /** Icon/emoji for visual identification */
   icon?: string
+  /** Saved requests for this dataset (Postman-style) */
+  savedRequests?: SavedRequest[]
 }
 
 export interface ApiEndpoint {

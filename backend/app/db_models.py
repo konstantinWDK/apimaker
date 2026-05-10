@@ -72,6 +72,7 @@ class Dataset(SQLModel, table=True):
     name: str
     source_type: str = "manual"
     sample_rows: Optional[str] = Field(default=None)  # JSON-serialized sample data
+    saved_requests: Optional[str] = Field(default=None)  # JSON-serialized list of SavedRequest objects
 
 
 class Endpoint(SQLModel, table=True):

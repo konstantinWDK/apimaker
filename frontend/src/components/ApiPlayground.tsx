@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { ProjectDraft } from '../types/schemas'
 import { readBackendConfig } from '../lib/backendConfig'
+import { fireToast } from '../components/Toast'
+import { useProjectBuilder } from '../hooks/useProjectBuilder'
 
 interface Props {
   project: ProjectDraft
@@ -109,7 +111,10 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
   const [queryParams, setQueryParams] = useState<Array<{ key: string, value: string }>>([{ key: '', value: '' }])
   const [headers, setHeaders] = useState<Array<{ key: string, value: string }>>([{ key: '', value: '' }])
   const [history, setHistory] = useState<ApiResponse[]>([])
-  const [activeConfigTab, setActiveConfigTab] = useState<'params' | 'headers' | 'body' | 'curl'>('params')
+  const [activeConfigTab, setActiveConfigTab] = useState<'params' | 'headers' | 'body' | 'curl' | 'saved'>('params')
+  const [saveName, setSaveName] = useState('')
+  const [showSaveDialog, setShowSaveDialog] = useState(false)
+  const { upsertDataset } = useProjectBuilder()
   const [response, setResponse] = useState<ApiResponse | null>(null)
   const [bodyError, setBodyError] = useState<string | null>(null)
   const [responseTime, setResponseTime] = useState<number | null>(null)
@@ -195,21 +200,27 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
     const startTime = performance.now()
 
     try {
-      const headers: Record<string, string> = {
+      const requestHeaders: Record<string, string> = {
         'Content-Type': 'application/json',
       }
 
+      // Add security headers automatically
       if (project.authMethod === 'apikey' && project.apiKey) {
-        headers['X-API-Key'] = project.apiKey
+        requestHeaders['X-API-Key'] = project.apiKey
       } else if (project.authMethod === 'jwt') {
-        // For testing in sandbox, we send a dummy bearer token 
-        // as the backend verify_mock_auth just checks for presence
-        headers['Authorization'] = 'Bearer sim-token-123'
+        requestHeaders['Authorization'] = 'Bearer sim-token-123'
       }
+
+      // Add manual headers from the UI
+      headers.forEach(h => {
+        if (h.key.trim()) {
+          requestHeaders[h.key] = h.value
+        }
+      })
 
       const options: RequestInit = {
         method,
-        headers,
+        headers: requestHeaders,
       }
       
       if (method !== 'GET' && body) {
@@ -304,6 +315,10 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
     setQueryParams(next)
     setResponse(null)
   }
+  const removeQueryParam = (index: number) => {
+    setQueryParams(prev => prev.filter((_, i) => i !== index))
+    setResponse(null)
+  }
   const updatePathParam = (index: number, value: string) => {
     const next = [...pathParams]
     next[index] = { ...next[index], value }
@@ -317,6 +332,61 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
     next[index] = { key: k, value: v }
     setHeaders(next)
     setResponse(null)
+  }
+  const removeHeader = (index: number) => {
+    setHeaders(prev => prev.filter((_, i) => i !== index))
+    setResponse(null)
+  }
+  const loadSavedRequest = (req: any) => {
+    setMethod(req.method)
+    setPath(req.path)
+    setQueryParams(req.params || [])
+    setHeaders(req.headers || [])
+    setBody(req.body || '')
+    setActiveConfigTab('params')
+    fireToast(`Cargada petición: ${req.name}`, 'success')
+  }
+
+  const handleSaveRequest = async () => {
+    if (!saveName.trim()) return
+    
+    // Try to find the target dataset based on the path
+    // We'll look for an endpoint that matches this path
+    const fullPath = `/${path.replace(/^\/|\/$/g, '')}`
+    const matchedEp = project.endpoints.find(ep => `/${ep.path.replace(/^\/|\/$/g, '')}` === fullPath)
+    const targetDsId = matchedEp?.targetDatasetId || project.datasets[0]?.id
+
+    if (!targetDsId) {
+      fireToast('No se encontró un dataset para guardar esta petición.', 'error')
+      return
+    }
+
+    const targetDs = project.datasets.find(d => d.id === targetDsId)
+    if (!targetDs) return
+
+    const newRequest = {
+      id: crypto.randomUUID(),
+      name: saveName,
+      method,
+      path,
+      params: queryParams,
+      headers,
+      body
+    }
+
+    const updatedRequests = [...(targetDs.savedRequests || []), newRequest]
+    upsertDataset({ ...targetDs, savedRequests: updatedRequests })
+    
+    setShowSaveDialog(false)
+    setSaveName('')
+    fireToast('Petición guardada con éxito', 'success')
+  }
+
+  const deleteSavedRequest = (dsId: string, reqId: string) => {
+    const targetDs = project.datasets.find(d => d.id === dsId)
+    if (!targetDs) return
+    const updatedRequests = (targetDs.savedRequests || []).filter(r => r.id !== reqId)
+    upsertDataset({ ...targetDs, savedRequests: updatedRequests })
   }
 
   // Show only relevant methods based on selected endpoint, plus manual option
@@ -355,14 +425,37 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
                     placeholder="/records" 
                   />
                 </div>
-                
-                <div className="path-resolved-preview">
-                   <code>{mockUrl.replace(backendBaseUrl, '')}</code>
+                <div className="address-bar-actions">
+                  <button 
+                    type="button" 
+                    className="btn ghost btn-icon" 
+                    onClick={() => setShowSaveDialog(!showSaveDialog)}
+                    title="Guardar petición"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  </button>
+                  <button type="button" className="btn primary playground-run" onClick={runRequest} disabled={isRunning || !mockRunning}>
+                    {isRunning ? '...' : 'Send'}
+                  </button>
                 </div>
+              </div>
 
-                <button type="button" className="btn primary playground-run" onClick={runRequest} disabled={isRunning || !mockRunning}>
-                  {isRunning ? '...' : 'Send'}
-                </button>
+              {showSaveDialog && (
+                <div className="save-request-dialog">
+                  <input 
+                    className="field field-small" 
+                    placeholder="Nombre de la petición (ej: Listar Pokemon)" 
+                    value={saveName}
+                    onChange={e => setSaveName(e.target.value)}
+                    autoFocus
+                  />
+                  <button className="btn primary btn-xs" onClick={handleSaveRequest}>Guardar</button>
+                  <button className="btn ghost btn-xs" onClick={() => setShowSaveDialog(false)}>Cancelar</button>
+                </div>
+              )}
+
+              <div className="path-resolved-preview">
+                 <code>{mockUrl.replace(backendBaseUrl, '')}</code>
               </div>
 
               {/* Tabs for Params, Headers, Body, cURL */}
@@ -385,6 +478,12 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
                   disabled={method === 'GET'}
                 >
                   Body
+                </button>
+                <button 
+                  className={`playground-tab-btn ${activeConfigTab === 'saved' ? 'active' : ''}`}
+                  onClick={() => setActiveConfigTab('saved')}
+                >
+                  Saved
                 </button>
                 <button 
                   className={`playground-tab-btn ${activeConfigTab === 'curl' ? 'active' : ''}`}
@@ -429,6 +528,7 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
                           <div key={i} className="kv-row">
                             <input className="field field-small" placeholder="Key" value={q.key} onChange={(e) => updateQueryParam(i, e.target.value, q.value)} />
                             <input className="field field-small" placeholder="Value" value={q.value} onChange={(e) => updateQueryParam(i, q.key, e.target.value)} />
+                            <button className="btn-remove" onClick={() => removeQueryParam(i)} title="Remove parameter">×</button>
                           </div>
                         ))}
                         <button className="btn ghost btn-xs" onClick={addQueryParam}>+ Add query param</button>
@@ -441,11 +541,21 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
                   <div className="kv-editor">
                     {headers.map((h, i) => (
                       <div key={i} className="kv-row">
-                        <input className="field field-small" placeholder="Header" value={h.key} onChange={(e) => updateHeader(i, e.target.value, h.value)} />
+                        <input 
+                          className="field field-small" 
+                          placeholder="Header" 
+                          value={h.key} 
+                          onChange={(e) => updateHeader(i, e.target.value, h.value)} 
+                          list="common-headers-list"
+                        />
                         <input className="field field-small" placeholder="Value" value={h.value} onChange={(e) => updateHeader(i, h.key, e.target.value)} />
+                        <button className="btn-remove" onClick={() => removeHeader(i)} title="Remove header">×</button>
                       </div>
                     ))}
                     <button className="btn ghost btn-xs" onClick={addHeader}>+ Add header</button>
+                    <datalist id="common-headers-list">
+                      {COMMON_HEADERS.map(h => <option key={h} value={h} />)}
+                    </datalist>
                   </div>
                 )}
 
@@ -464,6 +574,32 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
                       placeholder="{}"
                     />
                     {bodyError && <p className="api-playground__body-error">{bodyError}</p>}
+                  </div>
+                )}
+
+                {activeConfigTab === 'saved' && (
+                  <div className="saved-requests-list">
+                    {project.datasets.map(ds => (
+                      <div key={ds.id} className="dataset-saved-group">
+                        <div className="param-section__label">{ds.name}</div>
+                        {(ds.savedRequests || []).length === 0 ? (
+                          <p className="muted-text-small">No hay peticiones guardadas</p>
+                        ) : (
+                          <div className="history-list">
+                            {(ds.savedRequests || []).map(req => (
+                              <div key={req.id} className="history-item" onClick={() => loadSavedRequest(req)}>
+                                <span className={`history-method ${req.method.toLowerCase()}`}>{req.method}</span>
+                                <span className="history-path">{req.name || req.path}</span>
+                                <button 
+                                  className="btn-remove" 
+                                  onClick={(e) => { e.stopPropagation(); deleteSavedRequest(ds.id, req.id); }}
+                                >×</button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -583,22 +719,48 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
         .address-bar-row .playground-run { padding-left: 1.5rem; padding-right: 1.5rem; flex-shrink: 0; }
 
         .path-resolved-preview {
-          font-size: 0.72rem;
-          color: #3b82f6;
+          font-size: 0.62rem;
+          color: #64748b;
           white-space: nowrap;
           font-family: monospace;
-          flex-shrink: 0;
-          max-width: 300px;
+          margin-top: -0.65rem;
+          margin-bottom: 0.85rem;
+          margin-left: 95px;
+          max-width: calc(100% - 100px);
           overflow: hidden;
           text-overflow: ellipsis;
+          opacity: 0.8;
         }
         .path-resolved-preview code {
-          background: #eff6ff;
-          padding: 0.25rem 0.6rem;
-          border-radius: 6px;
-          font-weight: 600;
-          border: 1px solid #dbeafe;
+          background: #f8fafc;
+          padding: 0.15rem 0.4rem;
+          border-radius: 4px;
+          font-weight: 500;
+          border: 1px solid #e2e8f0;
+          color: #3b82f6;
         }
+
+        .address-bar-actions { display: flex; align-items: center; gap: 0.5rem; }
+        .btn-icon { padding: 0.5rem; display: flex; align-items: center; justify-content: center; }
+        
+        .save-request-dialog {
+          display: flex;
+          gap: 0.5rem;
+          padding: 0.75rem;
+          background: #f1f5f9;
+          border-radius: 8px;
+          margin-bottom: 1rem;
+          align-items: center;
+          border: 1px solid #e2e8f0;
+          animation: slideDown 0.2s ease-out;
+        }
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        .dataset-saved-group { margin-bottom: 1.5rem; }
+        .dataset-saved-group:last-child { margin-bottom: 0; }
 
         .label-tiny { font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; margin-bottom: 0.25rem; display: block; }
         .field-tiny { padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; height: 28px; }
@@ -739,6 +901,24 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
           max-width: 90px;
           text-align: center;
         }
+        .btn-remove {
+          background: none;
+          border: none;
+          color: #94a3b8;
+          font-size: 1.25rem;
+          line-height: 1;
+          cursor: pointer;
+          padding: 0 0.4rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+          border-radius: 4px;
+        }
+        .btn-remove:hover {
+          color: #ef4444;
+          background: #fef2f2;
+        }
 
         .param-section { margin-bottom: 0.75rem; }
         .param-section__label {
@@ -837,3 +1017,17 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
 }
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
+
+const COMMON_HEADERS = [
+  'Authorization',
+  'Content-Type',
+  'Accept',
+  'Accept-Language',
+  'User-Agent',
+  'X-API-Key',
+  'Cache-Control',
+  'Origin',
+  'X-Request-ID',
+  'X-Client-Version',
+  'X-Client-Platform'
+]
