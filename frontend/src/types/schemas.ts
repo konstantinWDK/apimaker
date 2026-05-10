@@ -1,4 +1,7 @@
-export type FieldType = 'string' | 'integer' | 'float' | 'boolean' | 'datetime'
+export type FieldType = 'string' | 'integer' | 'float' | 'boolean' | 'datetime' | 'email' | 'uuid'
+
+/** Fake data generator category for each field type */
+export type FakerCategory = 'name' | 'email' | 'company' | 'address' | 'phone' | 'product' | 'date' | 'number' | 'boolean' | 'text' | 'uuid' | 'auto'
 
 export interface FieldSchema {
   id: string
@@ -6,6 +9,25 @@ export interface FieldSchema {
   type: FieldType
   required: boolean
   description?: string
+  /** Default value for new records */
+  defaultValue?: string
+  /** For strings: minimum length */
+  minLength?: number
+  /** For strings/numbers: maximum length/value */
+  maxLength?: number
+  /** For strings: regex pattern validation */
+  pattern?: string
+  /** For strings/numbers: allowed values (enum) */
+  enum?: string[]
+  /** Whether this field is a primary key */
+  isPrimaryKey?: boolean
+  /** Faker category for realistic data generation */
+  fakerCategory?: FakerCategory
+  /** Foreign key reference to another dataset's field */
+  references?: {
+    datasetId: string
+    fieldName: string
+  }
 }
 
 export interface DatasetMeta {
@@ -15,6 +37,10 @@ export interface DatasetMeta {
   fields: FieldSchema[]
   sampleRows: Array<Record<string, string>>
   uploadedFrom?: string
+  /** Optional description of what this dataset represents */
+  description?: string
+  /** Icon/emoji for visual identification */
+  icon?: string
 }
 
 export interface ApiEndpoint {
@@ -43,6 +69,7 @@ export interface ProjectDraft {
   sharePath?: string
   lastGeneration?: GenerationResult
   remoteId?: string
+  workspaceId?: string
 }
 
 export interface GeneratedEndpoint {

@@ -330,7 +330,7 @@ export function DatabaseConfigPanel() {
         {/* Results Feedback */}
         {testResult && (
           <div className={`feedback ${testResult.success ? 'success' : 'error'}`}>
-            <span className="icon">{testResult.success ? '✓' : '✗'}</span>
+            <span className="icon">{testResult.success ? 'OK' : 'ERR'}</span>
             <span className="msg">{testResult.message}</span>
           </div>
         )}
@@ -354,7 +354,7 @@ export function DatabaseConfigPanel() {
               <div className="badge pg">PostgreSQL {activeEnv === 'dev' ? 'Dev' : 'Prod'}</div>
             </div>
             <button className="btn-sync" onClick={handleSync} disabled={syncing}>
-              {syncing ? '⏳ Sincronizando...' : `🔄 Sincronizar desde ${currentInfo?.type === 'sqlite' ? 'SQLite' : 'Postgres'} a ${activeEnv === 'dev' ? 'Desarrollo' : 'Producción'}`}
+              {syncing ? 'Sincronizando...' : `Sincronizar desde ${currentInfo?.type === 'sqlite' ? 'SQLite' : 'Postgres'} a ${activeEnv === 'dev' ? 'Desarrollo' : 'Producción'}`}
             </button>
             <p className="sync-hint">Útil para desplegar cambios o migrar de motor sin perder tus proyectos.</p>
           </div>

@@ -65,6 +65,9 @@ export function ShareView() {
   const [status, setStatus] = useState<ShareStatus>('loading')
   const [shareData, setShareData] = useState<ShareData | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
+  const [passwordRequired, setPasswordRequired] = useState(false)
+  const [sharePassword, setSharePassword] = useState('')
+  const [passwordError, setPasswordError] = useState('')
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -75,16 +78,39 @@ export function ShareView() {
       setStatus('missing')
       return
     }
-    getShareSnapshot(shareId, slug)
-      .then((data: ShareData) => {
-        setShareData(data)
-        setStatus('ready')
-      })
-      .catch((err: Error) => {
-        setErrorMsg(err.message)
-        setStatus('error')
-      })
+    fetchSnapshot(shareId, slug)
   }, [])
+
+  const fetchSnapshot = async (shareId: string, slug: string, password?: string) => {
+    try {
+      const data = await getShareSnapshot(shareId, slug, password)
+      setShareData(data)
+      setStatus('ready')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error desconocido'
+      if (message.toLowerCase().includes('password')) {
+        setPasswordRequired(true)
+        setStatus('error')
+        setErrorMsg('Este enlace está protegido con contraseña.')
+      } else {
+        setErrorMsg(message)
+        setStatus('error')
+      }
+    }
+  }
+
+  const handleUnlock = () => {
+    if (typeof window === 'undefined') return
+    const segments = window.location.pathname.split('/').filter(Boolean)
+    const shareId = segments[1] ?? ''
+    const slug = segments[2] ?? ''
+    if (!sharePassword) {
+      setPasswordError('Ingresa la contraseña')
+      return
+    }
+    setPasswordError('')
+    fetchSnapshot(shareId, slug, sharePassword)
+  }
 
   const handleBackToBuilder = () => {
     if (typeof window === 'undefined') return
@@ -106,8 +132,27 @@ export function ShareView() {
       <div className="share-shell share-shell--centered">
         <div className="share-empty-card">
           <h1>Enlace no disponible</h1>
-          <p>{errorMsg || 'Este enlace expiró o requiere contraseña.'}</p>
-          <button type="button" className="btn primary" onClick={handleBackToBuilder}>
+          {passwordRequired ? (
+            <>
+              <p>{errorMsg}</p>
+              <div className="share-password-form">
+                <input
+                  type="password"
+                  placeholder="Contraseña del enlace"
+                  value={sharePassword}
+                  onChange={e => setSharePassword(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleUnlock()}
+                />
+                {passwordError && <p className="error-text">{passwordError}</p>}
+                <button type="button" className="btn primary" onClick={handleUnlock}>
+                  Desbloquear
+                </button>
+              </div>
+            </>
+          ) : (
+            <p>{errorMsg || 'Este enlace expiró o requiere contraseña.'}</p>
+          )}
+          <button type="button" className="btn ghost" onClick={handleBackToBuilder}>
             Volver al builder
           </button>
         </div>

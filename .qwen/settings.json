@@ -74,7 +74,10 @@
       "Bash(print)",
       "Bash(file *)",
       "Bash(node *)",
-      "Bash(lsof *)"
+      "Bash(lsof *)",
+      "Bash(git stash)",
+      "Bash(git add *)",
+      "Bash(git commit)"
     ]
   },
   "$version": 4

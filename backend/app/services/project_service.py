@@ -37,18 +37,22 @@ class ProjectService:
         description: str | None = None,
         target_stack: str = "fastapi",
         slug: str | None = None,
+        workspace_id: str | None = None,
+        created_by: str | None = None,
     ) -> Project:
         import re
         if not slug:
             slug = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
         else:
             slug = re.sub(r'[^a-z0-9]+', '-', slug.lower()).strip('-')
-        
+
         project = Project(
             name=name,
             slug=slug,
             description=description,
             target_stack=target_stack,
+            workspace_id=workspace_id,
+            created_by=created_by,
         )
         session.add(project)
         session.commit()
@@ -92,8 +96,12 @@ class ProjectService:
         session.refresh(project)
         return project
 
-    def list_projects(self, session: Session) -> list[Project]:
-        return session.exec(select(Project)).all()
+    def list_projects(self, session: Session, workspace_id: str | None = None, user_id: str | None = None) -> list[Project]:
+        query = select(Project)
+        if workspace_id:
+            query = query.where(Project.workspace_id == workspace_id)
+        # If no workspace filter but user is authenticated, return all (for now — can restrict later)
+        return session.exec(query).all()
 
     def get_project(self, session: Session, project_id: str) -> Project:
         project = session.get(Project, str(project_id))

@@ -107,6 +107,7 @@ export const syncProjectWithBackend = async (project: ProjectDraft): Promise<Syn
         name: project.name,
         description: project.description,
         target_stack: project.targetStack,
+        workspace_id: (project as any).workspaceId,
       }),
     })
     const created = await handleResponse(createResponse)

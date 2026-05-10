@@ -151,13 +151,53 @@ async def mock_get(
         # Find the correct dataset for this endpoint
         ds_id, store = _find_dataset_for_endpoint(session, resolved_id, matched_ep)
 
+        # Extract query params for filtering (excluding pagination)
+        query_params = dict(request.query_params)
+        query_params.pop('skip', None)
+        query_params.pop('limit', None)
+
+        # Filter the store based on query parameters if any
+        if query_params:
+            filtered_store = []
+            for item in store:
+                if not isinstance(item, dict):
+                    continue
+                match = True
+                for k, v in query_params.items():
+                    if k not in item:
+                        match = False
+                        break
+                    
+                    item_val = item[k]
+                    # Handle different types for comparison
+                    if isinstance(item_val, (int, float)):
+                        try:
+                            if float(item_val) != float(v):
+                                match = False
+                                break
+                        except (ValueError, TypeError):
+                            match = False
+                            break
+                    elif isinstance(item_val, bool):
+                        if str(item_val).lower() != str(v).lower():
+                            match = False
+                            break
+                    else:
+                        # String comparison (case-insensitive)
+                        if str(item_val).lower() != str(v).lower():
+                            match = False
+                            break
+                if match:
+                    filtered_store.append(item)
+            store = filtered_store
+
         # Use operation_type for logic
         op_type = getattr(matched_ep, "operation_type", "custom")
 
         if param_value:
             # Path param captured — this is a detail request
             target_id = param_value
-            print(f"[MockServer] Searching for record matching '{target_id}' in dataset {ds_id} ({len(store)} items)")
+            print(f"[MockServer] Searching for record matching '{target_id}' in filtered dataset {ds_id} ({len(store)} items)")
 
             # 1. Try standard ID fields first
             for item in store:
@@ -186,7 +226,7 @@ async def mock_get(
             path_segments = path.strip("/").split("/")
             if len(path_segments) >= 2:
                 target_id = path_segments[-1]
-                print(f"[MockServer] Searching for record matching '{target_id}' in dataset {ds_id} ({len(store)} items)")
+                print(f"[MockServer] Searching for record matching '{target_id}' in dataset {ds_id}")
 
                 for item in store:
                     if not isinstance(item, dict):

@@ -105,6 +105,7 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
   const [method, setMethod] = useState<string>(initialEndpoint.method)
   const [path, setPath] = useState<string>(initialEndpoint.path)
   const [body, setBody] = useState<string>(() => buildBodyForMethod(project, initialEndpoint.method, initialEndpoint.path))
+  const [pathParams, setPathParams] = useState<Array<{ key: string, value: string }>>([])
   const [queryParams, setQueryParams] = useState<Array<{ key: string, value: string }>>([{ key: '', value: '' }])
   const [headers, setHeaders] = useState<Array<{ key: string, value: string }>>([{ key: '', value: '' }])
   const [history, setHistory] = useState<ApiResponse[]>([])
@@ -115,7 +116,8 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
   const [isRunning, setIsRunning] = useState(false)
   const bodyRef = useRef<HTMLTextAreaElement>(null)
 
-  // Reset form when project changes
+  // Reset form when project/endpoint changes
+  const endpointKey = endpoints.map(e => `${e.method}:${e.path}`).join('|')
   useEffect(() => {
     if (endpoints.length > 0) {
       const ep = endpoints[0]
@@ -123,36 +125,50 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
       setPath(ep.path)
       setBody(buildBodyForMethod(project, ep.method, ep.path, selectedDatasetId))
       setResponse(null)
+      // Auto-extract path params from the endpoint path
+      const matches = ep.path.match(/\{([^}]+)\}/g)
+      if (matches) {
+        const extracted = matches.map(m => m.slice(1, -1))
+        setPathParams(extracted.map(k => ({ key: k, value: '' })))
+      } else {
+        setPathParams([])
+      }
     }
-  }, [project.id, project.datasets.length, endpoints.length])
+  }, [project.id, project.datasets.length, endpointKey])
 
-  // Resolve path params with values from queryParams
+  // Resolve path params with values from pathParams
   const resolvedPath = useMemo(() => {
     let resolved = path
-    queryParams.filter(q => q.key.trim() !== '').forEach(q => {
-      resolved = resolved.replace(`{${q.key}}`, q.value || `{${q.key}}`)
+    pathParams.filter(p => p.key.trim() !== '' && p.value.trim() !== '').forEach(p => {
+      resolved = resolved.replace(`{${p.key}}`, p.value)
     })
     // Auto-replace {id} with 1 if still unresolved
     resolved = resolved.replace('{id}', '1')
     return resolved
-  }, [path, queryParams])
+  }, [path, pathParams])
 
   const mockUrl = useMemo(() => {
     let finalPath = resolvedPath.startsWith('/') ? resolvedPath : `/${resolvedPath}`
-    
-    const effectiveId = project.slug || project.remoteId || project.id
-    let url = `${backendBaseUrl}/api/mock/${effectiveId}${finalPath}`
 
-    // Add query params
+    const effectiveId = project.slug || project.remoteId || project.id
+    // Ensure we don't have double slashes if finalPath is empty or just /
+    const base = `${backendBaseUrl}/api/mock/${effectiveId}`
+    let url = base + (finalPath === '/' ? '' : finalPath)
+
+    // Add ONLY query params
     const activeQueryParams = queryParams.filter(q => q.key.trim() !== '')
     if (activeQueryParams.length > 0) {
       const searchParams = new URLSearchParams()
       activeQueryParams.forEach(q => searchParams.append(q.key, q.value))
-      url += `?${searchParams.toString()}`
+      
+      const queryString = searchParams.toString()
+      if (queryString) {
+        url += (url.includes('?') ? '&' : '?') + queryString
+      }
     }
 
     return url
-  }, [backendBaseUrl, project.id, project.remoteId, project.slug, resolvedPath])
+  }, [backendBaseUrl, project.id, project.remoteId, project.slug, resolvedPath, queryParams])
 
   const curlSnippet = useMemo(() => buildCurl(method, mockUrl, body, project), [method, mockUrl, body, project])
 
@@ -239,8 +255,46 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
   }
 
   const handlePathChange = (val: string) => {
-    setPath(val)
+    let basePath = val
+    let newQueryParams: Array<{ key: string, value: string }> = []
+
+    // 1. Detect and extract query params if present in the typed path
+    if (val.includes('?')) {
+      const parts = val.split('?')
+      basePath = parts[0]
+      const search = new URLSearchParams(parts[1])
+      search.forEach((v, k) => {
+        newQueryParams.push({ key: k, value: v })
+      })
+    }
+
+    setPath(basePath)
     setResponse(null)
+
+    // 2. Update query params if we found any in the path
+    if (newQueryParams.length > 0) {
+      setQueryParams(prev => {
+        const existing = prev.filter(q => q.key !== '')
+        // We prioritize the typed ones
+        return [...newQueryParams, { key: '', value: '' }]
+      })
+    }
+
+    // 3. Auto-extract path params from {placeholders}
+    const matches = basePath.match(/\{([^}]+)\}/g)
+    if (matches) {
+      const extracted = matches.map(m => m.slice(1, -1))
+      setPathParams(prev => {
+        const existingKeys = new Set(prev.map(p => p.key))
+        // Add new params not already present
+        const newParams = extracted.filter(k => !existingKeys.has(k)).map(k => ({ key: k, value: '' }))
+        // Remove params no longer in path
+        const filtered = prev.filter(p => extracted.includes(p.key))
+        return [...filtered, ...newParams]
+      })
+    } else {
+      setPathParams([])
+    }
   }
 
   const addQueryParam = () => setQueryParams([...queryParams, { key: '', value: '' }])
@@ -248,6 +302,12 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
     const next = [...queryParams]
     next[index] = { key: k, value: v }
     setQueryParams(next)
+    setResponse(null)
+  }
+  const updatePathParam = (index: number, value: string) => {
+    const next = [...pathParams]
+    next[index] = { ...next[index], value }
+    setPathParams(next)
     setResponse(null)
   }
 
@@ -295,11 +355,11 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
                     placeholder="/records" 
                   />
                 </div>
-                {path.includes('{') && (
-                  <span className="path-resolved">
-                    → <code>{resolvedPath}</code>
-                  </span>
-                )}
+                
+                <div className="path-resolved-preview">
+                   <code>{mockUrl.replace(backendBaseUrl, '')}</code>
+                </div>
+
                 <button type="button" className="btn primary playground-run" onClick={runRequest} disabled={isRunning || !mockRunning}>
                   {isRunning ? '...' : 'Send'}
                 </button>
@@ -307,11 +367,11 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
 
               {/* Tabs for Params, Headers, Body, cURL */}
               <div className="playground-tabs">
-                <button 
+                <button
                   className={`playground-tab-btn ${activeConfigTab === 'params' ? 'active' : ''}`}
                   onClick={() => setActiveConfigTab('params')}
                 >
-                  Params {queryParams.filter(q => q.key).length > 0 && <span className="count-dot" />}
+                  Path/Query {pathParams.length > 0 && <span className="count-dot" />}{queryParams.filter(q => q.key).length > 0 && <span className="count-dot" />}
                 </button>
                 <button 
                   className={`playground-tab-btn ${activeConfigTab === 'headers' ? 'active' : ''}`}
@@ -336,14 +396,44 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
 
               <div className="tab-content-area">
                 {activeConfigTab === 'params' && (
-                  <div className="kv-editor">
-                    {queryParams.map((q, i) => (
-                      <div key={i} className="kv-row">
-                        <input className="field field-small" placeholder="Key" value={q.key} onChange={(e) => updateQueryParam(i, e.target.value, q.value)} />
-                        <input className="field field-small" placeholder="Value" value={q.value} onChange={(e) => updateQueryParam(i, q.key, e.target.value)} />
+                  <div>
+                    {/* Path Params section */}
+                    {pathParams.length > 0 ? (
+                      <div className="param-section">
+                        <div className="param-section__label">Path Params</div>
+                        <div className="kv-editor">
+                          {pathParams.map((p, i) => (
+                            <div key={i} className="kv-row">
+                              <input className="field field-small param-key" value={`{${p.key}}`} readOnly disabled />
+                              <input className="field field-small" placeholder={`Value for {${p.key}}`} value={p.value} onChange={(e) => updatePathParam(i, e.target.value)} />
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    ))}
-                    <button className="btn ghost btn-xs" onClick={addQueryParam}>+ Add param</button>
+                    ) : (
+                      path.includes('{') && (
+                        <div className="param-section param-section--hint">
+                          <div className="param-section__label">Path Params</div>
+                          <p className="param-section__hint-text">
+                            El path contiene placeholders pero no se han extraido. Escribe el path de nuevo para activarlos.
+                          </p>
+                        </div>
+                      )
+                    )}
+
+                    {/* Query Params section */}
+                    <div className="param-section">
+                      <div className="param-section__label">Query Params (optional)</div>
+                      <div className="kv-editor">
+                        {queryParams.map((q, i) => (
+                          <div key={i} className="kv-row">
+                            <input className="field field-small" placeholder="Key" value={q.key} onChange={(e) => updateQueryParam(i, e.target.value, q.value)} />
+                            <input className="field field-small" placeholder="Value" value={q.value} onChange={(e) => updateQueryParam(i, q.key, e.target.value)} />
+                          </div>
+                        ))}
+                        <button className="btn ghost btn-xs" onClick={addQueryParam}>+ Add query param</button>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -380,7 +470,7 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
             </div>
           </div>
           <details className="api-playground__store-viewer">
-            <summary>📋 Ver datos en memoria ({store.length})</summary>
+            <summary>Ver datos en memoria ({store.length})</summary>
             <pre className="preview-json">{JSON.stringify(store.slice(0, 100), null, 2)}</pre>
           </details>
         </div>
@@ -413,7 +503,6 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
         <div className="playground-column">
           <div className="playground-card response-card">
             <div className="playground-card__header">
-              <span className="playground-card__number">2</span>
               <h4>Resultado</h4>
               {response && (
                 <span className={`status-badge ${response.status < 400 ? 'ok' : 'err'}`}>
@@ -491,20 +580,25 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
           font-family: monospace;
           font-size: 0.8rem;
         }
-        .path-resolved {
+        .address-bar-row .playground-run { padding-left: 1.5rem; padding-right: 1.5rem; flex-shrink: 0; }
+
+        .path-resolved-preview {
           font-size: 0.72rem;
           color: #3b82f6;
           white-space: nowrap;
           font-family: monospace;
           flex-shrink: 0;
+          max-width: 300px;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
-        .path-resolved code {
+        .path-resolved-preview code {
           background: #eff6ff;
-          padding: 0.15rem 0.4rem;
-          border-radius: 4px;
+          padding: 0.25rem 0.6rem;
+          border-radius: 6px;
           font-weight: 600;
+          border: 1px solid #dbeafe;
         }
-        .address-bar-row .playground-run { padding-left: 1.5rem; padding-right: 1.5rem; flex-shrink: 0; }
 
         .label-tiny { font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; margin-bottom: 0.25rem; display: block; }
         .field-tiny { padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; height: 28px; }
@@ -634,9 +728,38 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
           border-radius: 50%;
         }
 
-        .kv-editor { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+        .kv-editor { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.5rem; }
         .kv-row { display: flex; gap: 0.5rem; }
         .kv-row .field { flex: 1; }
+        .kv-row .param-key {
+          font-family: monospace;
+          background: #f1f5f9;
+          color: #64748b;
+          font-size: 0.75rem;
+          max-width: 90px;
+          text-align: center;
+        }
+
+        .param-section { margin-bottom: 0.75rem; }
+        .param-section__label {
+          font-size: 0.7rem;
+          font-weight: 600;
+          color: #64748b;
+          text-transform: uppercase;
+          margin-bottom: 0.35rem;
+          letter-spacing: 0.03em;
+        }
+        .param-section--hint {
+          background: #fefce8;
+          border: 1px solid #fde047;
+          border-radius: 6px;
+          padding: 0.5rem;
+        }
+        .param-section__hint-text {
+          font-size: 0.75rem;
+          color: #a16207;
+          margin: 0;
+        }
 
         .history-list { display: flex; flex-direction: column; gap: 0.4rem; }
         .history-item {

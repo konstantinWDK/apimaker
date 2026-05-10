@@ -77,6 +77,7 @@ class CreateProjectRequest(BaseModel):
     jwt_secret: str | None = None
     rate_limit: int | None = None
     target_stack: Literal["fastapi", "express", "nest"] = "fastapi"
+    workspace_id: str | None = None
     datasets: list[DatasetMeta] = Field(default_factory=list)
 
 

@@ -136,7 +136,7 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
     <div className="endpoint-designer">
       <div className="endpoint-summary endpoint-summary--compact" style={{ padding: '0.5rem', background: 'transparent', border: 'none' }}>
         <a className="endpoint-preview__link" href={previewUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem', textDecoration: 'none' }}>
-          <span className="icon">🔗</span> {previewUrl}
+          <span className="icon"></span> {previewUrl}
         </a>
       </div>
 
@@ -279,7 +279,7 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
                       rel="noopener noreferrer"
                       className="endpoint-item__url"
                     >
-                      🔗 {previewBase}{endpoint.path}
+                      {previewBase}{endpoint.path}
                     </a>
                   )}
                 </div>

@@ -360,7 +360,7 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
               className="btn ghost btn-sm dbi__file-btn"
               onClick={() => fileInputRef.current?.click()}
             >
-              📁 Seleccionar archivo
+              Seleccionar archivo
             </button>
             {sqliteFile && <span className="dbi__file-name">{sqliteFile.name}</span>}
           </div>
@@ -389,10 +389,10 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
           onClick={handleTestConnection}
           disabled={isConnectDisabled || testStatus === 'testing'}
         >
-          {testStatus === 'testing' ? '⏳ Probando...' : '⚡ Probar conexión'}
+          {testStatus === 'testing' ? 'Probando...' : 'Probar conexion'}
         </button>
-        {testStatus === 'ok' && <span className="dbi__test-ok">✓ {testMessage}</span>}
-        {testStatus === 'error' && <span className="dbi__test-error">✗ {testMessage}</span>}
+        {testStatus === 'ok' && <span className="dbi__test-ok">OK: {testMessage}</span>}
+        {testStatus === 'error' && <span className="dbi__test-error">ERR: {testMessage}</span>}
       </div>
 
       {error && <p className="error-text">{error}</p>}

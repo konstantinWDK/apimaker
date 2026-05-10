@@ -73,34 +73,34 @@ export function SyncPanel() {
         onClick={handleSync}
         disabled={syncing}
       >
-        {syncing ? '⏳ Sincronizando...' : '🔄 Sincronizar ahora'}
+        {syncing ? 'Sincronizando...' : 'Sincronizar ahora'}
       </button>
 
       {result && (
         <div className={`sync-panel__result ${result.success ? 'success' : 'error'}`}>
-          <p><strong>{result.success ? '✓' : '✗'}</strong> {result.message}</p>
+          <p><strong>{result.success ? 'OK' : 'ERR'}</strong> {result.message}</p>
           {result.success && result.counts && (
             <div className="sync-panel__details">
               {result.counts.users_synced > 0 && (
-                <span className="sync-badge">👤 {result.counts.users_synced} usuarios</span>
+                <span className="sync-badge">{result.counts.users_synced} usuarios</span>
               )}
               {result.counts.projects_synced > 0 && (
-                <span className="sync-badge">📁 {result.counts.projects_synced} proyectos</span>
+                <span className="sync-badge">{result.counts.projects_synced} proyectos</span>
               )}
               {result.counts.datasets_synced > 0 && (
-                <span className="sync-badge">📊 {result.counts.datasets_synced} datasets</span>
+                <span className="sync-badge">{result.counts.datasets_synced} datasets</span>
               )}
               {result.counts.fields_synced > 0 && (
-                <span className="sync-badge">📝 {result.counts.fields_synced} campos</span>
+                <span className="sync-badge">{result.counts.fields_synced} campos</span>
               )}
               {result.counts.endpoints_synced > 0 && (
-                <span className="sync-badge">🔗 {result.counts.endpoints_synced} endpoints</span>
+                <span className="sync-badge">{result.counts.endpoints_synced} endpoints</span>
               )}
               {result.counts.shares_synced > 0 && (
-                <span className="sync-badge">🔗 {result.counts.shares_synced} shares</span>
+                <span className="sync-badge">{result.counts.shares_synced} shares</span>
               )}
               {result.counts.skipped > 0 && (
-                <span className="sync-badge skipped">⏭️ {result.counts.skipped} omitidos</span>
+                <span className="sync-badge skipped">{result.counts.skipped} omitidos</span>
               )}
             </div>
           )}

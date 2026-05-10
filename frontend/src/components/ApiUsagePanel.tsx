@@ -254,7 +254,7 @@ export function ApiUsagePanel() {
                         <tr key={f.name}>
                           <td><code>{f.name}</code></td>
                           <td>{f.type}</td>
-                          <td>{f.req ? '✓' : '—'}</td>
+                          <td>{f.req ? 'Si' : '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -326,7 +326,7 @@ export function ApiUsagePanel() {
                   <span className="api-usage__card-summary">— {ex.summary}</span>
                 </div>
                 <button type="button" className="btn ghost btn-small api-usage__card-copy" onClick={() => copyCode(ex.code, ex.id)}>
-                  {copiedCode === ex.id ? '✓ Copiado' : 'Copiar'}
+                  {copiedCode === ex.id ? 'Copiado' : 'Copiar'}
                 </button>
               </div>
               <pre className="api-usage__card-code"><code>{ex.code}</code></pre>
@@ -437,11 +437,11 @@ fly launch && fly deploy`}</code></pre>
       <div className="api-usage__deploy-checklist">
         <h3>🚀 Checklist de Producción</h3>
         <ul className="api-usage__checklist">
-          <li><span className="api-usage__checkmark">✓</span> <strong>Base de Datos:</strong> Usa PostgreSQL persistente en lugar de SQLite.</li>
-          <li><span className="api-usage__checkmark">✓</span> <strong>Seguridad:</strong> Cambia <code>SECRET_KEY</code> y desactiva <code>DEBUG</code>.</li>
-          <li><span className="api-usage__checkmark">✓</span> <strong>HTTPS:</strong> Obligatorio. Usa Certbot (Let's Encrypt) o Cloudflare.</li>
-          <li><span className="api-usage__checkmark">✓</span> <strong>Gunicorn:</strong> Usa un servidor WSGI/ASGI robusto con múltiples workers.</li>
-          <li><span className="api-usage__checkmark">✓</span> <strong>CORS:</strong> Restringe <code>ALLOW_ORIGINS</code> a tus dominios conocidos.</li>
+          <li><span className="api-usage__checkmark">[X]</span> <strong>Base de Datos:</strong> Usa PostgreSQL persistente en lugar de SQLite.</li>
+          <li><span className="api-usage__checkmark">[X]</span> <strong>Seguridad:</strong> Cambia <code>SECRET_KEY</code> y desactiva <code>DEBUG</code>.</li>
+          <li><span className="api-usage__checkmark">[X]</span> <strong>HTTPS:</strong> Obligatorio. Usa Certbot (Let's Encrypt) o Cloudflare.</li>
+          <li><span className="api-usage__checkmark">[X]</span> <strong>Gunicorn:</strong> Usa un servidor WSGI/ASGI robusto con múltiples workers.</li>
+          <li><span className="api-usage__checkmark">[X]</span> <strong>CORS:</strong> Restringe <code>ALLOW_ORIGINS</code> a tus dominios conocidos.</li>
         </ul>
       </div>
     </div>

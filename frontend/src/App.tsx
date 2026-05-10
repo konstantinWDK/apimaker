@@ -5,14 +5,14 @@ import { ApiUsagePanel } from './components/ApiUsagePanel'
 import { BackendSyncCard } from './components/BackendSyncCard'
 import { CredentialPanel } from './components/CredentialPanel'
 import { DatabaseConfigPanel } from './components/DatabaseConfigPanel'
-import { DatasetUploader } from './components/DatasetUploader'
 import { DatabaseImportPanel } from './components/DatabaseImportPanel'
 import { EndpointDesigner } from './components/EndpointDesigner'
 import { EndpointGallery } from './components/EndpointGallery'
 import { GenerationResultPanel } from './components/GenerationResultPanel'
+import { DatasetEditor } from './components/DatasetEditor'
+import { SchemaDiagram } from './components/SchemaDiagram'
 import { LoginScreen } from './components/LoginScreen'
 import { PayloadPreview } from './components/PayloadPreview'
-import { PreviewPanel } from './components/PreviewPanel'
 import { ProjectForm } from './components/ProjectForm'
 import { ProjectSidebar } from './components/ProjectSidebar'
 import { SectionCard } from './components/SectionCard'
@@ -21,6 +21,7 @@ import { ShareView } from './components/ShareView'
 import { UserCard } from './components/UserCard'
 import { useProjectBuilder } from './hooks/useProjectBuilder'
 import { useAuth } from './hooks/useAuth'
+import { useToast } from './components/Toast'
 import type { GenerationResult, ProjectDraft } from './types/schemas'
 import { slugify } from './lib/slug'
 import { readBackendConfig } from './lib/backendConfig'
@@ -45,11 +46,11 @@ const apiFetch = async (path: string, init?: RequestInit) => {
 export function App() {
   const isShareView = typeof window !== 'undefined' && window.location.pathname.startsWith('/share/')
   const { isAuthenticated, login, error: authError, logout, resetCredentials, authStatus } = useAuth()
+  const toast = useToast()
   const {
     project,
     updateProject,
     upsertDataset,
-    removeDataset,
     upsertEndpoint,
     removeEndpoint,
     replaceProject,
@@ -122,7 +123,7 @@ export function App() {
       // Sync with backend using the new centralized function
       const effectiveProjectId = await saveProject()
       if (!effectiveProjectId) {
-        alert('Error al guardar el proyecto. Asegúrate de estar autenticado.')
+        toast('Error al guardar el proyecto. Asegúrate de estar autenticado.', 'error')
         return
       }
 
@@ -138,7 +139,7 @@ export function App() {
       })
 
       if (!gr.ok) {
-        alert(`Error al generar bundle: ${await gr.text()}`)
+        toast(`Error al generar bundle: ${await gr.text()}`, 'error')
         return
       }
 
@@ -164,7 +165,7 @@ export function App() {
         setTimeout(() => setShowSuccess(false), 3000)
       }
     } catch (err) {
-      alert(`Error: ${err instanceof Error ? err.message : 'desconocido'}`)
+      toast(`Error: ${err instanceof Error ? err.message : 'desconocido'}`, 'error')
     } finally {
       setIsGenerating(false)
     }
@@ -217,72 +218,92 @@ export function App() {
       case 'datasets':
         const currentDataset = project.datasets.find(d => d.id === selectedDatasetId) || project.datasets[0]
         return (
-          <div className="datasets-tab-layout-vertical">
-            <div className="datasets-header-bar">
-              <div className="datasets-tabs">
-                {project.datasets.map(ds => (
-                  <div key={ds.id} className={`dataset-tab ${ds.id === (selectedDatasetId || project.datasets[0]?.id) ? 'active' : ''}`}>
-                    <button type="button" onClick={() => { setSelectedDatasetId(ds.id); setIsImportingDB(false); }}>
-                      {ds.name}
-                      <span className="badge-xs">{ds.sourceType}</span>
-                    </button>
-                    <button type="button" className="btn-remove-ds" onClick={() => removeDataset(ds.id)}>×</button>
-                  </div>
-                ))}
-              </div>
-              <div className="dropdown">
-                <button type="button" className="btn ghost btn-sm">+ Nueva tabla</button>
-                <div className="dropdown-content">
-                  <button type="button" onClick={() => {
+          <div className="datasets-tab-new">
+            {/* Schema diagram overview */}
+            <SectionCard title="Modelo de Datos" subtitle={`${project.datasets.length} dataset(s) — Vista general del esquema`} accent="emerald" fullWidth>
+              <SchemaDiagram
+                datasets={project.datasets}
+                onDatasetClick={(id) => { setSelectedDatasetId(id); setIsImportingDB(false); }}
+                activeDatasetId={selectedDatasetId}
+              />
+            </SectionCard>
+
+            {/* Dataset editor for selected dataset */}
+            {currentDataset ? (
+              <SectionCard title={`${currentDataset.name}`} subtitle="Editar esquema y datos" accent="sky" fullWidth>
+                <DatasetEditor
+                  dataset={currentDataset}
+                  onCommit={upsertDataset}
+                  otherDatasets={project.datasets.filter(d => d.id !== currentDataset.id)}
+                />
+              </SectionCard>
+            ) : (
+              <SectionCard title="Datasets" subtitle="Crea tu primer dataset" accent="sky" fullWidth>
+                <div className="empty-state">
+                  <p className="muted-text">Añade un dataset para empezar a diseñar tu API.</p>
+                  <button type="button" className="btn primary" onClick={() => {
                     const newId = crypto.randomUUID()
                     upsertDataset({
                       id: newId,
-                      name: `Tabla ${project.datasets.length + 1}`,
+                      name: 'Usuarios',
                       sourceType: 'manual',
-                      fields: [{ id: crypto.randomUUID(), name: 'id', type: 'integer', required: true }],
+                      icon: '',
+                      description: 'Usuarios del sistema',
+                      fields: [
+                        { id: crypto.randomUUID(), name: 'id', type: 'integer', required: true, isPrimaryKey: true, fakerCategory: 'number' },
+                        { id: crypto.randomUUID(), name: 'nombre', type: 'string', required: true, fakerCategory: 'name' },
+                        { id: crypto.randomUUID(), name: 'email', type: 'email', required: true, fakerCategory: 'email' },
+                      ],
                       sampleRows: []
                     })
                     setSelectedDatasetId(newId)
-                  }}>Manual / CSV</button>
-                  <button type="button" onClick={() => setIsImportingDB(true)}>Base de datos</button>
+                  }}>
+                    + Crear dataset de ejemplo
+                  </button>
                 </div>
-              </div>
-            </div>
-            <div className="datasets-main">
-              {isImportingDB ? (
-                <SectionCard title="Importar desde Base de Datos" subtitle="Conecta e introspecciona tablas" accent="sky" fullWidth>
-                  <DatabaseImportPanel 
-                    onImport={(newDatasets) => {
-                      newDatasets.forEach((ds) => {
-                        upsertDataset(ds)
-                        // Auto-generate CRUD endpoints for each imported dataset
-                        const basePath = '/' + ds.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')
-                        upsertEndpoint({ id: crypto.randomUUID(), name: 'Listar ' + ds.name, method: 'GET', path: basePath, summary: 'Listar registros de ' + ds.name, operationType: 'list', targetDatasetId: ds.id })
-                        upsertEndpoint({ id: crypto.randomUUID(), name: 'Obtener ' + ds.name, method: 'GET', path: basePath + '/{id}', summary: 'Obtener un registro de ' + ds.name, operationType: 'get', targetDatasetId: ds.id })
-                        upsertEndpoint({ id: crypto.randomUUID(), name: 'Crear ' + ds.name, method: 'POST', path: basePath, summary: 'Crear registro en ' + ds.name, operationType: 'create', targetDatasetId: ds.id })
-                        upsertEndpoint({ id: crypto.randomUUID(), name: 'Actualizar ' + ds.name, method: 'PUT', path: basePath + '/{id}', summary: 'Actualizar registro de ' + ds.name, operationType: 'update', targetDatasetId: ds.id })
-                        upsertEndpoint({ id: crypto.randomUUID(), name: 'Eliminar ' + ds.name, method: 'DELETE', path: basePath + '/{id}', summary: 'Eliminar registro de ' + ds.name, operationType: 'delete', targetDatasetId: ds.id })
-                      })
-                      if (newDatasets.length > 0) setSelectedDatasetId(newDatasets[0].id)
-                      setIsImportingDB(false)
-                    }}
-                    onCancel={() => setIsImportingDB(false)}
-                  />
-                </SectionCard>
-              ) : currentDataset ? (
-                <SectionCard title={`${currentDataset.name}`} subtitle="Configuración de la tabla y datos" accent="emerald" fullWidth>
-                  <div className="split-panel">
-                    <div className="split-panel__cell">
-                      <DatasetUploader dataset={currentDataset} onCommit={upsertDataset} />
-                    </div>
-                    <div className="split-panel__cell">
-                      <PreviewPanel project={project} datasetId={currentDataset.id} />
-                    </div>
-                  </div>
-                </SectionCard>
-              ) : (
-                <div className="empty-state">No hay datasets. Crea uno para empezar.</div>
-              )}
+              </SectionCard>
+            )}
+
+            {/* DB import panel (collapsible) */}
+            {isImportingDB && (
+              <SectionCard title="Importar desde Base de Datos" subtitle="Conecta e introspecciona tablas" accent="sky" fullWidth>
+                <DatabaseImportPanel
+                  onImport={(newDatasets) => {
+                    newDatasets.forEach((ds) => {
+                      upsertDataset(ds)
+                      const basePath = '/' + ds.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+                      upsertEndpoint({ id: crypto.randomUUID(), name: 'Listar ' + ds.name, method: 'GET', path: basePath, summary: 'Listar registros de ' + ds.name, operationType: 'list', targetDatasetId: ds.id })
+                      upsertEndpoint({ id: crypto.randomUUID(), name: 'Obtener ' + ds.name, method: 'GET', path: basePath + '/{id}', summary: 'Obtener un registro de ' + ds.name, operationType: 'get', targetDatasetId: ds.id })
+                      upsertEndpoint({ id: crypto.randomUUID(), name: 'Crear ' + ds.name, method: 'POST', path: basePath, summary: 'Crear registro en ' + ds.name, operationType: 'create', targetDatasetId: ds.id })
+                      upsertEndpoint({ id: crypto.randomUUID(), name: 'Actualizar ' + ds.name, method: 'PUT', path: basePath + '/{id}', summary: 'Actualizar registro de ' + ds.name, operationType: 'update', targetDatasetId: ds.id })
+                      upsertEndpoint({ id: crypto.randomUUID(), name: 'Eliminar ' + ds.name, method: 'DELETE', path: basePath + '/{id}', summary: 'Eliminar registro de ' + ds.name, operationType: 'delete', targetDatasetId: ds.id })
+                    })
+                    if (newDatasets.length > 0) setSelectedDatasetId(newDatasets[0].id)
+                    setIsImportingDB(false)
+                  }}
+                  onCancel={() => setIsImportingDB(false)}
+                />
+              </SectionCard>
+            )}
+
+            {/* Add dataset button bar */}
+            <div className="datasets-action-bar">
+              <button type="button" className="btn ghost" onClick={() => {
+                const newId = crypto.randomUUID()
+                upsertDataset({
+                  id: newId,
+                  name: `Tabla ${project.datasets.length + 1}`,
+                  sourceType: 'manual',
+                  fields: [{ id: crypto.randomUUID(), name: 'id', type: 'integer', required: true, isPrimaryKey: true }],
+                  sampleRows: []
+                })
+                setSelectedDatasetId(newId)
+              }}>
+                + Nuevo dataset
+              </button>
+              <button type="button" className="btn ghost" onClick={() => setIsImportingDB(!isImportingDB)}>
+                {isImportingDB ? 'Cerrar importacion' : 'Importar desde BD'}
+              </button>
             </div>
           </div>
         )
@@ -411,7 +432,14 @@ export function App() {
             onStopMock={stopMock}
             onSwitchProject={replaceProject}
             onSync={saveProject}
-            onDelete={deleteProject}
+            onDelete={async (id: string) => {
+              const p = projects.find(p => p.id === id)
+              const name = p?.name || 'este proyecto'
+              if (window.confirm(`¿Estás seguro de que quieres eliminar "${name}"? Esta acción no se puede deshacer.`)) {
+                await deleteProject(id)
+                toast(`Proyecto "${name}" eliminado`, 'info')
+              }
+            }}
           />
         </div>
         <div className="app-content">

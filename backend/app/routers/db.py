@@ -1,8 +1,10 @@
-from fastapi import APIRouter, HTTPException, Body, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File, Form
 import sqlalchemy
 from sqlalchemy.engine import make_url
 import tempfile
 import os
+
+from ..security import CurrentUser, get_current_user_from_header
 
 router = APIRouter(prefix="/db", tags=["Database Introspection"])
 
@@ -38,6 +40,7 @@ async def test_connection(
     connection_url: str = Body(None, embed=True),
     file: UploadFile = File(None),
     dialect: str = Form(None),
+    user: CurrentUser = Depends(get_current_user_from_header),
 ):
     """
     Test if we can connect to the provided DB URL or uploaded SQLite file.
@@ -78,7 +81,7 @@ async def test_connection(
     except HTTPException:
         raise
     except Exception as e:
-        return {"ok": False, "message": str(e)}
+        return {"ok": False, "message": "No se pudo establecer la conexión. Verifica las credenciales."}
 
 
 @router.post("/introspect")
@@ -86,6 +89,7 @@ async def introspect_db(
     connection_url: str = Body(None, embed=True),
     file: UploadFile = File(None),
     dialect: str = Form(None),
+    user: CurrentUser = Depends(get_current_user_from_header),
 ):
     """
     List tables and their columns from the external database or uploaded SQLite file.

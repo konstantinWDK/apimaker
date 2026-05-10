@@ -198,7 +198,7 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
             </div>
             {project.remoteId && (
               <p className="success-text" style={{ fontSize: '0.75rem', marginTop: '0.5rem' }}>
-                ✓ Proyecto sincronizado con el backend
+                Proyecto sincronizado con el backend
               </p>
             )}
           </div>

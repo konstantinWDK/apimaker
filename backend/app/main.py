@@ -12,6 +12,14 @@ from .services.mock_server import router as mock_api_router
 
 settings = get_settings()
 
+# SECURITY: Crash if using default JWT secret in production
+_DEFAULT_JWT_SECRET = "apimaker-dev-secret-key-change-this-in-prod"
+if settings.environment == "production" and settings.jwt_secret_key == _DEFAULT_JWT_SECRET:
+    raise RuntimeError(
+        "SECURITY ERROR: APIMAKER_JWT_SECRET_KEY must be set in production. "
+        "Generate a secure key with: python -c 'import secrets; print(secrets.token_hex(32))'"
+    )
+
 app = FastAPI(title=settings.project_name)
 
 app.add_middleware(

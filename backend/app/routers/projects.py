@@ -18,10 +18,10 @@ from ..models import (
     Project as PydanticProject,
     UploadDatasetRequest,
 )
+from ..security import CurrentUser, get_current_user_from_header, require_admin
 from ..openapi_builder import build_openapi_document
 from ..services.generation import run_generation
 from ..services.project_service import project_service
-from ..security import require_admin, get_current_user_from_header, CurrentUser
 
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -87,8 +87,11 @@ def _db_to_pydantic(db_project, datasets_with_fields=None, endpoints=None) -> Py
 
 
 @router.get("", response_model=list[PydanticProject])
-def list_projects(session: Session = Depends(get_session)) -> list[PydanticProject]:
-    db_projects = project_service.list_projects(session)
+def list_projects(
+    workspace_id: str | None = None,
+    session: Session = Depends(get_session),
+) -> list[PydanticProject]:
+    db_projects = project_service.list_projects(session, workspace_id=workspace_id)
     result = []
     for p in db_projects:
         data = project_service.get_project_with_data(session, p.id)
@@ -112,6 +115,8 @@ def create_project(
         slug=payload.slug,
         description=payload.description,
         target_stack=payload.target_stack,
+        workspace_id=payload.workspace_id,
+        created_by=user.user_id,
     )
     # Handle initial datasets if provided
     if payload.datasets:

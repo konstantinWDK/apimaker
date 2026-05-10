@@ -7,7 +7,16 @@ from sqlmodel import SQLModel
 from alembic import context
 
 # Import our database models so Alembic can detect them
-from app.db_models import Project, Dataset, DatasetField, Endpoint  # noqa: F401
+from app.db_models import (
+    User,
+    Workspace,
+    WorkspaceMember,
+    Project,
+    Dataset,
+    DatasetField,
+    Endpoint,
+    ShareSnapshot,
+)  # noqa: F401
 
 # this is the Alembic Config object
 config = context.config

@@ -88,36 +88,47 @@ def login(payload: LoginRequest, session: Session = Depends(get_session)) -> Log
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-def register(payload: RegisterRequest, session: Session = Depends(get_session)) -> dict:
-    """Register a new user. Only works if no users exist yet (first-run) or if caller is admin."""
-    # Check if any users exist
-    existing_count = session.exec(select(User)).all()
-    if len(existing_count) > 0:
-        # Require admin to create new users
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admins can create new users. Use the admin panel.",
-        )
-    # First user becomes admin
-    user = User(
+def register(
+    payload: RegisterRequest,
+    session: Session = Depends(get_session),
+    user: CurrentUser | None = Depends(get_current_user_from_header),
+) -> dict:
+    """Register a new user. First user becomes admin; subsequent users require admin auth."""
+    existing_count = len(session.exec(select(User)).all())
+    if existing_count > 0:
+        # Require admin to create new users after first user
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required",
+            )
+        if user.role != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin access required to create new users",
+            )
+    # First user becomes admin, subsequent users become members by default
+    role = "admin" if existing_count == 0 else "member"
+    user_obj = User(
         username=payload.username,
         email=payload.email,
         password_hash=hash_password(payload.password),
-        role="admin",
+        role=role,
     )
-    session.add(user)
+    session.add(user_obj)
     session.flush()
-    # Create default workspace
-    workspace = Workspace(
-        name=f"{payload.username}'s Workspace",
-        slug=payload.username.lower().replace(" ", "-"),
-        owner_id=user.id,
-    )
-    session.add(workspace)
-    session.flush()
-    session.add(WorkspaceMember(workspace_id=workspace.id, user_id=user.id, role="owner"))
+    # Create default workspace for first user only
+    if existing_count == 0:
+        workspace = Workspace(
+            name=f"{payload.username}'s Workspace",
+            slug=payload.username.lower().replace(" ", "-"),
+            owner_id=user_obj.id,
+        )
+        session.add(workspace)
+        session.flush()
+        session.add(WorkspaceMember(workspace_id=workspace.id, user_id=user_obj.id, role="owner"))
     session.commit()
-    return {"id": user.id, "username": user.username, "role": user.role}
+    return {"id": user_obj.id, "username": user_obj.username, "role": user_obj.role}
 
 
 @router.post("/refresh", response_model=RefreshResponse)

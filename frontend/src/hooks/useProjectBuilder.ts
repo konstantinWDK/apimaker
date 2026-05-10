@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 import type { ApiEndpoint, DatasetMeta, ProjectDraft } from '../types/schemas'
+import { fireToast } from '../components/Toast'
 
 interface BuilderState {
   project: ProjectDraft
@@ -91,8 +92,11 @@ const getAuthHeaders = (): HeadersInit => {
 }
 
 const api = {
-  async listProjects(): Promise<ProjectDraft[]> {
-    const res = await fetch(`${getBaseUrl()}/projects`)
+  async listProjects(workspaceId?: string): Promise<ProjectDraft[]> {
+    const url = workspaceId
+      ? `${getBaseUrl()}/projects?workspace_id=${workspaceId}`
+      : `${getBaseUrl()}/projects`
+    const res = await fetch(url)
     if (!res.ok) return []
     const data = await res.json()
     return data.map((p: any) => ({
@@ -139,6 +143,7 @@ const api = {
         sampleRows: p.dataset.sample_rows || [],
       })!] : []),
       remoteId: p.slug || p.id,
+      workspaceId: p.workspace_id,
     }))
   },
 
@@ -152,6 +157,7 @@ const api = {
       jwt_secret: draft.jwtSecret,
       rate_limit: draft.rateLimit,
       target_stack: draft.targetStack,
+      workspace_id: (draft as any).workspaceId,
     }
     if (draft.datasets && draft.datasets.length > 0) {
       body.datasets = draft.datasets.map(ds => ({
@@ -560,22 +566,25 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
 
   loadProjects: (projects) =>
     set((state) => {
-      // Create a unified list that includes the current project if it's a local draft
+      // SAFEGUARD: Always preserve the current localStorage project
       let unifiedProjects = [...projects]
-      const currentIsLocal = !state.project.remoteId
-      if (currentIsLocal && !projects.find(p => p.id === state.project.id)) {
-        unifiedProjects = [state.project, ...projects]
+      const currentProject = state.project
+      const currentInBackend = projects.find(p => p.id === currentProject.id)
+
+      // Add current project to list if not already present
+      if (!currentInBackend) {
+        unifiedProjects = [currentProject, ...projects]
       }
 
       const nextState: Partial<BuilderState> = { projects: unifiedProjects }
-      
-      const currentExists = unifiedProjects.find(p => p.id === state.project.id)
-      if (!currentExists && state.project.remoteId) {
-        if (unifiedProjects.length > 0) {
-          nextState.project = unifiedProjects[0]
-        }
+
+      // Only replace current project if we have a valid backend project
+      // AND the current one is a stale remote project (not localStorage)
+      const currentExists = unifiedProjects.find(p => p.id === currentProject.id)
+      if (!currentExists && currentProject.remoteId && unifiedProjects.length > 0) {
+        nextState.project = unifiedProjects[0]
       }
-      
+
       return nextState as BuilderState
     }),
 
@@ -637,7 +646,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
     const { project, refreshProjects } = get()
     const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
     if (!token) {
-      console.error('No hay token de sesión')
+      fireToast('No hay sesión activa. Inicia sesión primero.', 'error')
       return null
     }
 
@@ -705,7 +714,8 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       persist(currentState.project, currentState.selectedDatasetId)
       return effectiveId
     } catch (error) {
-      console.error('Error saving project:', error)
+      const msg = error instanceof Error ? error.message : 'Error desconocido al guardar'
+      fireToast(msg, 'error')
       return null
     } finally {
       set({ isGenerating: false })

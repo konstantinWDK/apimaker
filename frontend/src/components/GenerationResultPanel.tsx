@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import type { GenerationResult } from '../types/schemas'
 import { readBackendConfig } from '../lib/backendConfig'
+import { useToast } from './Toast'
 
 interface Props {
   result: GenerationResult
@@ -14,6 +15,7 @@ export function GenerationResultPanel({ result, projectId }: Props) {
   const [sharing, setSharing] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(result.shareUrl || null)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const toast = useToast()
 
   useEffect(() => () => {
     if (timeoutRef.current) {
@@ -35,6 +37,8 @@ export function GenerationResultPanel({ result, projectId }: Props) {
   }
 
   const [shareError, setShareError] = useState<string | null>(null)
+  const [sharePassword, setSharePassword] = useState<string | null>(null)
+  const [showPasswordInput, setShowPasswordInput] = useState(false)
 
   const handleCreateShare = async () => {
     setSharing(true)
@@ -58,7 +62,7 @@ export function GenerationResultPanel({ result, projectId }: Props) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ expires_days: 30 }),
+        body: JSON.stringify({ expires_days: 30, password: sharePassword || undefined }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -86,7 +90,7 @@ export function GenerationResultPanel({ result, projectId }: Props) {
       let token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
 
       if (!token) {
-        alert('No hay sesión activa. Inicia sesión primero para descargar el bundle.')
+        toast('No hay sesión activa. Inicia sesión primero para descargar el bundle.', 'error')
         setDownloading(false)
         return
       }
@@ -98,7 +102,7 @@ export function GenerationResultPanel({ result, projectId }: Props) {
       if (!res.ok) {
         const errText = await res.text()
         console.error('[Download] Download failed:', res.status, errText)
-        alert(`Error al descargar: ${res.status} - ${errText}`)
+        toast(`Error al descargar: ${res.status}`, 'error')
         setDownloading(false)
         return
       }
@@ -107,7 +111,7 @@ export function GenerationResultPanel({ result, projectId }: Props) {
       triggerDownload(blob, `${projectId}-bundle.zip`)
     } catch (err) {
       console.error('[Download] Exception:', err)
-      alert('Error de conexión. Asegúrate de que el backend está activo.')
+      toast('Error de conexión. Asegúrate de que el backend está activo.', 'error')
     } finally {
       setDownloading(false)
     }
@@ -158,19 +162,59 @@ export function GenerationResultPanel({ result, projectId }: Props) {
         <p className="label">Enlace compartible</p>
         {shareError && <p className="error-text" style={{ fontSize: '0.82rem' }}>{shareError}</p>}
         {!shareUrl ? (
-          <button
-            type="button"
-            className="btn ghost btn-small btn-full"
-            onClick={handleCreateShare}
-            disabled={sharing}
-          >
-            {sharing ? 'Creando enlace...' : 'Crear enlace para compartir'}
-          </button>
+          <>
+            {!showPasswordInput ? (
+              <div className="share-actions">
+                <button
+                  type="button"
+                  className="btn ghost btn-small btn-full"
+                  onClick={handleCreateShare}
+                  disabled={sharing}
+                >
+                  {sharing ? 'Creando enlace...' : 'Crear enlace público'}
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost btn-small btn-full"
+                  onClick={() => setShowPasswordInput(true)}
+                  style={{ marginTop: '0.25rem' }}
+                >
+                  Con contraseña
+                </button>
+              </div>
+            ) : (
+              <div className="share-password-form">
+                <input
+                  type="password"
+                  placeholder="Contraseña (opcional)"
+                  value={sharePassword || ''}
+                  onChange={e => setSharePassword(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleCreateShare()}
+                />
+                <button
+                  type="button"
+                  className="btn ghost btn-small btn-full"
+                  onClick={handleCreateShare}
+                  disabled={sharing}
+                >
+                  {sharing ? 'Creando enlace...' : 'Crear enlace protegido'}
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost btn-small"
+                  onClick={() => { setShowPasswordInput(false); setSharePassword(null); }}
+                  style={{ fontSize: '0.8rem' }}
+                >
+                  ← Público
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <div className="share-input">
             <input type="text" value={shareUrl} readOnly />
             <button type="button" className="btn ghost btn-small" onClick={handleCopyShare}>
-              {copied ? '✓' : 'Copiar'}
+              {copied ? 'Copiado' : 'Copiar'}
             </button>
           </div>
         )}
