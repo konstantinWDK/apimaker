@@ -74,15 +74,14 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
 
   return (
     <aside className="sidebar">
-      <div className="sidebar__project-header">
-        <h1 className="sidebar__h1-title">{project.name || 'Nuevo Proyecto'}</h1>
-        <p className="sidebar__subtitle">Stack: {project.targetStack}</p>
-        
-      </div>
-
       <div className="sidebar__section">
         <p className="sidebar__section-title">Información del Proyecto</p>
         <div className="sidebar__status-card" style={{ padding: '1rem' }}>
+          <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #f1f5f9' }}>
+            <h1 className="sidebar__h1-title">{project.name || 'Nuevo Proyecto'}</h1>
+            <p className="sidebar__subtitle" style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: '#64748b' }}>Stack: {project.targetStack}</p>
+          </div>
+
           <dl className="sidebar__stats" style={{ margin: 0 }}>
             <div>
               <dt>Tablas</dt>
