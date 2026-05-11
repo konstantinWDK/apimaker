@@ -3578,6 +3578,13 @@ input[type='password'] {
   border-radius: 999px;
 }
 
+.schema-diagram__delete {
+  background: none; border: none; cursor: pointer; padding: 0.2rem;
+  color: #94a3b8; border-radius: 4px; line-height: 1; flex-shrink: 0;
+  margin-left: 0.35rem;
+}
+.schema-diagram__delete:hover { color: #dc2626; background: #fef2f2; }
+
 .schema-diagram__fields {
   padding: 0.25rem 0;
 }

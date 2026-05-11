@@ -309,6 +309,12 @@ export function App() {
               <SchemaDiagram
                 datasets={project.datasets}
                 onDatasetClick={(id) => { setSelectedDatasetId(id); setEditingDatasetId(id); setIsImportingDB(false); }}
+                onDeleteDataset={(id) => {
+                  if (confirm('Eliminar este dataset? Esta accion no se puede deshacer.')) {
+                    removeDataset(id)
+                    if (selectedDatasetId === id) setSelectedDatasetId(project.datasets.filter(d => d.id !== id)[0]?.id || null)
+                  }
+                }}
                 activeDatasetId={selectedDatasetId}
               />
             </SectionCard>

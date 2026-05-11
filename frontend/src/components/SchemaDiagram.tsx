@@ -3,6 +3,7 @@ import type { DatasetMeta } from '../types/schemas'
 interface Props {
   datasets: DatasetMeta[]
   onDatasetClick?: (id: string) => void
+  onDeleteDataset?: (id: string) => void
   activeDatasetId?: string | null
 }
 
@@ -47,6 +48,16 @@ export function SchemaDiagram({ datasets, onDatasetClick, activeDatasetId }: Pro
           <div className="schema-diagram__header">
             <span className="schema-diagram__name">{dataset.name}</span>
             <span className="schema-diagram__count">{dataset.fields.length} campos</span>
+            {onDeleteDataset && (
+              <button
+                type="button"
+                className="schema-diagram__delete"
+                onClick={(e) => { e.stopPropagation(); onDeleteDataset(dataset.id); }}
+                title="Eliminar dataset"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+              </button>
+            )}
           </div>
 
           {/* Fields list */}
