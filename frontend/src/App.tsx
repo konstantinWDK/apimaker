@@ -5,7 +5,6 @@ import { ApiUsagePanel } from './components/ApiUsagePanel'
 import { BackendSyncCard } from './components/BackendSyncCard'
 import { DatabaseImportPanel } from './components/DatabaseImportPanel'
 import { EndpointDesigner } from './components/EndpointDesigner'
-import { EndpointGallery } from './components/EndpointGallery'
 import { GenerationResultPanel } from './components/GenerationResultPanel'
 import { DatasetEditor } from './components/DatasetEditor'
 import { SchemaDiagram } from './components/SchemaDiagram'
@@ -68,6 +67,8 @@ export function App() {
     saveProject,
     isGenerating,
     setIsGenerating,
+    selectedDatasetId,
+    setSelectedDatasetId,
   } = useProjectBuilder()
 
   if (isShareView) {
@@ -85,8 +86,6 @@ export function App() {
   const [activePage, setActivePage] = useState<'builder' | 'info' | 'usage' | 'config'>('builder')
   const localBaseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'
   const backendBaseUrl = readBackendConfig().baseUrl?.replace(/\/$/, '') || 'http://localhost:8000'
-
-  const { selectedDatasetId, setSelectedDatasetId } = useProjectBuilder()
 
   const performLogout = () => {
     logout()
@@ -183,12 +182,12 @@ export function App() {
   // Load projects from backend on mount
   useEffect(() => {
     refreshProjects()
-  }, [])
+  }, [refreshProjects])
 
   useEffect(() => {
     setResult(project.lastGeneration ?? null)
     setGenerationWarning(null)
-  }, [project.lastGeneration])
+  }, [project.lastGeneration, setResult, setGenerationWarning])
 
   // Update browser title dynamically
   useEffect(() => {
