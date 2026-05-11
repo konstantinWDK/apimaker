@@ -284,9 +284,38 @@ def render_bundle(
             readme_content += "\n## 📦 Datos Iniciales (Seeds)\n"
             readme_content += "Este proyecto incluye un archivo `data.json`. La API importará estos datos automáticamente en el primer arranque si la base de datos está vacía.\n"
 
+        readme_content += "\n## 🚀 Despliegue en la Nube\n\n"
+        readme_content += "### Railway\n"
+        readme_content += "```bash\n"
+        readme_content += "# Instala Railway CLI y ejecuta:\nrailway login\nrailway up\n```\n"
+        readme_content += "Railway detecta automáticamente el Dockerfile incluido en el proyecto.\n\n"
+        readme_content += "### Render\n"
+        readme_content += "1. Sube este repositorio a GitHub\n"
+        readme_content += "2. Conecta tu repo en https://render.com\n"
+        readme_content += "3. Render usará el archivo `deploy/render.yaml` para configurar el servicio automáticamente.\n\n"
+        readme_content += "### Docker Compose (auto-hospedado)\n"
+        readme_content += "```bash\n"
+        readme_content += "docker compose up -d --build\n"
+        readme_content += "```\n"
+
         readme_content += "\n---\n*Generado con ❤️ por API Maker Studio*"
         
         zf.writestr("README.md", readme_content)
+
+        # Add deployment configs
+        deploy_dir = TEMPLATE_DIR / "deploy"
+        if deploy_dir.exists():
+            try:
+                deploy_env = Environment(
+                    loader=FileSystemLoader(str(deploy_dir)),
+                    autoescape=select_autoescape(),
+                )
+                for tpl in deploy_env.list_templates():
+                    target = tpl.replace(".j2", "")
+                    content = deploy_env.get_template(tpl).render(context)
+                    zf.writestr(f"deploy/{target}", content)
+            except Exception:
+                pass
 
     buf.seek(0)
     return buf.getvalue()

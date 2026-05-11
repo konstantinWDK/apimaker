@@ -170,6 +170,42 @@ export function GenerationResultPanel({ result, projectId }: Props) {
             </div>
           </div>
 
+          <div className="deploy-card deploy-options-card">
+            <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.9rem' }}>Despliegue 1-click</h3>
+            <div className="deploy-options">
+              <div className="deploy-option">
+                <div className="deploy-option__icon">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                </div>
+                <div className="deploy-option__info">
+                  <strong>Railway</strong>
+                  <p>Conecta tu repo de GitHub y Railway detecta automaticamente el Dockerfile.</p>
+                </div>
+                <button className="btn ghost btn-sm" onClick={() => handleCopy('railway up')}>railway up</button>
+              </div>
+              <div className="deploy-option">
+                <div className="deploy-option__icon">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+                </div>
+                <div className="deploy-option__info">
+                  <strong>Render</strong>
+                  <p>Usa el archivo <code>deploy/render.yaml</code> incluido en el bundle para deploy automatizado.</p>
+                </div>
+                <a className="btn ghost btn-sm" href="https://render.com/docs/deploy-blueprint" target="_blank" rel="noreferrer">Blueprint</a>
+              </div>
+              <div className="deploy-option">
+                <div className="deploy-option__icon">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                </div>
+                <div className="deploy-option__info">
+                  <strong>Docker Compose</strong>
+                  <p>Usa <code>docker compose up -d</code> para levantar localmente con PostgreSQL.</p>
+                </div>
+                <button className="btn ghost btn-sm" onClick={() => handleCopy('docker compose up -d')}>Copiar</button>
+              </div>
+            </div>
+          </div>
+
           <div className="deploy-card export-card">
             <h3 style={{ margin: '0 0 0.5rem', fontSize: '0.9rem' }}>Exportar / Importar Proyecto</h3>
             <p className="card-desc" style={{ fontSize: '0.8rem', marginBottom: '0.75rem' }}>
@@ -345,6 +381,23 @@ export function GenerationResultPanel({ result, projectId }: Props) {
           display: flex;
           gap: 0.5rem;
         }
+        .deploy-options-card {
+          margin-bottom: 1rem;
+        }
+        .deploy-options {
+          display: flex; flex-direction: column; gap: 0.75rem;
+        }
+        .deploy-option {
+          display: flex; align-items: center; gap: 0.75rem;
+          padding: 0.6rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px;
+          transition: border-color 0.15s;
+        }
+        .deploy-option:hover { border-color: #cbd5e1; }
+        .deploy-option__icon { flex-shrink: 0; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: #f1f5f9; border-radius: 8px; color: #64748b; }
+        .deploy-option__info { flex: 1; min-width: 0; }
+        .deploy-option__info strong { display: block; font-size: 0.85rem; color: #1e293b; }
+        .deploy-option__info p { font-size: 0.75rem; color: #64748b; margin: 0.15rem 0 0; }
+        .deploy-option__info code { font-size: 0.7rem; background: #f1f5f9; padding: 0.1rem 0.3rem; border-radius: 3px; }
       `}</style>
     </div>
   )

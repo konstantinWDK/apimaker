@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: {{ project_name | lower | replace(' ', '-') }}
+    env: docker
+    repo: https://github.com/your-org/your-repo
+    branch: main
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: PORT
+        value: "8000"
+      - key: DATABASE_URL
+        value: sqlite:///./data.db
+      {% if auth_method == 'apikey' %}
+      - key: API_KEY
+        value: {{ api_key }}
+      {% endif %}
+      {% if auth_method == 'jwt' %}
+      - key: JWT_SECRET
+        value: {{ jwt_secret }}
+      {% endif %}
