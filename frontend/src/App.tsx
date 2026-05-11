@@ -523,17 +523,22 @@ export function App() {
             <>
               <header className="app-header">
                 <div className="app-header__main">
-                  <h1 className="page-title">{project.name || 'Nuevo Proyecto'}</h1>
-                  <ProjectForm project={project} onChange={updateProject} />
+                  <div className="app-header__hero">
+                    <div className="app-header__hero-top">
+                      <h1 className="page-title">{project.name || 'Nuevo Proyecto'}</h1>
+                      {project.datasets.length > 0 && (
+                        <div className="dataset-badge">
+                          Dataset activo: <span className="dataset-badge__name">
+                            {project.datasets.find(d => d.id === selectedDatasetId)?.name || project.datasets[0]?.name}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <ProjectForm project={project} onChange={updateProject} />
+                  </div>
                 </div>
               </header>
 
-
-              {selectedDatasetId && project.datasets.find(d => d.id === selectedDatasetId) && (
-                <div className="dataset-badge">
-                  Dataset activo: <span className="dataset-badge__name">{project.datasets.find(d => d.id === selectedDatasetId)?.name}</span>
-                </div>
-              )}
               <div className="tabs">
                 {tabs.map((tab) => (
                   <button

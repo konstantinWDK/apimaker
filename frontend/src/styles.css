@@ -223,17 +223,31 @@ body {
 }
 
 .dataset-badge {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: #64748b;
   font-weight: 500;
   line-height: 1;
-  margin: 0;
-  margin-bottom: -0.3rem;
+  margin: 0.2rem 0 0;
 }
 .dataset-badge__name {
   font-weight: 700;
   color: #1e293b;
 }
+
+.app-header__hero {
+  background: linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%);
+  border: 1px solid #e0e7ff;
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+}
+.app-header__hero-top {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
 .tabs {
   display: inline-flex;
   gap: 0.5rem;

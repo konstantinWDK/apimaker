@@ -498,12 +498,15 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       }
       persist(next, null)
 
+      // Auto-select first dataset
+      const firstDsId = next.datasets.length > 0 ? next.datasets[0].id : null
+
       // Ensure the project list also reflects this new project if it's not already there
       const projects = state.projects.find(p => p.id === next.id)
         ? state.projects
         : [next, ...state.projects]
 
-      return { project: next, projects, history: state.history, mockRunning: false, selectedDatasetId: null }
+      return { project: next, projects, history: state.history, mockRunning: false, selectedDatasetId: firstDsId }
     }),
 
   setGenerationResult: (payload) =>
