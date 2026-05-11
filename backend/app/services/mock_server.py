@@ -143,6 +143,13 @@ async def mock_get(
     try:
         resolved_id = _resolve_project_id(session, project_id)
         project_ds = _mock_data.get(resolved_id)
+
+        # Auto-initialize data from DB if store is empty
+        if project_ds is None or not project_ds:
+            logger.info("Auto-initializing mock data for project %s", resolved_id)
+            start_mock_server_fn(session, resolved_id)
+            project_ds = _mock_data.get(resolved_id)
+
         if project_ds is None or not project_ds:
             raise HTTPException(status_code=404, detail="Mock data not initialized. Start mock server from the dashboard.")
 
@@ -304,6 +311,13 @@ async def mock_post(
     """Mock POST — create a new record."""
     resolved_id = _resolve_project_id(session, project_id)
     project_ds = _mock_data.get(resolved_id)
+
+    # Auto-initialize data from DB if store is empty
+    if project_ds is None or not project_ds:
+        logger.info("Auto-initializing mock data for project %s", resolved_id)
+        start_mock_server_fn(session, resolved_id)
+        project_ds = _mock_data.get(resolved_id)
+
     if project_ds is None or not project_ds:
         raise HTTPException(status_code=404, detail="Mock server not running for this project. Start it first.")
 
