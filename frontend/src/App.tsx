@@ -361,7 +361,7 @@ export function App() {
         )
       case 'webhooks':
         return (
-          <SectionCard title="Webhooks" subtitle="Notifica a URLs externas cuando cambian los datos en el mock server" accent="purple" fullWidth>
+          <SectionCard title="Webhooks" subtitle="Notifica a URLs externas cuando cambian los datos en el mock server" accent="sky" fullWidth>
             <WebhookPanel projectId={project.slug || project.remoteId || project.id} />
           </SectionCard>
         )
@@ -664,7 +664,7 @@ export function App() {
                   </div>
                   <div className="info-stack">
                     <div className="info-stack__head">
-                      <span className="info-stack__dot" style={{ background: '#8b5cf6 }} />
+                      <span className="info-stack__dot" style={{ background: '#8b5cf6' }} />
                       <strong>NestJS</strong>
                       <span className="info-stack__badge">Completo</span>
                     </div>
