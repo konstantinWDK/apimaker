@@ -346,102 +346,84 @@ export function ApiUsagePanel() {
             <svg className="api-usage__deploy-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 3.5h-3v3h3v-3zm0 4h-3v3h3v-3zm-4-4h-3v3h3v-3zm0 4h-3v3h3v-3zm-4-4h-3v3h3v-3zm0 4h-3v3h3v-3zm12 7.5c0 1.4-1.1 2.5-2.5 2.5h-10c-1.4 0-2.5-1.1-2.5-2.5V14h15v1zm-15-2h15v-1h-15v1zm15 3H1.5c-.8 0-1.5.7-1.5 1.5v2c0 .8.7 1.5 1.5 1.5h21c.8 0 1.5-.7 1.5-1.5v-2c0-.8-.7-1.5-1.5-1.5z"/></svg>
             <h3>Docker</h3>
           </div>
-          <p className="muted-text">El bundle incluye un Dockerfile listo.</p>
-          <pre className="api-usage__deploy-code"><code>{`# Desde el bundle descomprimido\ndocker build -t ${project.name.toLowerCase().replace(/[^a-z0-9]/g, '-')} .\ndocker run -p 8000:8000 ${project.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}</code></pre>
+          <p className="muted-text">El bundle incluye un Dockerfile listo para produccion.</p>
+          <pre className="api-usage__deploy-code"><code>{`# Desde el bundle descomprimido
+docker build -t my-api .
+docker run -p 8000:8000 my-api`}</code></pre>
         </div>
         <div className="api-usage__deploy-card">
           <div className="api-usage__deploy-header">
             <svg className="api-usage__deploy-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
             <h3>Docker Compose</h3>
           </div>
-          <p className="muted-text">API + PostgreSQL persistente.</p>
-          <pre className="api-usage__deploy-code"><code>{`version: "3.8"
-services:
-  api:
-    build: .
-    ports: ["8000:8000"]
-    environment:
-      - DATABASE_URL=postgresql+psycopg2://user:pass@db:5432/apimaker
-    depends_on: [db]
-  db:
-    image: postgres:16
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: pass
-      POSTGRES_DB: apimaker
-    volumes: [pgdata:/var/lib/postgresql/data]
-volumes: {pgdata:}`}</code></pre>
+          <p className="muted-text">El bundle incluye <code>docker-compose.yml</code> con API + PostgreSQL.</p>
+          <pre className="api-usage__deploy-code"><code>{`# Desde la carpeta del bundle
+docker compose up -d --build
+
+# La API estara en http://localhost:8000
+# Documentacion en http://localhost:8000/docs`}</code></pre>
         </div>
         <div className="api-usage__deploy-card">
           <div className="api-usage__deploy-header">
-            <svg className="api-usage__deploy-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-            <h3>Reverse Proxy (Nginx)</h3>
+            <svg className="api-usage__deploy-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/></svg>
+            <h3>Railway</h3>
           </div>
-          <p className="muted-text">Configuración recomendada para producción con SSL.</p>
-          <pre className="api-usage__deploy-code"><code>{`server {
-    listen 80;
-    server_name api.tu-dominio.com;
-    location / {
-        proxy_pass http://localhost:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}`}</code></pre>
+          <p className="muted-text">El bundle incluye <code>deploy/railway.json</code>. Conecta tu repo y Railway lo detecta automaticamente.</p>
+          <pre className="api-usage__deploy-code"><code>{`railway login
+railway up`}</code></pre>
+        </div>
+        <div className="api-usage__deploy-card">
+          <div className="api-usage__deploy-header">
+            <svg className="api-usage__deploy-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+            <h3>Render</h3>
+          </div>
+          <p className="muted-text">El bundle incluye <code>deploy/render.yaml</code>. Sube el repo a GitHub y conectalo en Render.</p>
+          <pre className="api-usage__deploy-code"><code>{`1. Sube el proyecto a GitHub
+2. Ve a https://render.com
+3. Nuevo Blueprint > conecta tu repo
+4. Render detecta deploy/render.yaml`}</code></pre>
         </div>
         <div className="api-usage__deploy-card">
           <div className="api-usage__deploy-header">
             <svg className="api-usage__deploy-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
             <h3>CI/CD (GitHub Actions)</h3>
           </div>
-          <p className="muted-text">Automatiza el despliegue al hacer push.</p>
-          <pre className="api-usage__deploy-code"><code>{`jobs:
+          <p className="muted-text">Automatiza el despliegue en tu VPS al hacer push a main.</p>
+          <pre className="api-usage__deploy-code"><code>{`# .github/workflows/deploy.yml
+on: push
+jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Deploy
+      - name: Deploy via SSH
         run: ssh user@host "cd /app && docker compose up -d --build"`}</code></pre>
         </div>
         <div className="api-usage__deploy-card">
           <div className="api-usage__deploy-header">
-            <svg className="api-usage__deploy-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/></svg>
-            <h3>VPS / Cloud</h3>
+            <svg className="api-usage__deploy-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            <h3>VPS / Manual</h3>
           </div>
-          <p className="muted-text">Directo con uvicorn o gunicorn.</p>
-          <pre className="api-usage__deploy-code"><code>{`# Setup
-python3 -m venv /opt/apimaker && source /opt/apimaker/bin/activate
+          <p className="muted-text">Instalacion directa con Python/Node en tu servidor.</p>
+          <pre className="api-usage__deploy-code"><code>{`# FastAPI
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-
-# Dev
 uvicorn main:app --host 0.0.0.0 --port 8000
 
-# Prod
-gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker \\
-  --bind 0.0.0.0:8000`}</code></pre>
-        </div>
-        <div className="api-usage__deploy-card">
-          <div className="api-usage__deploy-header">
-            <svg className="api-usage__deploy-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-            <h3>PaaS</h3>
-          </div>
-          <p className="muted-text">Render, Railway, Fly.io — sube y listo.</p>
-          <pre className="api-usage__deploy-code"><code>{`# Render: pip install -r requirements.txt
-# Start: uvicorn main:app --host 0.0.0.0 --port $PORT
-
-# Railway: auto-detecta requirements.txt
-
-# Fly.io
-fly launch && fly deploy`}</code></pre>
+# Express / NestJS
+npm install
+npm start`}</code></pre>
         </div>
       </div>
       <div className="api-usage__deploy-checklist">
-        <h3>🚀 Checklist de Producción</h3>
+        <h3>Checklist de Produccion</h3>
         <ul className="api-usage__checklist">
           <li><span className="api-usage__checkmark">[X]</span> <strong>Base de Datos:</strong> Usa PostgreSQL persistente en lugar de SQLite.</li>
-          <li><span className="api-usage__checkmark">[X]</span> <strong>Seguridad:</strong> Cambia <code>SECRET_KEY</code> y desactiva <code>DEBUG</code>.</li>
-          <li><span className="api-usage__checkmark">[X]</span> <strong>HTTPS:</strong> Obligatorio. Usa Certbot (Let's Encrypt) o Cloudflare.</li>
-          <li><span className="api-usage__checkmark">[X]</span> <strong>Gunicorn:</strong> Usa un servidor WSGI/ASGI robusto con múltiples workers.</li>
-          <li><span className="api-usage__checkmark">[X]</span> <strong>CORS:</strong> Restringe <code>ALLOW_ORIGINS</code> a tus dominios conocidos.</li>
+          <li><span className="api-usage__checkmark">[X]</span> <strong>Seguridad:</strong> Cambia las claves secretas en el archivo <code>.env</code>.</li>
+          <li><span className="api-usage__checkmark">[X]</span> <strong>HTTPS:</strong> Obligatorio en produccion. Usa Certbot o Cloudflare.</li>
+          <li><span className="api-usage__checkmark">[X]</span> <strong>Workers:</strong> Usa multiples workers para produccion (gunicorn, pm2).</li>
+          <li><span className="api-usage__checkmark">[X]</span> <strong>CORS:</strong> Restringe origenes permitidos en produccion.</li>
+          <li><span className="api-usage__checkmark">[X]</span> <strong>SDK:</strong> Si marcaste "Generar SDK", el bundle incluye clientes TypeScript y Python en <code>sdks/</code>.</li>
         </ul>
       </div>
     </div>
