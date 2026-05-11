@@ -120,24 +120,30 @@ export function ApiUsagePanel() {
     const steps = [
       {
         num: 1,
-        title: 'Inicia sesión',
-        desc: 'Accede con las credenciales por defecto:',
-        code: 'Usuario: admin\nContraseña: admin',
+        title: 'Instala API Maker',
+        desc: 'Ejecuta el instalador desde la terminal. Crea el admin, elige base de datos y carga datos demo:',
+        code: './install.sh\n\n# El Setup Wizard te guia:\n# - Usuario admin (por defecto: admin / admin)\n# - BD: SQLite (sin config) o PostgreSQL\n# - Datos demo: proyecto Pokedex',
       },
       {
         num: 2,
+        title: 'Inicia sesion',
+        desc: 'Accede a http://localhost:5173 con las credenciales configuradas en el wizard:',
+        code: 'Usuario: admin\nContrasena: admin',
+      },
+      {
+        num: 3,
         title: 'Configura tu proyecto',
-        desc: 'Define nombre, descripción y stack tecnológico:',
+        desc: 'Define nombre, descripcion y stack tecnologico:',
         fields: [
           { label: 'Nombre', value: 'API Usuarios Banco' },
-          { label: 'Descripción', value: 'API REST para gestión de clientes bancarios' },
+          { label: 'Descripcion', value: 'API REST para gestion de clientes bancarios' },
           { label: 'Stack', value: 'fastapi' },
         ],
       },
       {
-        num: 3,
+        num: 4,
         title: 'Define el dataset',
-        desc: 'Ve a "Dataset & Vista previa" y añade los campos de tu modelo:',
+        desc: 'Ve a la pestana "Datasets" y anade los campos de tu modelo. Puedes importar desde CSV, Excel o una BD externa:',
         table: [
           { name: 'id_cliente', type: 'integer', req: true },
           { name: 'nombre', type: 'string', req: true },
@@ -149,9 +155,9 @@ export function ApiUsagePanel() {
         ],
       },
       {
-        num: 4,
-        title: 'Diseña los endpoints',
-        desc: 'En "Endpoints & Simulador" añade las rutas REST:',
+        num: 5,
+        title: 'Disena los endpoints',
+        desc: 'En la pestana "Endpoints" anade las rutas REST. Cada endpoint se vincula a un dataset:',
         endpoints: [
           { method: 'GET', path: '/clientes', summary: 'Listar todos los clientes' },
           { method: 'GET', path: '/clientes/{id}', summary: 'Obtener un cliente por ID' },
@@ -161,37 +167,37 @@ export function ApiUsagePanel() {
         ],
       },
       {
-        num: 5,
-        title: 'Prueba en el simulador',
-        desc: 'Selecciona un endpoint y pulsa "Probar API local" para ver datos de ejemplo generados automáticamente. No necesitas backend.',
-      },
-      {
         num: 6,
-        title: 'Genera la API',
-        desc: 'Pulsa el botón azul "Actualizar API" para generar sandbox URL, documentación Redoc y enlace compartible.',
-        action: { label: 'Ver Sandbox y Endpoints', tab: 'codigo' as UsageTab }
+        title: 'Prueba en el Simulador',
+        desc: 'En la pestana "Simulador", lanza el mock server y prueba tus endpoints con datos realistas generados automaticamente. No necesitas backend externo.',
       },
       {
         num: 7,
-        title: 'Sincroniza y descarga',
-        desc: 'En "Payload & Entrega", sincroniza con el backend y descarga el bundle.zip con código listo para desplegar.',
-        action: { label: 'Ver guía de Despliegue', tab: 'desplegar' as UsageTab }
+        title: 'Configura Seguridad',
+        desc: 'En la pestana "Seguridad" elige autenticacion (JWT, API Key), rate limiting y configura secretos. Todo se incluye en el codigo generado.',
       },
       {
         num: 8,
-        title: 'Colaboración y Share Links',
-        desc: 'Genera un "Share Link" para que clientes o compañeros puedan probar la API y ver la documentación sin necesidad de tener cuenta.',
+        title: 'Genera la API',
+        desc: 'Pulsa el boton "Guardar y lanzar API" para sincronizar con el backend y generar el bundle. Obtendras URL del sandbox, docs Redoc y share link.',
+        action: { label: 'Ver ejemplos de codigo', tab: 'codigo' as UsageTab }
       },
       {
         num: 9,
-        title: 'Seguridad y Administración',
-        desc: 'Configura las credenciales del builder y protege tus proyectos. Sincroniza con PostgreSQL para persistencia real.',
+        title: 'Descarga el bundle',
+        desc: 'En la pestana "API generada" encontraras el bundle .zip con codigo listo para produccion: modelos, controladores, Docker, seeds, tests y SDKs.',
+        action: { label: 'Ver guia de Despliegue', tab: 'desplegar' as UsageTab }
       },
       {
         num: 10,
-        title: 'Despliega',
-        desc: 'Descomprime el bundle y despliega:',
-        code: 'docker build -t api-usuarios-banco .\ndocker run -p 8000:8000 api-usuarios-banco',
+        title: 'Comparte y versiona',
+        desc: 'Usa el panel de Versiones para guardar snapshots del proyecto. Genera Share Links con contrasena y expiracion para compartir sin exponer el editor.',
+      },
+      {
+        num: 11,
+        title: 'Despliega a produccion',
+        desc: 'Descomprime el bundle y elige tu plataforma:',
+        code: '# Docker\ncd bundle && docker compose up -d --build\n\n# Railway\nrailway up\n\n# VPS manual\npip install -r requirements.txt\nuvicorn main:app --host 0.0.0.0 --port 8000',
       },
     ]
 
