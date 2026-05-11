@@ -18,7 +18,7 @@ from fastapi import FastAPI, HTTPException, Query, Request, Depends, Security
 from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from sqlalchemy import create_engine, ForeignKey
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, relationship, joinedload
 import jwt
 
 # ─── Configuration ───────────────────────────────────────────────
@@ -144,21 +144,42 @@ def startup():
 
 # ─── Endpoints ───────────────────────────────────────────────────
 {% for ep in endpoints %}
-{% set target_ds = None %}
-{% for ds in datasets %}
-  {% if ds.id == ep.target_dataset_id or (not ep.target_dataset_id and loop.first) %}
-    {% set target_ds = ds %}
-  {% endif %}
-{% endfor %}
-
+{% set target_ds = ep.target_dataset %}
 {% if target_ds %}
 {% set model_name = target_ds.name | capitalize | replace(" ", "") %}
 {# --- LIST --- #}
 {% if ep.operation_type == "list" %}
-@app.get("{{ ep.path }}", response_model=List[{{ model_name }}Response], dependencies=[Depends(verify_auth)])
-async def {{ ep.name | lower | replace(" ", "_") }}(skip: int = 0, limit: int = 100):
+@app.get("{{ ep.path }}", dependencies=[Depends(verify_auth)])
+async def {{ ep.name | lower | replace(" ", "_") }}(
+    page: int = Query(1, ge=1),
+    limit: int = Query(100, ge=1, le=1000),
+    include: str = Query(None, description="Comma-separated relations to eager-load"),
+    {% for f in target_ds.fields %}
+    {{ f.name }}: Optional[{{ f.python_type }}] = Query(None),
+    {% endfor %}
+):
     with get_db() as db:
-        return db.query({{ model_name }}Record).offset(skip).limit(limit).all()
+        query = db.query({{ model_name }}Record)
+        {% for f in target_ds.fields %}
+        if {{ f.name }} is not None:
+            query = query.filter({{ model_name }}Record.{{ f.name }} == {{ f.name }})
+        {% endfor %}
+        if include:
+            for name in include.split(","):
+                name = name.strip()
+                {% for field in target_ds.fields %}
+                {% if field.references %}
+                if name == "{{ field.references.dataset_name | lower }}":
+                    query = query.options(joinedload({{ model_name }}Record.{{ field.name }}_rel))
+                {% endif %}
+                {% endfor %}
+                {% for ref in target_ds.referenced_by %}
+                if name == "{{ ref.dataset_name | lower }}":
+                    query = query.options(joinedload({{ model_name }}Record.{{ ref.dataset_name | lower | replace(" ", "_") }}_items))
+                {% endfor %}
+        total = query.count()
+        items = query.offset((page - 1) * limit).limit(limit).all()
+        return {"data": items, "total": total, "page": page, "pages": (total + limit - 1) // limit}
 
 {# --- GET --- #}
 {% elif ep.operation_type == "get" %}

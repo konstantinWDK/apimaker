@@ -132,6 +132,7 @@ def _build_context(
             "fields": ds_fields,
             "sample_rows": [],
             "referenced_by": reverse_refs.get(ds.id, []),
+            "filterable_fields": [f["name"] for f in ds_fields],
         }
         
         if ds.sample_rows:
@@ -142,6 +143,9 @@ def _build_context(
         
         processed_datasets.append(ds_ctx)
 
+    # Build dataset lookup by ID so endpoints can reference their target dataset directly
+    dataset_lookup = {d["id"]: d for d in processed_datasets}
+
     endpoints_context = [
         {
             "id": ep.id,
@@ -151,6 +155,7 @@ def _build_context(
             "summary": ep.summary,
             "operation_type": ep.operation_type or "custom",
             "target_dataset_id": ep.target_dataset_id,
+            "target_dataset": dataset_lookup.get(ep.target_dataset_id),
         }
         for ep in endpoints
     ]
@@ -215,6 +220,7 @@ def render_bundle(
                 ("docker-compose.yml.j2", "docker-compose.yml"),
                 ("setup.sh.j2", "setup.sh"),
                 ("env.example.j2", ".env.example"),
+                ("ci.yml.j2", ".github/workflows/ci.yml"),
             ]
         elif stack == "express":
             files_to_render = [
@@ -224,6 +230,7 @@ def render_bundle(
                 ("docker-compose.yml.j2", "docker-compose.yml"),
                 ("setup.sh.j2", "setup.sh"),
                 ("env.example.j2", ".env.example"),
+                ("ci.yml.j2", ".github/workflows/ci.yml"),
             ]
         elif stack == "nest":
             files_to_render = [
@@ -236,6 +243,7 @@ def render_bundle(
                 ("docker-compose.yml.j2", "docker-compose.yml"),
                 ("setup.sh.j2", "setup.sh"),
                 ("env.example.j2", ".env.example"),
+                ("ci.yml.j2", ".github/workflows/ci.yml"),
             ]
 
         for tpl_name, target_name in files_to_render:

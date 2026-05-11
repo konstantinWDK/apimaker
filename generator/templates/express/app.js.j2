@@ -140,7 +140,7 @@ function errorHandler(err, req, res, next) {
 }
 
 // ─── CRUD Route Builder ────────────────────────────────────────
-function buildCrudRoutes(model, modelName, basePath, operationTypes) {
+function buildCrudRoutes(model, modelName, basePath, operationTypes, opts = {}) {
   const router = express.Router();
   router.use(verifyAuth);
 
@@ -153,19 +153,44 @@ function buildCrudRoutes(model, modelName, basePath, operationTypes) {
       summary: `List all ${modelName}`,
       tags: [modelName],
       parameters: [
-        { name: 'skip', in: 'query', schema: { type: 'integer' }, description: 'Records to skip' },
-        { name: 'limit', in: 'query', schema: { type: 'integer' }, description: 'Max records to return' },
+        { name: 'page', in: 'query', schema: { type: 'integer' }, description: 'Page number (1-based)' },
+        { name: 'limit', in: 'query', schema: { type: 'integer' }, description: 'Max records per page' },
+        { name: 'include', in: 'query', schema: { type: 'string' }, description: 'Comma-separated relations to include' },
       ],
-      responses: { 200: { description: `Array of ${modelName}` } },
+      responses: { 200: { description: `Paginated ${modelName} list` } },
     };
     router.get('/', async (req, res, next) => {
       try {
-        const skip = parseInt(req.query.skip) || 0;
+        const page = Math.max(parseInt(req.query.page) || 1, 1);
         const limit = Math.min(parseInt(req.query.limit) || 100, 1000);
-        const items = await model.findAll({ offset: skip, limit });
-        res.json(items);
+        const offset = (page - 1) * limit;
+
+        // Dynamic filters from query params matching model fields
+        const where = {};
+        const filterable = opts.filterableFields || [];
+        for (const key of Object.keys(req.query)) {
+          if (filterable.includes(key) && !['page', 'limit', 'include'].includes(key)) {
+            where[key] = req.query[key];
+          }
+        }
+
+        // Eager loading via ?include=relation1,relation2
+        const include = [];
+        if (req.query.include) {
+          const requested = req.query.include.split(',').map(s => s.trim());
+          for (const name of (opts.forwardIncludes || [])) {
+            if (requested.includes(name)) include.push({ association: name });
+          }
+          for (const name of (opts.reverseIncludes || [])) {
+            if (requested.includes(name)) include.push({ association: name });
+          }
+        }
+
+        const { count, rows } = await model.findAndCountAll({ where, offset, limit, include });
+        res.json({ data: rows, total: count, page, pages: Math.ceil(count / limit) });
       } catch (err) { next(err); }
     });
+  }
   }
 
   if (operationTypes.includes('get')) {
@@ -239,12 +264,7 @@ function buildCrudRoutes(model, modelName, basePath, operationTypes) {
 
 // ─── Register Routes per Endpoint ──────────────────────────────
 {% for ep in endpoints %}
-{% set target_ds = None %}
-{% for ds in datasets %}
-  {% if ds.id == ep.target_dataset_id or (not ep.target_dataset_id and loop.first) %}
-    {% set target_ds = ds %}
-  {% endif %}
-{% endfor %}
+{% set target_ds = ep.target_dataset %}
 {% if target_ds %}
 {% set model_name = target_ds.name | capitalize | replace(" ", "") %}
 // Endpoint: {{ ep.name }} ({{ ep.operation_type }}) @ {{ ep.path }}
@@ -256,7 +276,11 @@ app.{{ ep.method | lower }}('{{ ep.path }}', verifyAuth, async (req, res, next) 
   } catch (err) { next(err); }
 });
 {% else %}
-buildCrudRoutes({{ model_name }}, '{{ model_name }}', '{{ ep.path }}', ['{{ ep.operation_type }}']);
+buildCrudRoutes({{ model_name }}, '{{ model_name }}', '{{ ep.path }}', ['{{ ep.operation_type }}'], {
+  filterableFields: [{% for f in target_ds.fields %}'{{ f.name }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+  forwardIncludes: [{% for field in target_ds.fields %}{% if field.references %}'{{ field.references.dataset_name | lower }}'{% if not loop.last %}, {% endif %}{% endif %}{% endfor %}],
+  reverseIncludes: [{% for ref in target_ds.referenced_by %}'{{ ref.dataset_name | lower }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+});
 {% endif %}
 {% endif %}
 {% endfor %}

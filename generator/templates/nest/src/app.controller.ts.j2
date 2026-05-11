@@ -3,7 +3,7 @@ import {
   UseGuards, HttpException, HttpStatus, Injectable, NestMiddleware,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, FindManyOptions } from 'typeorm';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader, ApiQuery } from '@nestjs/swagger';
 import * as jwt from 'jsonwebtoken';
 
@@ -74,15 +74,49 @@ export class {{ model_name }}Controller {
 
   @Get('{{ ds.name | lower | replace(" ", "_") }}')
   @ApiOperation({ summary: 'List all {{ model_name }}' })
-  @ApiQuery({ name: 'skip', required: false, type: Number })
+  @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'include', required: false, type: String, description: 'Comma-separated relations' })
 {% if auth_method == 'jwt' %}
   @ApiBearerAuth()
 {% elif auth_method == 'apikey' %}
   @ApiHeader({ name: 'X-API-Key', required: true })
 {% endif %}
-  async findAll(@Query('skip') skip?: number, @Query('limit') limit?: number) {
-    return this.repo.find({ skip: skip || 0, take: Math.min(limit || 100, 1000) });
+  async findAll(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('include') include?: string,
+    @Query() filters?: any,
+  ) {
+    const pg = Math.max(page || 1, 1);
+    const lim = Math.min(limit || 100, 1000);
+    const where: any = {};
+    const filterable = [{% for f in ds.fields %}'{{ f.name }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+    for (const key of Object.keys(filters)) {
+      if (filterable.includes(key) && !['page', 'limit', 'include'].includes(key)) {
+        where[key] = filters[key];
+      }
+    }
+    const relations: string[] = [];
+    if (include) {
+      const requested = include.split(',').map(s => s.trim());
+      {% for field in ds.fields %}
+      {% if field.references %}
+      if (requested.includes('{{ field.references.dataset_name | lower }}')) {
+        relations.push('{{ field.references.dataset_name | lower }}');
+      }
+      {% endif %}
+      {% endfor %}
+      {% for ref in ds.referenced_by %}
+      if (requested.includes('{{ ref.dataset_name | lower }}')) {
+        relations.push('{{ ref.dataset_name | lower | replace(" ", "_") }}Items');
+      }
+      {% endfor %}
+    }
+    const [data, total] = await this.repo.findAndCount({
+      where, skip: (pg - 1) * lim, take: lim, relations,
+    });
+    return { data, total, page: pg, pages: Math.ceil(total / lim) };
   }
 
   @Get('{{ ds.name | lower | replace(" ", "_") }}/:id')

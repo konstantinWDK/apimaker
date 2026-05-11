@@ -14,8 +14,8 @@ def _make_sample_data():
                 "saved_requests": None,
             })(),
             "fields": [
-                type("obj", (object,), {"name": "name", "field_type": "string", "required": True, "description": "Full name"})(),
-                type("obj", (object,), {"name": "email", "field_type": "string", "required": True, "description": "Email address"})(),
+                type("obj", (object,), {"name": "name", "field_type": "string", "required": True, "description": "Full name", "references": None})(),
+                type("obj", (object,), {"name": "email", "field_type": "string", "required": True, "description": "Email address", "references": None})(),
             ],
         }
     ]
