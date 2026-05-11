@@ -358,24 +358,41 @@ export function App() {
           </div>
         )
       case 'result':
-        return effectiveResult ? (
-          <SectionCard title="Proyecto Generado" subtitle="Descarga el código fuente completo listo para producción" accent="emerald" fullWidth>
+        return (
+          <SectionCard title="Proyecto Generado" subtitle={effectiveResult ? "Descarga el código fuente completo listo para producción" : "Configura las opciones y genera tu API"} accent="emerald" fullWidth>
             <div className="generation-result-flow">
-              <GenerationResultPanel 
-                result={effectiveResult} 
-                projectId={project.slug || project.remoteId || project.id} 
-              />
-              
-              <div className="deployment-notice">
-                <p>Este bundle contiene la arquitectura completa (modelos, controladores, seguridad y Docker) para el stack <strong>{project.targetStack.toUpperCase()}</strong>.</p>
+              {/* Generation options - always visible */}
+              <div className="gen-options">
+                <p className="gen-options__title">Opciones de generación</p>
+                <div className="gen-options__checks">
+                  <label className="checkbox-label">
+                    <input type="checkbox" checked={project.includeData !== false} onChange={(e) => updateProject({ includeData: e.target.checked })} />
+                    Incluir datos de ejemplo (seeds)
+                  </label>
+                  <label className="checkbox-label">
+                    <input type="checkbox" checked={project.includeSdk !== false} onChange={(e) => updateProject({ includeSdk: e.target.checked })} />
+                    Generar SDK (TypeScript + Python)
+                  </label>
+                </div>
               </div>
-            </div>
-          </SectionCard>
-        ) : (
-          <SectionCard title="API generada" subtitle="Tu sandbox aparecerá aquí" fullWidth>
-            <div className="empty-state">
-              <p className="muted-text">Genera la API en la vista principal para ver los detalles.</p>
-              <button type="button" className="btn ghost btn-small" onClick={handleGenerate}>Generar ahora</button>
+
+              {effectiveResult ? (
+                <>
+                  <GenerationResultPanel 
+                    result={effectiveResult} 
+                    projectId={project.slug || project.remoteId || project.id} 
+                  />
+                  
+                  <div className="deployment-notice">
+                    <p>Este bundle contiene la arquitectura completa (modelos, controladores, seguridad y Docker) para el stack <strong>{project.targetStack.toUpperCase()}</strong>.</p>
+                  </div>
+                </>
+              ) : (
+                <div className="empty-state">
+                  <p className="muted-text">Genera la API en la vista principal para ver los detalles.</p>
+                  <button type="button" className="btn ghost btn-small" onClick={handleGenerate}>Generar ahora</button>
+                </div>
+              )}
             </div>
           </SectionCard>
         )
