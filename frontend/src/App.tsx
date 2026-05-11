@@ -79,6 +79,7 @@ export function App() {
   const [showSuccess, setShowSuccess] = useState(false)
   const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'security' | 'simulator' | 'delivery' | 'result' | 'webhooks'>('datasets')
   const [isImportingDB, setIsImportingDB] = useState(false)
+  const [editingDatasetId, setEditingDatasetId] = useState<string | null>(null)
   const [activePage, setActivePage] = useState<'builder' | 'info' | 'usage' | 'config'>('builder')
   const localBaseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'
   const backendBaseUrl = readBackendConfig().baseUrl?.replace(/\/$/, '') || 'http://localhost:8000'
@@ -221,50 +222,67 @@ export function App() {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'datasets':
-        const currentDataset = project.datasets.find(d => d.id === selectedDatasetId) || project.datasets[0]
-        return (
-          <div className="datasets-tab-new">
-            {/* Schema diagram overview */}
-            <SectionCard title="Modelo de Datos" subtitle={`${project.datasets.length} dataset(s) — Vista general del esquema`} accent="emerald" fullWidth>
-              <SchemaDiagram
-                datasets={project.datasets}
-                onDatasetClick={(id) => { setSelectedDatasetId(id); setIsImportingDB(false); }}
-                activeDatasetId={selectedDatasetId}
-              />
-            </SectionCard>
+        const currentDataset = project.datasets.find(d => d.id === (editingDatasetId || selectedDatasetId)) || project.datasets[0]
 
-            {/* Dataset editor for selected dataset */}
-            {currentDataset ? (
-              <SectionCard title={`${currentDataset.name}`} subtitle="Editar esquema y datos" accent="sky" fullWidth>
+        // Editing mode: show breadcrumb + editor
+        if (editingDatasetId && currentDataset) {
+          return (
+            <div className="datasets-tab-new">
+              <div className="dataset-breadcrumb">
+                <button type="button" className="dataset-breadcrumb__link" onClick={() => { setEditingDatasetId(null); setIsImportingDB(false); }}>
+                  Datasets
+                </button>
+                <span className="dataset-breadcrumb__sep">&gt;</span>
+                <span className="dataset-breadcrumb__current">Edicion: {currentDataset.name}</span>
+              </div>
+              <SectionCard title={currentDataset.name} subtitle="Editar esquema y datos" accent="sky" fullWidth>
                 <DatasetEditor
                   dataset={currentDataset}
                   onCommit={upsertDataset}
                   otherDatasets={project.datasets.filter(d => d.id !== currentDataset.id)}
                 />
               </SectionCard>
-            ) : (
+            </div>
+          )
+        }
+
+        // Overview mode: diagram + actions
+        return (
+          <div className="datasets-tab-new">
+            {/* Action bar at top */}
+            <div className="datasets-action-bar">
+              <button type="button" className="btn primary" onClick={() => {
+                const newId = crypto.randomUUID()
+                upsertDataset({
+                  id: newId,
+                  name: `Tabla ${project.datasets.length + 1}`,
+                  sourceType: 'manual',
+                  fields: [{ id: crypto.randomUUID(), name: 'id', type: 'integer', required: true, isPrimaryKey: true }],
+                  sampleRows: []
+                })
+                setEditingDatasetId(newId)
+              }}>
+                + Nuevo dataset
+              </button>
+              <button type="button" className="btn ghost" onClick={() => setIsImportingDB(!isImportingDB)}>
+                {isImportingDB ? 'Cerrar importacion' : 'Importar desde BD'}
+              </button>
+            </div>
+
+            {/* Schema diagram overview */}
+            <SectionCard title="Modelo de Datos" subtitle={`${project.datasets.length} dataset(s) — Vista general del esquema`} accent="emerald" fullWidth>
+              <SchemaDiagram
+                datasets={project.datasets}
+                onDatasetClick={(id) => { setSelectedDatasetId(id); setEditingDatasetId(id); setIsImportingDB(false); }}
+                activeDatasetId={selectedDatasetId}
+              />
+            </SectionCard>
+
+            {/* Empty state when no datasets */}
+            {project.datasets.length === 0 && (
               <SectionCard title="Datasets" subtitle="Crea tu primer dataset" accent="sky" fullWidth>
                 <div className="empty-state">
-                  <p className="muted-text">Añade un dataset para empezar a diseñar tu API.</p>
-                  <button type="button" className="btn primary" onClick={() => {
-                    const newId = crypto.randomUUID()
-                    upsertDataset({
-                      id: newId,
-                      name: 'Usuarios',
-                      sourceType: 'manual',
-                      icon: '',
-                      description: 'Usuarios del sistema',
-                      fields: [
-                        { id: crypto.randomUUID(), name: 'id', type: 'integer', required: true, isPrimaryKey: true, fakerCategory: 'number' },
-                        { id: crypto.randomUUID(), name: 'nombre', type: 'string', required: true, fakerCategory: 'name' },
-                        { id: crypto.randomUUID(), name: 'email', type: 'email', required: true, fakerCategory: 'email' },
-                      ],
-                      sampleRows: []
-                    })
-                    setSelectedDatasetId(newId)
-                  }}>
-                    + Crear dataset de ejemplo
-                  </button>
+                  <p className="muted-text">Aun no hay datasets. Usa "+ Nuevo dataset" para empezar.</p>
                 </div>
               </SectionCard>
             )}
@@ -283,33 +301,13 @@ export function App() {
                       upsertEndpoint({ id: crypto.randomUUID(), name: 'Actualizar ' + ds.name, method: 'PUT', path: basePath + '/{id}', summary: 'Actualizar registro de ' + ds.name, operationType: 'update', targetDatasetId: ds.id })
                       upsertEndpoint({ id: crypto.randomUUID(), name: 'Eliminar ' + ds.name, method: 'DELETE', path: basePath + '/{id}', summary: 'Eliminar registro de ' + ds.name, operationType: 'delete', targetDatasetId: ds.id })
                     })
-                    if (newDatasets.length > 0) setSelectedDatasetId(newDatasets[0].id)
+                    if (newDatasets.length > 0) { setSelectedDatasetId(newDatasets[0].id); setEditingDatasetId(newDatasets[0].id); }
                     setIsImportingDB(false)
                   }}
                   onCancel={() => setIsImportingDB(false)}
                 />
               </SectionCard>
             )}
-
-            {/* Add dataset button bar */}
-            <div className="datasets-action-bar">
-              <button type="button" className="btn ghost" onClick={() => {
-                const newId = crypto.randomUUID()
-                upsertDataset({
-                  id: newId,
-                  name: `Tabla ${project.datasets.length + 1}`,
-                  sourceType: 'manual',
-                  fields: [{ id: crypto.randomUUID(), name: 'id', type: 'integer', required: true, isPrimaryKey: true }],
-                  sampleRows: []
-                })
-                setSelectedDatasetId(newId)
-              }}>
-                + Nuevo dataset
-              </button>
-              <button type="button" className="btn ghost" onClick={() => setIsImportingDB(!isImportingDB)}>
-                {isImportingDB ? 'Cerrar importacion' : 'Importar desde BD'}
-              </button>
-            </div>
           </div>
         )
       case 'endpoints':

@@ -234,6 +234,18 @@ body {
   color: #1e293b;
 }
 
+.dataset-breadcrumb {
+  display: flex; align-items: center; gap: 0.5rem;
+  margin-bottom: 1rem; font-size: 0.85rem;
+}
+.dataset-breadcrumb__link {
+  background: none; border: none; color: #3b82f6; cursor: pointer;
+  font-size: 0.85rem; font-weight: 500; padding: 0;
+}
+.dataset-breadcrumb__link:hover { text-decoration: underline; }
+.dataset-breadcrumb__sep { color: #94a3b8; font-weight: 300; }
+.dataset-breadcrumb__current { color: #1e293b; font-weight: 600; }
+
 .app-header__hero {
   background: linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%);
   border: 1px solid #e0e7ff;
