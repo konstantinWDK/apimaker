@@ -14,6 +14,7 @@ from sqlmodel import Session, select
 
 from ..db import get_session
 from ..db_models import Dataset, DatasetField, Endpoint, Project
+from ..routers.webhooks import dispatch_webhooks
 
 
 # In-memory mock data store: _mock_data[project_id][dataset_id] = list[dict]
@@ -314,6 +315,8 @@ async def mock_post(
 
     new_item = {"_id": str(uuid4())[:8], "id": len(store) + 1, **body, "created_at": datetime.utcnow().isoformat()}
     store.append(new_item)
+    # Dispatch webhook
+    await dispatch_webhooks(session, str(resolved_id), "create", new_item)
     return new_item
 
 
@@ -345,8 +348,10 @@ async def mock_put(
     for ds_id, store in project_ds.items():
         for i, item in enumerate(store):
             if item.get("_id") == item_id or str(item.get("id")) == str(item_id):
-                store[i] = {"_id": item_id, **body}
-                return store[i]
+                updated = {"_id": item_id, **body}
+                store[i] = updated
+                await dispatch_webhooks(session, str(resolved_id), "update", updated)
+                return updated
 
     raise HTTPException(status_code=404, detail="Not found")
 
@@ -373,7 +378,8 @@ async def mock_delete(
     for ds_id, store in project_ds.items():
         for i, item in enumerate(store):
             if item.get("_id") == item_id or str(item.get("id")) == str(item_id):
-                store.pop(i)
+                removed = store.pop(i)
+                await dispatch_webhooks(session, str(resolved_id), "delete", removed)
                 return
 
     raise HTTPException(status_code=404, detail="Not found")

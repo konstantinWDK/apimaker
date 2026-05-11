@@ -10,6 +10,7 @@ from .config import get_settings
 from .db import create_db_and_tables, get_database_info
 from .routers import admin as admin_router
 from .routers import auth, mock as mock_ctrl_router, projects, share as share_router, db
+from .routers import webhooks as webhooks_router
 from .services.mock_server import router as mock_api_router
 
 
@@ -60,6 +61,7 @@ app.include_router(mock_api_router)
 app.include_router(share_router.router)
 app.include_router(admin_router.router)
 app.include_router(db.router)
+app.include_router(webhooks_router.router)
 
 
 @app.on_event("startup")

@@ -125,3 +125,17 @@ class ShareSnapshot(SQLModel, table=True):
     expires_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     views_count: int = Field(default=0)
+
+
+class Webhook(SQLModel, table=True):
+    """Webhook configuration for a project."""
+
+    __tablename__ = "webhooks"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    project_id: str = Field(foreign_key="projects.id", index=True)
+    url: str
+    events: str  # JSON array: ["create", "update", "delete"]
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)

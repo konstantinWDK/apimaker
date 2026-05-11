@@ -18,6 +18,7 @@ import { SecurityConfigPanel } from './components/SecurityConfigPanel'
 import { ShareView } from './components/ShareView'
 import { UserCard } from './components/UserCard'
 import { ConfigPanel } from './components/ConfigPanel'
+import { WebhookPanel } from './components/WebhookPanel'
 import { useProjectBuilder } from './hooks/useProjectBuilder'
 import { useAuth } from './hooks/useAuth'
 import { useToast } from './components/Toast'
@@ -76,7 +77,7 @@ export function App() {
   const [result, setResult] = useState<GenerationResult | null>(null)
   const [generationWarning, setGenerationWarning] = useState<string | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
-  const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'security' | 'simulator' | 'delivery' | 'result'>('datasets')
+  const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'security' | 'simulator' | 'delivery' | 'result' | 'webhooks'>('datasets')
   const [isImportingDB, setIsImportingDB] = useState(false)
   const [activePage, setActivePage] = useState<'builder' | 'info' | 'usage' | 'config'>('builder')
   const localBaseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'
@@ -98,6 +99,7 @@ export function App() {
       { id: 'security', label: 'Seguridad' },
       { id: 'simulator', label: 'Simulador' },
       { id: 'delivery', label: 'Cómo usarla' },
+      { id: 'webhooks', label: 'Webhooks' },
       { id: 'result', label: 'API generada' },
     ],
     [],
@@ -356,6 +358,12 @@ export function App() {
               />
             </SectionCard>
           </div>
+        )
+      case 'webhooks':
+        return (
+          <SectionCard title="Webhooks" subtitle="Notifica a URLs externas cuando cambian los datos en el mock server" accent="purple" fullWidth>
+            <WebhookPanel projectId={project.slug || project.remoteId || project.id} />
+          </SectionCard>
         )
       case 'result':
         return (
