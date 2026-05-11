@@ -10,6 +10,11 @@ Plataforma que permite definir datasets, endpoints y generar APIs listas para de
 - `infra/`: definiciones de infraestructura/IaC.
 - `docs/`: documentación funcional y técnica.
 
+## Requisitos
+
+- **Python 3.11 o superior**: El proyecto utiliza funcionalidades de tipado y rendimiento que requieren esta versión mínima.
+- **Node.js**: Para el desarrollo del frontend.
+
 ## Puesta en marcha
 
 ### Backend
@@ -19,20 +24,27 @@ Plataforma que permite definir datasets, endpoints y generar APIs listas para de
 cd backend
 python -m venv .venv
 .\.venv\Scripts\activate
-pip install -e .[dev]
-
-# Iniciar servidor
+pip install -e ".[dev]"
 .\start.ps1
 ```
 
-#### Linux / macOS (Bash)
+#### Linux
 ```bash
 cd backend
+# Asegúrate de tener python3-venv instalado
 python3 -m venv .venv
 source .venv/bin/activate
 pip3 install -e ".[dev]"
+./start.sh
+```
 
-# Iniciar servidor
+#### macOS (Zsh/Bash)
+```bash
+cd backend
+# Usamos python3.11 para evitar la versión antigua del sistema
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip3 install -e ".[dev]"
 ./start.sh
 ```
 
