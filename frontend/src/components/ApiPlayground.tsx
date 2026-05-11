@@ -171,44 +171,6 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
 
       {/* Main layout */}
       <div className="pg__layout">
-        {/* Sidebar: endpoints + history */}
-        <div className="pg__sidebar">
-          <div className="pg__sidebar-section">
-            <div className="pg__sidebar-label">Endpoints</div>
-            {endpoints.length === 0 ? (
-              <p className="pg__empty">Sin endpoints</p>
-            ) : (
-              endpoints.map(ep => (
-                <button
-                  key={ep.id}
-                  className="pg__ep-item"
-                  onClick={() => selectEndpoint(ep)}
-                >
-                  <span className="pg__ep-method" style={{ color: METHOD_COLORS[ep.method] || '#64748b' }}>{ep.method}</span>
-                  <span className="pg__ep-path">{ep.path}</span>
-                </button>
-              ))
-            )}
-          </div>
-
-          {history.length > 0 && (
-            <div className="pg__sidebar-section">
-              <div className="pg__sidebar-label">Historial</div>
-              {history.slice(0, 10).map((h, i) => (
-                <button
-                  key={i}
-                  className="pg__history-item"
-                  onClick={() => { setMethod(h.method); setUrl(h.url); setResponse(h) }}
-                >
-                  <span className={`pg__history-status ${h.status < 400 ? 'ok' : 'err'}`}>{h.status || 'ERR'}</span>
-                  <span className="pg__ep-method" style={{ color: METHOD_COLORS[h.method] || '#64748b' }}>{h.method}</span>
-                  <span className="pg__history-url">{h.url.replace(mockBase, '')}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* Main content */}
         <div className="pg__main">
           {/* URL Bar */}
@@ -351,6 +313,44 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
               </div>
             )}
           </div>
+        </div>
+
+        {/* Sidebar: endpoints + history */}
+        <div className="pg__sidebar">
+          <div className="pg__sidebar-section">
+            <div className="pg__sidebar-label">Endpoints</div>
+            {endpoints.length === 0 ? (
+              <p className="pg__empty">Sin endpoints</p>
+            ) : (
+              endpoints.map(ep => (
+                <button
+                  key={ep.id}
+                  className="pg__ep-item"
+                  onClick={() => selectEndpoint(ep)}
+                >
+                  <span className="pg__ep-method" style={{ color: METHOD_COLORS[ep.method] || '#64748b' }}>{ep.method}</span>
+                  <span className="pg__ep-path">{ep.path}</span>
+                </button>
+              ))
+            )}
+          </div>
+
+          {history.length > 0 && (
+            <div className="pg__sidebar-section">
+              <div className="pg__sidebar-label">Historial</div>
+              {history.slice(0, 10).map((h, i) => (
+                <button
+                  key={i}
+                  className="pg__history-item"
+                  onClick={() => { setMethod(h.method); setUrl(h.url); setResponse(h) }}
+                >
+                  <span className={`pg__history-status ${h.status < 400 ? 'ok' : 'err'}`}>{h.status || 'ERR'}</span>
+                  <span className="pg__ep-method" style={{ color: METHOD_COLORS[h.method] || '#64748b' }}>{h.method}</span>
+                  <span className="pg__history-url">{h.url.replace(mockBase, '')}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
