@@ -64,6 +64,7 @@ export function App() {
     mockError,
     refreshProjects,
     projects,
+    removeDataset,
     saveProject,
     isGenerating,
     setIsGenerating,

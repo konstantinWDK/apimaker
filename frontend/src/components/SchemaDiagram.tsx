@@ -27,7 +27,7 @@ const TYPE_ICONS: Record<string, string> = {
   uuid: 'ID',
 }
 
-export function SchemaDiagram({ datasets, onDatasetClick, activeDatasetId }: Props) {
+export function SchemaDiagram({ datasets, onDatasetClick, onDeleteDataset, activeDatasetId }: Props) {
   if (datasets.length === 0) {
     return (
       <div className="schema-diagram__empty">
