@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { ApiPlayground } from './ApiPlayground'
 import { BackendSyncCard } from './BackendSyncCard'
 import { DatabaseImportPanel } from './DatabaseImportPanel'
 import { DataMappingPanel } from './DataMappingPanel'
@@ -30,10 +29,6 @@ export function BuilderPage() {
     upsertEndpoint,
     removeEndpoint,
     setGenerationResult,
-    startMock,
-    mockRunning,
-    mockLoading,
-    mockError,
     removeDataset,
     saveProject,
     isGenerating,
@@ -45,7 +40,7 @@ export function BuilderPage() {
   const [result, setResult] = useState<GenerationResult | null>(null)
   const [generationWarning, setGenerationWarning] = useState<string | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
-  const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'mappings' | 'security' | 'simulator' | 'delivery' | 'result' | 'webhooks' | 'versions'>('datasets')
+  const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'mappings' | 'security' | 'delivery' | 'result' | 'webhooks' | 'versions'>('datasets')
   const [isImportingDB, setIsImportingDB] = useState(false)
   const [editingDatasetId, setEditingDatasetId] = useState<string | null>(null)
   const [mappings, setMappings] = useState<MappingRule[]>([])
@@ -58,7 +53,6 @@ export function BuilderPage() {
       { id: 'endpoints', label: 'Endpoints' },
       { id: 'mappings', label: 'Mappings' },
       { id: 'security', label: 'Seguridad' },
-      { id: 'simulator', label: 'Simulador' },
       { id: 'delivery', label: 'Cómo usarla' },
       { id: 'webhooks', label: 'Webhooks' },
       { id: 'versions', label: 'Versiones' },
@@ -347,19 +341,6 @@ export function BuilderPage() {
         return (
           <SectionCard title="Configuración de Seguridad" subtitle="Protege tus endpoints y limita el tráfico" accent="amber" fullWidth>
             <SecurityConfigPanel project={project} onChange={updateProject} />
-          </SectionCard>
-        )
-      case 'simulator':
-        return (
-          <SectionCard title="Simulador" subtitle="Haz llamadas contra tu sandbox local" accent="sky" fullWidth>
-            <ApiPlayground
-              project={project}
-              mockRunning={mockRunning}
-              onStartMock={startMock}
-              mockLoading={mockLoading}
-              mockError={mockError}
-              selectedDatasetId={selectedDatasetId ?? undefined}
-            />
           </SectionCard>
         )
       case 'delivery':

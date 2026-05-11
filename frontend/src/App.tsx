@@ -11,6 +11,7 @@ import { InfoPage } from './components/InfoPage'
 import { DocsPage } from './components/DocsPage'
 import { ConfigPage } from './components/ConfigPage'
 import { BuilderPage } from './components/BuilderPage'
+import { SimulatorPage } from './components/SimulatorPage'
 import { useProjectBuilder } from './hooks/useProjectBuilder'
 import { useAuth } from './hooks/useAuth'
 import { useToast } from './components/Toast'
@@ -193,6 +194,12 @@ export function App() {
                 Uso
               </NavLink>
               <NavLink
+                to="/simulator"
+                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+              >
+                Simulador
+              </NavLink>
+              <NavLink
                 to="/info"
                 className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
               >
@@ -221,6 +228,7 @@ export function App() {
 
           <Routes>
             <Route path="/" element={<BuilderPage />} />
+            <Route path="/simulator" element={<SimulatorPage />} />
             <Route path="/usage" element={<ApiUsagePanel />} />
             <Route path="/info" element={<InfoPage />} />
             <Route path="/config" element={<ConfigPage authStatus={authStatus} onLogout={performLogout} />} />
