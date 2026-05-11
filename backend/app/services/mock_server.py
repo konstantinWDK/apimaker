@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
+
+logger = logging.getLogger("apimaker.mock_server")
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
@@ -153,7 +156,7 @@ async def mock_get(
         matched_ep = None
         param_value = None
 
-        print(f"[MockServer] Matching GET {full_path}")
+        logger.debug("Matching GET %s", full_path)
 
         # 1. Exact path match first
         for ep in endpoints:
@@ -182,7 +185,7 @@ async def mock_get(
                             matched_ep = ep
                             break
                     except Exception as re_err:
-                        print(f"[MockServer] Regex error: {re_err}")
+                        logger.debug("Regex error: %s", re_err)
 
         if not matched_ep:
             raise HTTPException(
@@ -240,7 +243,7 @@ async def mock_get(
         if param_value:
             # Path param captured — this is a detail request
             target_id = param_value
-            print(f"[MockServer] Searching for record matching '{target_id}' in filtered dataset {ds_id} ({len(store)} items)")
+            logger.debug("Searching for record matching '%s' in filtered dataset %s (%d items)", target_id, ds_id, len(store))
 
             # 1. Try standard ID fields first
             for item in store:
@@ -264,7 +267,7 @@ async def mock_get(
                             item = {**item, "_includes": related}
                         return item
 
-            print(f"[MockServer] No match found for {target_id}")
+            logger.debug("No match found for %s", target_id)
             raise HTTPException(status_code=404, detail=f"No record found matching '{target_id}'")
 
         # Build paginated response
@@ -346,7 +349,7 @@ async def mock_post(
     except Exception:
         body = {}
 
-    new_item = {"_id": str(uuid4())[:8], "id": len(store) + 1, **body, "created_at": datetime.utcnow().isoformat()}
+    new_item = {"_id": str(uuid4())[:8], "id": len(store) + 1, **body, "created_at": datetime.now(timezone.utc).isoformat()}
     store.append(new_item)
     # Persist to database
     if ds_id:
@@ -430,7 +433,7 @@ async def mock_delete(
 
 def start_mock_server_fn(session: Session, project_id: str) -> dict:
     """Start mock server for a project (initialize data for ALL datasets)."""
-    print(f"[MockServer] Starting mock server for project_id={project_id}")
+    logger.info("Starting mock server for project_id=%s", project_id)
     project = session.get(Project, str(project_id))
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -440,7 +443,7 @@ def start_mock_server_fn(session: Session, project_id: str) -> dict:
         select(Dataset).where(Dataset.project_id == str(project_id))
     ).all()
 
-    print(f"[MockServer] Found {len(datasets)} datasets for project")
+    logger.info("Found %d datasets for project", len(datasets))
 
     fields = []
     endpoints = session.exec(
@@ -459,11 +462,11 @@ def start_mock_server_fn(session: Session, project_id: str) -> dict:
         store = []
         if dataset.sample_rows:
             try:
-                print(f"[MockServer] Loading sample_rows for dataset '{dataset.name}' ({len(dataset.sample_rows)} chars)")
+                logger.debug("Loading sample_rows for dataset '%s' (%d chars)", dataset.name, len(dataset.sample_rows))
                 store = json.loads(dataset.sample_rows)
-                print(f"[MockServer]   -> Loaded {len(store)} rows")
+                logger.debug("  -> Loaded %d rows", len(store))
                 if store:
-                    print(f"[MockServer]   -> First row keys: {list(store[0].keys())}")
+                    logger.debug("  -> First row keys: %s", list(store[0].keys()))
                 # Ensure every item has an _id
                 for item in store:
                     if "_id" not in item:
@@ -471,12 +474,12 @@ def start_mock_server_fn(session: Session, project_id: str) -> dict:
                 project_store[dataset.id] = store
                 total_rows += len(store)
             except Exception as e:
-                print(f"[MockServer]   -> Error loading sample_rows: {e}")
+                logger.warning("  -> Error loading sample_rows: %s", e)
                 import traceback
                 traceback.print_exc()
                 project_store[dataset.id] = []
         else:
-            print(f"[MockServer]   -> No sample_rows for dataset '{dataset.name}', empty store")
+            logger.debug("  -> No sample_rows for dataset '%s', empty store", dataset.name)
             project_store[dataset.id] = []
 
     _mock_data[str(project_id)] = project_store

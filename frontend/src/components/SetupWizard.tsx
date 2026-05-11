@@ -226,7 +226,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
               
               <button 
                 type="button"
-                onClick={() => window.location.reload()}
+                onClick={onComplete}
                 className="btn-primary"
                 style={{ maxWidth: '200px', margin: '0 auto' }}
               >
