@@ -18,7 +18,7 @@ from ..models import (
     Project as PydanticProject,
     UploadDatasetRequest,
 )
-from ..security import CurrentUser, get_current_user_from_header, require_admin
+from ..security import CurrentUser, get_current_user_from_header
 from ..openapi_builder import build_openapi_document
 from ..services.generation import run_generation
 from ..services.project_service import project_service
@@ -215,7 +215,7 @@ def update_project(
 def delete_project(
     project_id: str,
     session: Session = Depends(get_session),
-    user: CurrentUser = Depends(require_admin),
+    user: CurrentUser = Depends(get_current_user_from_header),
 ) -> None:
     try:
         resolved_id = project_service.resolve_id(session, project_id)
@@ -232,7 +232,7 @@ def upload_dataset(
     project_id: str,
     payload: UploadDatasetRequest,
     session: Session = Depends(get_session),
-    user: CurrentUser = Depends(require_admin),
+    user: CurrentUser = Depends(get_current_user_from_header),
 ) -> PydanticProject:
     try:
         resolved_id = project_service.resolve_id(session, project_id)
@@ -272,7 +272,7 @@ def define_endpoints(
     project_id: str,
     payload: DefineEndpointsRequest,
     session: Session = Depends(get_session),
-    user: CurrentUser = Depends(require_admin),
+    user: CurrentUser = Depends(get_current_user_from_header),
 ) -> PydanticProject:
     try:
         resolved_id = project_service.resolve_id(session, project_id)
@@ -307,7 +307,7 @@ def generate_artifacts(
     project_id: str,
     payload: GenerationRequest,
     session: Session = Depends(get_session),
-    user: CurrentUser = Depends(require_admin),
+    user: CurrentUser = Depends(get_current_user_from_header),
 ) -> GenerationResult:
     try:
         resolved_id = project_service.resolve_id(session, project_id)
@@ -353,7 +353,7 @@ def project_docs(
 def download_bundle(
     project_id: str,
     session: Session = Depends(get_session),
-    user: CurrentUser = Depends(require_admin),
+    user: CurrentUser = Depends(get_current_user_from_header),
 ) -> FileResponse:
     """Download the generated code bundle (zip file)."""
     from pathlib import Path

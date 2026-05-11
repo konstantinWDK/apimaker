@@ -74,6 +74,47 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
 
   return (
     <aside className="sidebar">
+      <div className="sidebar__list">
+        <div className="sidebar__list-header">
+          <p className="sidebar__list-title">Proyectos</p>
+        </div>
+        <button type="button" className="btn ghost btn-small sidebar__new" onClick={onCreate}>
+          + Nuevo proyecto
+        </button>
+        {projects.length === 0 ? (
+          <p className="muted-text">Guarda tu proyecto para verlo aquí.</p>
+        ) : (
+          <ul>
+            {projects
+              .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
+              .map((item) => {
+                const isActive = item.id === project.id
+                return (
+                  <li key={item.id} className={`sidebar__list-item${isActive ? ' active' : ''}`}>
+                    <button type="button" className="sidebar__list-button" onClick={() => onSwitchProject(item)}>
+                      <div>
+                        <p className="sidebar__list-name">{item.name}</p>
+                        <p className="sidebar__list-meta">{item.endpoints.length} endpoints · {formatDate(item.updatedAt)}</p>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className="sidebar__delete-btn"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onDelete(item.id)
+                      }}
+                      aria-label={`Eliminar ${item.name}`}
+                    >
+                      ×
+                    </button>
+                  </li>
+                )
+              })}
+          </ul>
+        )}
+      </div>
+
       <div className="sidebar__section">
         <p className="sidebar__section-title">Información del Proyecto</p>
         <div className="sidebar__status-card" style={{ padding: '1rem' }}>
@@ -203,47 +244,6 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
             )}
           </div>
         </div>
-      </div>
-
-      <div className="sidebar__list">
-        <div className="sidebar__list-header">
-          <p className="sidebar__list-title">Proyectos</p>
-        </div>
-        <button type="button" className="btn ghost btn-small sidebar__new" onClick={onCreate}>
-          + Nuevo proyecto
-        </button>
-        {projects.length === 0 ? (
-          <p className="muted-text">Guarda tu proyecto para verlo aquí.</p>
-        ) : (
-          <ul>
-            {projects
-              .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
-              .map((item) => {
-                const isActive = item.id === project.id
-                return (
-                  <li key={item.id} className={`sidebar__list-item${isActive ? ' active' : ''}`}>
-                    <button type="button" className="sidebar__list-button" onClick={() => onSwitchProject(item)}>
-                      <div>
-                        <p className="sidebar__list-name">{item.name}</p>
-                        <p className="sidebar__list-meta">{item.endpoints.length} endpoints · {formatDate(item.updatedAt)}</p>
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      className="sidebar__delete-btn"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onDelete(item.id)
-                      }}
-                      aria-label={`Eliminar ${item.name}`}
-                    >
-                      ×
-                    </button>
-                  </li>
-                )
-              })}
-          </ul>
-        )}
       </div>
     </aside>
   )

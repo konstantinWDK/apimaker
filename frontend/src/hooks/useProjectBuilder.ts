@@ -460,10 +460,12 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       const nextProjects = state.projects.map(p => p.id === nextProject.id ? nextProject : p)
 
       // Queue API save
-      const saveId = nextProject.remoteId || nextProject.id
-      queueSave(async () => {
-        await api.syncEndpoints(saveId, nextEndpoints)
-      })
+      if (nextProject.remoteId) {
+        const saveId = nextProject.remoteId
+        queueSave(async () => {
+          await api.syncEndpoints(saveId, nextEndpoints)
+        })
+      }
       return { project: nextProject, projects: nextProjects }
     }),
 
@@ -692,7 +694,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
           throw new Error('Error al sincronizar el proyecto con el servidor')
         }
       } else {
-        await api.updateProject(effectiveId, {
+        const updated = await api.updateProject(effectiveId, {
           name: currentProject.name,
           slug: currentProject.slug,
           description: currentProject.description,
@@ -703,6 +705,27 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
           target_stack: currentProject.targetStack,
           include_data: currentProject.includeData,
         })
+        if (!updated) {
+          // Project might have been deleted on backend; try to find by slug or recreate
+          const all = await api.listProjects()
+          const existing = all.find(p => p.slug === currentProject.slug)
+          if (existing) {
+            effectiveId = existing.slug || existing.id
+            currentProject = { ...currentProject, remoteId: effectiveId }
+            set({ project: currentProject })
+            persist(currentProject, get().selectedDatasetId)
+          } else {
+            let created = await api.createProject(currentProject)
+            if (created) {
+              effectiveId = created.slug || created.id
+              currentProject = { ...currentProject, remoteId: effectiveId }
+              set({ project: currentProject })
+              persist(currentProject, get().selectedDatasetId)
+            } else {
+              throw new Error('Error al sincronizar el proyecto con el servidor')
+            }
+          }
+        }
       }
 
       // Sync datasets and endpoints

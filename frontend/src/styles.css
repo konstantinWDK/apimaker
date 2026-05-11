@@ -3514,10 +3514,6 @@ input[type='password'] {
   border-bottom: 1px solid #e2e8f0;
 }
 
-.schema-diagram__icon {
-  font-size: 1.4rem;
-}
-
 .schema-diagram__name {
   font-weight: 600;
   font-size: 0.95rem;
@@ -3656,16 +3652,6 @@ input[type='password'] {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-}
-
-.dataset-editor__icon {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  text-align: center;
-  font-size: 1.2rem;
-  background: #f8fafc;
 }
 
 .dataset-editor__name {
@@ -4033,6 +4019,11 @@ input[type='password'] {
   padding: 3rem;
   text-align: center;
   color: #94a3b8;
+}
+
+.data-editor__more {
+  padding: 1rem;
+  text-align: center;
 }
 
 /* Import panel */

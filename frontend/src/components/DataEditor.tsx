@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { FieldSchema } from '../types/schemas'
 
 interface Props {
@@ -19,7 +20,11 @@ const TYPE_BADGE: Record<string, string> = {
   uuid: 'ID',
 }
 
+const PAGE_SIZE = 10
+
 export function DataEditor({ fields, rows, onUpdateRow, onRemoveRow, onRegenerateRow }: Props) {
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+
   if (fields.length === 0) {
     return (
       <div className="data-editor__empty">
@@ -31,10 +36,13 @@ export function DataEditor({ fields, rows, onUpdateRow, onRemoveRow, onRegenerat
   if (rows.length === 0) {
     return (
       <div className="data-editor__empty">
-        <p>No hay datos. Pulsa "Generar 10 filas" en el esquema.</p>
+        <p>No hay datos. Usa "Regenerar" en la barra de herramientas para generar filas de prueba.</p>
       </div>
     )
   }
+
+  const visibleRows = rows.slice(0, visibleCount)
+  const hasMore = visibleCount < rows.length
 
   return (
     <div className="data-editor__table">
@@ -53,7 +61,7 @@ export function DataEditor({ fields, rows, onUpdateRow, onRemoveRow, onRegenerat
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, rowIndex) => (
+          {visibleRows.map((row, rowIndex) => (
             <tr key={rowIndex}>
               <td className="data-editor__row-num">{rowIndex + 1}</td>
               <td className="data-editor__actions">
@@ -104,6 +112,13 @@ export function DataEditor({ fields, rows, onUpdateRow, onRemoveRow, onRegenerat
           ))}
         </tbody>
       </table>
+      {hasMore && (
+        <div className="data-editor__more">
+          <button type="button" className="btn ghost btn-sm" onClick={() => setVisibleCount(v => v + PAGE_SIZE)}>
+            Mostrar siguientes {Math.min(PAGE_SIZE, rows.length - visibleCount)} filas ({rows.length - visibleCount} restantes)
+          </button>
+        </div>
+      )}
     </div>
   )
 }

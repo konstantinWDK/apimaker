@@ -45,7 +45,6 @@ export function SchemaDiagram({ datasets, onDatasetClick, activeDatasetId }: Pro
         >
           {/* Table header */}
           <div className="schema-diagram__header">
-            <span className="schema-diagram__icon">{dataset.icon ?? ''}</span>
             <span className="schema-diagram__name">{dataset.name}</span>
             <span className="schema-diagram__count">{dataset.fields.length} campos</span>
           </div>

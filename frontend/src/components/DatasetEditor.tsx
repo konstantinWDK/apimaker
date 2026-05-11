@@ -48,7 +48,6 @@ const emptyField = (): FieldSchema => ({
 export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets = [] }: Props) {
   const [name, setName] = useState(dataset?.name ?? 'Dataset principal')
   const [description, setDescription] = useState(dataset?.description ?? '')
-  const [icon, setIcon] = useState(dataset?.icon ?? '')
   const [sourceType, setSourceType] = useState<DatasetMeta['sourceType']>(dataset?.sourceType ?? 'manual')
   const [fields, setFields] = useState<FieldSchema[]>(dataset?.fields ?? [])
   const [sampleRows, setSampleRows] = useState<Array<Record<string, string>>>(dataset?.sampleRows ?? [])
@@ -66,7 +65,6 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
       setSampleRows(dataset.sampleRows ?? [])
       setName(dataset.name ?? 'Dataset principal')
       setDescription(dataset.description ?? '')
-      setIcon(dataset.icon ?? '')
       setSourceType(dataset.sourceType ?? 'manual')
     }
   }, [dataset?.id])
@@ -210,7 +208,6 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
       id: dataset?.id ?? crypto.randomUUID(),
       name,
       description,
-      icon,
       sourceType,
       fields,
       sampleRows,
@@ -224,14 +221,6 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
       {/* Header: name, icon, description */}
       <div className="dataset-editor__header">
         <div className="dataset-editor__identity">
-          <input
-            type="text"
-            className="dataset-editor__icon"
-            value={icon}
-            onChange={e => setIcon(e.target.value.slice(0, 2))}
-            maxLength={2}
-            title="Icono del dataset"
-          />
           <input
             type="text"
             className="dataset-editor__name"
@@ -283,12 +272,6 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
             <div className="schema-editor__toolbar">
               <button type="button" className="btn ghost btn-sm" onClick={addField}>
                 + Campo
-              </button>
-              <button type="button" className="btn ghost btn-sm" onClick={() => generateData(10)}>
-                Generar 10 filas
-              </button>
-              <button type="button" className="btn ghost btn-sm" onClick={() => generateData(50)}>
-                Generar 50 filas
               </button>
             </div>
 
