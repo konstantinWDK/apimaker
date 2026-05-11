@@ -30,7 +30,7 @@ pip install -e .[dev]
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e .[dev]
+pip3 install -e ".[dev]"
 
 # Iniciar servidor
 ./start.sh

@@ -14,6 +14,11 @@ artifacts/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
+*.egg
+.eggs/
+build/
+dist/
 
 node_modules/
 dist/
