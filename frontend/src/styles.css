@@ -2715,6 +2715,30 @@ input[type='password'] {
   transition: box-shadow 0.15s;
 }
 
+.api-usage__deploy-card--recommended {
+  border-color: #3b82f6;
+  background: #f8faff;
+  position: relative;
+}
+
+.api-usage__deploy-card--recommended:hover {
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.12);
+}
+
+.api-usage__recommended-badge {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: #3b82f6;
+  color: white;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .api-usage__deploy-card:hover {
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
 }
@@ -4171,6 +4195,71 @@ input[type='password'] {
   background: #fff;
   border-radius: 12px;
   padding: 1rem;
+}
+
+/* ─── Info Page ─────────────────────────────────────────────── */
+.info-page {
+  max-width: 900px; margin: 0 auto; padding: 2rem 0;
+}
+.info-hero {
+  display: flex; gap: 2rem; align-items: center;
+  background: linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%);
+  border: 1px solid #e0e7ff; border-radius: 16px; padding: 2rem; margin-bottom: 2rem;
+}
+.info-hero__content { flex: 1; }
+.info-hero__title { font-size: 1.8rem; font-weight: 800; color: #1e293b; margin: 0 0 0.5rem; }
+.info-hero__subtitle { font-size: 0.9rem; color: #64748b; line-height: 1.5; margin: 0 0 1.25rem; }
+.info-hero__stats { display: flex; gap: 1.5rem; }
+.info-hero__stat { text-align: center; }
+.info-hero__stat-value { display: block; font-size: 1.3rem; font-weight: 800; color: #3b82f6; }
+.info-hero__stat-label { font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.03em; }
+.info-hero__graphic { flex-shrink: 0; width: 200px; }
+.info-hero__svg { width: 100%; height: auto; }
+.info-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem;
+}
+.info-card {
+  border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; background: #fff;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+.info-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-color: #cbd5e1; }
+.info-card__icon { width: 40px; height: 40px; background: #f8fafc; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 0.75rem; }
+.info-card__title { font-size: 0.9rem; font-weight: 600; color: #1e293b; margin: 0 0 0.35rem; }
+.info-card__desc { font-size: 0.8rem; color: #64748b; line-height: 1.4; margin: 0; }
+.info-section { margin-bottom: 2rem; }
+.info-section__title { font-size: 1.1rem; font-weight: 700; color: #1e293b; margin: 0 0 1rem; }
+.info-stacks { display: flex; gap: 1rem; }
+.info-stack {
+  flex: 1; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1rem; background: #fff;
+}
+.info-stack__head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+.info-stack__dot { width: 8px; height: 8px; border-radius: 50%; }
+.info-stack__badge {
+  font-size: 0.6rem; font-weight: 700; padding: 0.15rem 0.4rem; border-radius: 4px;
+  background: #bbf7d0; color: #166534; text-transform: uppercase; margin-left: auto;
+}
+.info-stack__desc { font-size: 0.8rem; color: #64748b; line-height: 1.4; margin: 0; }
+.info-steps { display: flex; flex-direction: column; gap: 0.75rem; }
+.info-step {
+  display: flex; gap: 1rem; align-items: flex-start;
+  border: 1px solid #e2e8f0; border-radius: 10px; padding: 1rem; background: #fff;
+}
+.info-step__num {
+  width: 32px; height: 32px; border-radius: 50%; background: #3b82f6; color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 0.85rem; flex-shrink: 0;
+}
+.info-step strong { display: block; font-size: 0.9rem; color: #1e293b; margin-bottom: 0.15rem; }
+.info-step p { font-size: 0.8rem; color: #64748b; margin: 0; line-height: 1.4; }
+
+@media (max-width: 768px) {
+  .info-hero { flex-direction: column; }
+  .info-hero__graphic { display: none; }
+  .info-grid { grid-template-columns: 1fr 1fr; }
+  .info-stacks { flex-direction: column; }
+}
+@media (max-width: 480px) {
+  .info-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 768px) {

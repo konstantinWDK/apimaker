@@ -341,12 +341,13 @@ export function ApiUsagePanel() {
   const renderDesplegar = () => (
     <div>
       <div className="api-usage__deploy-grid">
-        <div className="api-usage__deploy-card">
+        <div className="api-usage__deploy-card api-usage__deploy-card--recommended">
           <div className="api-usage__deploy-header">
+            <span className="api-usage__recommended-badge">Recomendado</span>
             <svg className="api-usage__deploy-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 3.5h-3v3h3v-3zm0 4h-3v3h3v-3zm-4-4h-3v3h3v-3zm0 4h-3v3h3v-3zm-4-4h-3v3h3v-3zm0 4h-3v3h3v-3zm12 7.5c0 1.4-1.1 2.5-2.5 2.5h-10c-1.4 0-2.5-1.1-2.5-2.5V14h15v1zm-15-2h15v-1h-15v1zm15 3H1.5c-.8 0-1.5.7-1.5 1.5v2c0 .8.7 1.5 1.5 1.5h21c.8 0 1.5-.7 1.5-1.5v-2c0-.8-.7-1.5-1.5-1.5z"/></svg>
             <h3>Docker</h3>
           </div>
-          <p className="muted-text">El bundle incluye un Dockerfile listo para produccion.</p>
+          <p className="muted-text">El bundle incluye un Dockerfile listo para produccion. Es la opcion mas sencilla y portable.</p>
           <pre className="api-usage__deploy-code"><code>{`# Desde el bundle descomprimido
 docker build -t my-api .
 docker run -p 8000:8000 my-api`}</code></pre>
