@@ -58,6 +58,8 @@ npm install
 npm run dev
 ```
 
+> **Nota de Seguridad**: La librería `xlsx` se instala directamente desde el CDN oficial de SheetJS para garantizar que se utiliza la versión parcheada contra vulnerabilidades de *Prototype Pollution*, ya que la versión del registro estándar de npm está obsoleta.
+
 ## Próximos pasos
 
 1. **Generador de Código Real**: Implementar plantillas Jinja2 para exportar el diseño a repositorios listos para producción.
