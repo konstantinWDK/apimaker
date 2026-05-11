@@ -63,6 +63,7 @@ if [ "$DB_OPTION" == "2" ]; then
     PG_DB=${PG_DB:-apimaker}
     
     DB_URL="postgresql+psycopg2://$PG_USER:$PG_PASS@$PG_HOST:$PG_PORT/$PG_DB"
+    export APIMAKER_DATABASE_URL=$DB_URL
     
     # Crear archivo de configuración para el backend
     mkdir -p backend/app/data
@@ -88,7 +89,6 @@ fi
 
 # 4. Seeding
 echo -e "${BLUE}🌱 Inicializando base de datos y usuario...${NC}"
-export APIMAKER_DATABASE_URL=$DB_URL
 cd backend
 ./.venv/bin/python app/scripts/seed_admin.py --username "$ADMIN_USER" --password "$ADMIN_PASS"
 cd ..
@@ -126,6 +126,6 @@ echo "Para arrancar la aplicación manualmente:"
 echo -e "1. Backend:  ${BLUE}cd backend && ./start.sh${NC}"
 echo -e "2. Frontend: ${BLUE}cd frontend && npm run dev${NC}"
 echo ""
-echo -e "Acceso: ${YELLOW}$ADMIN_USER / (la contraseña que elegiste)${NC}"
+echo -e "Acceso: ${YELLOW}$ADMIN_USER${NC}"
 echo "URL: http://localhost:5173"
 echo ""
