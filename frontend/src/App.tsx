@@ -224,6 +224,39 @@ export function App() {
       case 'datasets':
         const currentDataset = project.datasets.find(d => d.id === (editingDatasetId || selectedDatasetId)) || project.datasets[0]
 
+        // Import mode
+        if (isImportingDB) {
+          return (
+            <div className="datasets-tab-new">
+              <div className="dataset-breadcrumb">
+                <button type="button" className="dataset-breadcrumb__link" onClick={() => setIsImportingDB(false)}>
+                  Datasets
+                </button>
+                <span className="dataset-breadcrumb__sep">&gt;</span>
+                <span className="dataset-breadcrumb__current">Importar desde BD</span>
+              </div>
+              <SectionCard title="Importar desde Base de Datos" subtitle="Conecta e introspecciona tablas" accent="sky" fullWidth>
+                <DatabaseImportPanel
+                  onImport={(newDatasets) => {
+                    newDatasets.forEach((ds) => {
+                      upsertDataset(ds)
+                      const basePath = '/' + ds.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+                      upsertEndpoint({ id: crypto.randomUUID(), name: 'Listar ' + ds.name, method: 'GET', path: basePath, summary: 'Listar registros de ' + ds.name, operationType: 'list', targetDatasetId: ds.id })
+                      upsertEndpoint({ id: crypto.randomUUID(), name: 'Obtener ' + ds.name, method: 'GET', path: basePath + '/{id}', summary: 'Obtener un registro de ' + ds.name, operationType: 'get', targetDatasetId: ds.id })
+                      upsertEndpoint({ id: crypto.randomUUID(), name: 'Crear ' + ds.name, method: 'POST', path: basePath, summary: 'Crear registro en ' + ds.name, operationType: 'create', targetDatasetId: ds.id })
+                      upsertEndpoint({ id: crypto.randomUUID(), name: 'Actualizar ' + ds.name, method: 'PUT', path: basePath + '/{id}', summary: 'Actualizar registro de ' + ds.name, operationType: 'update', targetDatasetId: ds.id })
+                      upsertEndpoint({ id: crypto.randomUUID(), name: 'Eliminar ' + ds.name, method: 'DELETE', path: basePath + '/{id}', summary: 'Eliminar registro de ' + ds.name, operationType: 'delete', targetDatasetId: ds.id })
+                    })
+                    if (newDatasets.length > 0) { setSelectedDatasetId(newDatasets[0].id); setEditingDatasetId(newDatasets[0].id); }
+                    setIsImportingDB(false)
+                  }}
+                  onCancel={() => setIsImportingDB(false)}
+                />
+              </SectionCard>
+            </div>
+          )
+        }
+
         // Editing mode: show breadcrumb + editor
         if (editingDatasetId && currentDataset) {
           return (
@@ -264,8 +297,8 @@ export function App() {
               }}>
                 + Nuevo dataset
               </button>
-              <button type="button" className="btn ghost" onClick={() => setIsImportingDB(!isImportingDB)}>
-                {isImportingDB ? 'Cerrar importacion' : 'Importar desde BD'}
+              <button type="button" className="btn ghost" onClick={() => setIsImportingDB(true)}>
+                Importar desde BD
               </button>
             </div>
 
@@ -287,27 +320,6 @@ export function App() {
               </SectionCard>
             )}
 
-            {/* DB import panel (collapsible) */}
-            {isImportingDB && (
-              <SectionCard title="Importar desde Base de Datos" subtitle="Conecta e introspecciona tablas" accent="sky" fullWidth>
-                <DatabaseImportPanel
-                  onImport={(newDatasets) => {
-                    newDatasets.forEach((ds) => {
-                      upsertDataset(ds)
-                      const basePath = '/' + ds.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')
-                      upsertEndpoint({ id: crypto.randomUUID(), name: 'Listar ' + ds.name, method: 'GET', path: basePath, summary: 'Listar registros de ' + ds.name, operationType: 'list', targetDatasetId: ds.id })
-                      upsertEndpoint({ id: crypto.randomUUID(), name: 'Obtener ' + ds.name, method: 'GET', path: basePath + '/{id}', summary: 'Obtener un registro de ' + ds.name, operationType: 'get', targetDatasetId: ds.id })
-                      upsertEndpoint({ id: crypto.randomUUID(), name: 'Crear ' + ds.name, method: 'POST', path: basePath, summary: 'Crear registro en ' + ds.name, operationType: 'create', targetDatasetId: ds.id })
-                      upsertEndpoint({ id: crypto.randomUUID(), name: 'Actualizar ' + ds.name, method: 'PUT', path: basePath + '/{id}', summary: 'Actualizar registro de ' + ds.name, operationType: 'update', targetDatasetId: ds.id })
-                      upsertEndpoint({ id: crypto.randomUUID(), name: 'Eliminar ' + ds.name, method: 'DELETE', path: basePath + '/{id}', summary: 'Eliminar registro de ' + ds.name, operationType: 'delete', targetDatasetId: ds.id })
-                    })
-                    if (newDatasets.length > 0) { setSelectedDatasetId(newDatasets[0].id); setEditingDatasetId(newDatasets[0].id); }
-                    setIsImportingDB(false)
-                  }}
-                  onCancel={() => setIsImportingDB(false)}
-                />
-              </SectionCard>
-            )}
           </div>
         )
       case 'endpoints':
