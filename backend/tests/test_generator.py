@@ -114,3 +114,77 @@ def test_bundle_auth_settings_reflected() -> None:
         app_js = zf.read("app.js").decode("utf-8")
         assert "my-secret-key" in app_js
         assert "apikey" in app_js
+
+
+def test_typescript_sdk_renders() -> None:
+    """TypeScript SDK template should render without errors."""
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
+    from pathlib import Path
+    sdk_dir = Path(__file__).resolve().parent.parent.parent / "generator" / "templates" / "sdk"
+    env = Environment(loader=FileSystemLoader(str(sdk_dir)), autoescape=select_autoescape())
+    env.filters["capitalize"] = lambda s: s.capitalize() if s else ""
+    env.filters["lower"] = lambda s: s.lower() if s else ""
+    env.filters["replace"] = lambda s, old, new: s.replace(old, new) if s else ""
+    context = _build_context_for_sdk()
+    ts_code = env.get_template("typescript.ts.j2").render(context)
+    assert "ApiClient" in ts_code
+    assert "export class" in ts_code
+
+
+def test_python_sdk_renders() -> None:
+    """Python SDK template should render without errors."""
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
+    from pathlib import Path
+    sdk_dir = Path(__file__).resolve().parent.parent.parent / "generator" / "templates" / "sdk"
+    env = Environment(loader=FileSystemLoader(str(sdk_dir)), autoescape=select_autoescape())
+    env.filters["capitalize"] = lambda s: s.capitalize() if s else ""
+    env.filters["lower"] = lambda s: s.lower() if s else ""
+    env.filters["replace"] = lambda s, old, new: s.replace(old, new) if s else ""
+    context = _build_context_for_sdk()
+    py_code = env.get_template("python.py.j2").render(context)
+    assert "class ApiClient" in py_code
+    assert "import requests" in py_code
+
+
+def _build_context_for_sdk():
+    return {
+        "project_name": "TestAPI",
+        "project_description": "A test",
+        "auth_method": "none",
+        "api_key": "",
+        "jwt_secret": "",
+        "rate_limit": 0,
+        "target_stack": "fastapi",
+        "include_data": True,
+        "datasets": [
+            {
+                "id": "ds-1",
+                "name": "Users",
+                "fields": [
+                    {"name": "name", "type": "string", "python_type": "str", "required": True, "description": ""},
+                    {"name": "email", "type": "email", "python_type": "str", "required": True, "description": ""},
+                ],
+                "sample_rows": [],
+            }
+        ],
+        "endpoints": [
+            {
+                "id": "ep-1",
+                "name": "List Users",
+                "method": "GET",
+                "path": "/users",
+                "summary": "List all users",
+                "operation_type": "list",
+                "target_dataset_id": "ds-1",
+            },
+            {
+                "id": "ep-2",
+                "name": "Create User",
+                "method": "POST",
+                "path": "/users",
+                "summary": "Create a user",
+                "operation_type": "create",
+                "target_dataset_id": "ds-1",
+            },
+        ],
+    }

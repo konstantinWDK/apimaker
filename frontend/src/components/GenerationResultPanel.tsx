@@ -14,6 +14,8 @@ export function GenerationResultPanel({ result, projectId }: Props) {
   const [downloading, setDownloading] = useState(false)
   const [sharing, setSharing] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(result.shareUrl || null)
+  const [exporting, setExporting] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const toast = useToast()
 
@@ -69,6 +71,65 @@ export function GenerationResultPanel({ result, projectId }: Props) {
     }
   }
 
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const { baseUrl } = readBackendConfig()
+      const cleanBase = baseUrl?.replace(/\/$/, '')
+      const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
+
+      const res = await fetch(`${cleanBase}/projects/${projectId}/export`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      })
+      if (!res.ok) throw new Error('Error al exportar')
+
+      const data = await res.json()
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = `${projectId}-export.json`
+      link.click()
+      URL.revokeObjectURL(link.href)
+      toast('Proyecto exportado correctamente', 'info')
+    } catch (err) {
+      toast('Error al exportar el proyecto', 'error')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      const { baseUrl } = readBackendConfig()
+      const cleanBase = baseUrl?.replace(/\/$/, '')
+      const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
+
+      const res = await fetch(`${cleanBase}/projects/import`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data.datasets ? { ...data.project, datasets: data.datasets, endpoints: data.endpoints || [] } : data),
+      })
+
+      if (!res.ok) {
+        const errText = await res.text()
+        throw new Error(errText)
+      }
+
+      toast('Proyecto importado correctamente. Recarga la pagina para verlo.', 'success')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    } catch (err) {
+      toast(`Error al importar: ${err instanceof Error ? err.message : 'Formato invalido'}`, 'error')
+    }
+  }
+
   const baseUrl = result.apiUrl.split('/').slice(0, -1).join('/')
 
   return (
@@ -106,6 +167,22 @@ export function GenerationResultPanel({ result, projectId }: Props) {
               <a className="btn ghost btn-small" href={result.docsUrl} target="_blank" rel="noreferrer">
                 📚 Ver Documentación (Redoc)
               </a>
+            </div>
+          </div>
+
+          <div className="deploy-card export-card">
+            <h3 style={{ margin: '0 0 0.5rem', fontSize: '0.9rem' }}>Exportar / Importar Proyecto</h3>
+            <p className="card-desc" style={{ fontSize: '0.8rem', marginBottom: '0.75rem' }}>
+              Exporta el proyecto completo como JSON para compartirlo o importarlo en otra instancia.
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button type="button" className="btn ghost btn-small" onClick={handleExport} disabled={exporting}>
+                {exporting ? 'Exportando...' : '⬇ Exportar JSON'}
+              </button>
+              <button type="button" className="btn ghost btn-small" onClick={() => fileInputRef.current?.click()}>
+                ⬆ Importar JSON
+              </button>
+              <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
             </div>
           </div>
         </div>

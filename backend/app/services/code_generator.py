@@ -403,8 +403,54 @@ def run_generation(
     if payload.include_sdk:
         sdk_dir = artifacts_root / "sdks"
         sdk_dir.mkdir(parents=True, exist_ok=True)
-        sdk_paths.append(str(sdk_dir / "typescript"))
-        sdk_paths.append(str(sdk_dir / "python"))
+
+        # Render TypeScript SDK
+        try:
+            ts_env = Environment(
+                loader=FileSystemLoader(str(TEMPLATE_DIR / "sdk")),
+                autoescape=select_autoescape(),
+            )
+            ts_env.filters["capitalize"] = lambda s: s.capitalize() if s else ""
+            ts_env.filters["lower"] = lambda s: s.lower() if s else ""
+            ts_env.filters["replace"] = lambda s, old, new: s.replace(old, new) if s else ""
+
+            ts_context = _build_context(
+                project.name, project.description, project.auth_method,
+                project.api_key, project.jwt_secret, project.rate_limit,
+                datasets_with_fields, endpoints, project.target_stack or "fastapi",
+                project.include_data if hasattr(project, "include_data") else True,
+            )
+            ts_code = ts_env.get_template("typescript.ts.j2").render(ts_context)
+            ts_path = sdk_dir / "api-client.ts"
+            ts_path.write_text(ts_code)
+            sdk_paths.append(str(ts_path))
+        except Exception as e:
+            import logging
+            logging.warning(f"TypeScript SDK generation failed: {e}")
+
+        # Render Python SDK
+        try:
+            py_env = Environment(
+                loader=FileSystemLoader(str(TEMPLATE_DIR / "sdk")),
+                autoescape=select_autoescape(),
+            )
+            py_env.filters["capitalize"] = lambda s: s.capitalize() if s else ""
+            py_env.filters["lower"] = lambda s: s.lower() if s else ""
+            py_env.filters["replace"] = lambda s, old, new: s.replace(old, new) if s else ""
+
+            py_context = _build_context(
+                project.name, project.description, project.auth_method,
+                project.api_key, project.jwt_secret, project.rate_limit,
+                datasets_with_fields, endpoints, project.target_stack or "fastapi",
+                project.include_data if hasattr(project, "include_data") else True,
+            )
+            py_code = py_env.get_template("python.py.j2").render(py_context)
+            py_path = sdk_dir / "api_client.py"
+            py_path.write_text(py_code)
+            sdk_paths.append(str(py_path))
+        except Exception as e:
+            import logging
+            logging.warning(f"Python SDK generation failed: {e}")
 
     project_service.mark_status(session, project_id, "ready")
 

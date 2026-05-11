@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.openapi.docs import get_redoc_html
 from fastapi.responses import FileResponse, HTMLResponse
+from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from ..db import get_session
@@ -380,4 +381,120 @@ def download_bundle(
         str(bundle_path),
         media_type="application/zip",
         filename=f"{folder_name}-bundle.zip",
+    )
+
+
+@router.get("/{project_id}/export")
+def export_project(
+    project_id: str,
+    session: Session = Depends(get_session),
+) -> dict:
+    """Export full project as JSON (project + datasets + endpoints)."""
+    try:
+        resolved_id = project_service.resolve_id(session, project_id)
+        data = project_service.get_project_with_data(session, resolved_id)
+        db_project = data["project"]
+        datasets = data["datasets"]
+        endpoints = data["endpoints"]
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    import json
+    datasets_data = []
+    for entry in datasets:
+        ds = entry["dataset"]
+        fields = entry["fields"]
+        try:
+            sample_rows = json.loads(ds.sample_rows) if ds.sample_rows else []
+        except Exception:
+            sample_rows = []
+        datasets_data.append({
+            "id": ds.id,
+            "name": ds.name,
+            "source_type": ds.source_type,
+            "fields": [{"name": f.name, "type": f.field_type, "required": f.required, "description": f.description} for f in fields],
+            "sample_rows": sample_rows,
+        })
+
+    endpoints_data = [{
+        "id": ep.id,
+        "name": ep.name,
+        "method": ep.method,
+        "path": ep.path,
+        "summary": ep.summary,
+        "operation_type": ep.operation_type,
+        "target_dataset_id": ep.target_dataset_id,
+    } for ep in endpoints]
+
+    return {
+        "project": {
+            "name": db_project.name,
+            "slug": db_project.slug,
+            "description": db_project.description,
+            "auth_method": db_project.auth_method,
+            "api_key": db_project.api_key,
+            "jwt_secret": db_project.jwt_secret,
+            "rate_limit": db_project.rate_limit,
+            "target_stack": db_project.target_stack,
+            "include_data": db_project.include_data,
+        },
+        "datasets": datasets_data,
+        "endpoints": endpoints_data,
+        "version": "1",
+    }
+
+
+class ImportProjectRequest(BaseModel):
+    name: str | None = None
+    slug: str | None = None
+    description: str | None = None
+    auth_method: str = "none"
+    api_key: str | None = None
+    jwt_secret: str | None = None
+    rate_limit: int | None = None
+    target_stack: str = "fastapi"
+    include_data: bool = True
+    datasets: list[dict] = []
+    endpoints: list[dict] = []
+
+
+@router.post("/import", response_model=PydanticProject, status_code=201)
+def import_project(
+    payload: ImportProjectRequest,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(get_current_user_from_header),
+) -> PydanticProject:
+    """Import a project from JSON (created via export)."""
+    db_project = project_service.create_project(
+        session,
+        name=payload.name or "Imported Project",
+        slug=payload.slug,
+        description=payload.description,
+        target_stack=payload.target_stack,
+        created_by=user.user_id,
+    )
+
+    for ds_data in payload.datasets:
+        fields_data = ds_data.get("fields", [])
+        project_service.attach_dataset(
+            session,
+            project_id=db_project.id,
+            name=ds_data.get("name", "Dataset"),
+            source_type=ds_data.get("source_type", "manual"),
+            fields=fields_data,
+            sample_rows=ds_data.get("sample_rows", []),
+        )
+
+    if payload.endpoints:
+        project_service.define_endpoints(
+            session,
+            project_id=db_project.id,
+            endpoints=payload.endpoints,
+        )
+
+    data = project_service.get_project_with_data(session, db_project.id)
+    return _db_to_pydantic(
+        data["project"],
+        datasets_with_fields=data["datasets"],
+        endpoints=data["endpoints"],
     )

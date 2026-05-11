@@ -64,6 +64,14 @@ export function ProjectForm({ project, onChange }: Props) {
             />
             Incluir datos (seeds)
           </label>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={project.includeSdk !== false}
+              onChange={(e) => onChange({ includeSdk: e.target.checked })}
+            />
+            Generar SDK (TypeScript + Python)
+          </label>
         </div>
       </div>
 

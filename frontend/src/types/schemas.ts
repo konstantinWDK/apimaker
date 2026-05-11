@@ -76,6 +76,7 @@ export interface ProjectDraft {
   rateLimit?: number // requests per minute
   targetStack: 'fastapi' | 'express' | 'nest'
   includeData?: boolean
+  includeSdk?: boolean
   datasets: DatasetMeta[]
   endpoints: ApiEndpoint[]
   updatedAt?: string

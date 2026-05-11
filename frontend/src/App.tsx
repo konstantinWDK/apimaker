@@ -136,7 +136,7 @@ export function App() {
         },
         body: JSON.stringify({ 
           include_mock_server: true, 
-          include_sdk: true, 
+          include_sdk: project.includeSdk !== false, 
           include_data: project.includeData !== false 
         }),
       })
