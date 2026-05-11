@@ -19,6 +19,7 @@ import { ShareView } from './components/ShareView'
 import { UserCard } from './components/UserCard'
 import { ConfigPanel } from './components/ConfigPanel'
 import { WebhookPanel } from './components/WebhookPanel'
+import { VersionPanel } from './components/VersionPanel'
 import { useProjectBuilder } from './hooks/useProjectBuilder'
 import { useAuth } from './hooks/useAuth'
 import { useToast } from './components/Toast'
@@ -77,7 +78,7 @@ export function App() {
   const [result, setResult] = useState<GenerationResult | null>(null)
   const [generationWarning, setGenerationWarning] = useState<string | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
-  const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'security' | 'simulator' | 'delivery' | 'result' | 'webhooks'>('datasets')
+  const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'security' | 'simulator' | 'delivery' | 'result' | 'webhooks' | 'versions'>('datasets')
   const [isImportingDB, setIsImportingDB] = useState(false)
   const [editingDatasetId, setEditingDatasetId] = useState<string | null>(null)
   const [activePage, setActivePage] = useState<'builder' | 'info' | 'usage' | 'config'>('builder')
@@ -101,6 +102,7 @@ export function App() {
       { id: 'simulator', label: 'Simulador' },
       { id: 'delivery', label: 'Cómo usarla' },
       { id: 'webhooks', label: 'Webhooks' },
+      { id: 'versions', label: 'Versiones' },
       { id: 'result', label: 'API generada' },
     ],
     [],
@@ -373,6 +375,12 @@ export function App() {
         return (
           <SectionCard title="Webhooks" subtitle="Notifica a URLs externas cuando cambian los datos en el mock server" accent="sky" fullWidth>
             <WebhookPanel projectId={project.slug || project.remoteId || project.id} />
+          </SectionCard>
+        )
+      case 'versions':
+        return (
+          <SectionCard title="Versiones" subtitle="Historial de cambios del proyecto" accent="sky" fullWidth>
+            <VersionPanel projectId={project.slug || project.remoteId || project.id} />
           </SectionCard>
         )
       case 'result':

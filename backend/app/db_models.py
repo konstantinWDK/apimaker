@@ -139,3 +139,16 @@ class Webhook(SQLModel, table=True):
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ProjectVersion(SQLModel, table=True):
+    """Snapshot of a project at a point in time."""
+
+    __tablename__ = "project_versions"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    project_id: str = Field(foreign_key="projects.id", index=True)
+    version: int
+    message: str = ""
+    snapshot_data: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
