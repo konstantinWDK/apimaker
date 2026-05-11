@@ -186,7 +186,8 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
         
         <div className="sidebar__card sidebar__card--status">
           <div className="sidebar__status-item">
-            <div className="sidebar__mock-bar">
+            <div className="sidebar__status-bar">
+              <span className="sidebar__status-label">Live Mode</span>
               <span className={`sidebar__mock-dot ${mockRunning ? 'on' : 'off'}`} />
               <span className="sidebar__mock-label">
                 {mockRunning ? 'Activo' : 'Inactivo'}
@@ -200,7 +201,7 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
                   onClick={onStartMock}
                   disabled={mockLoading}
                 >
-                  {mockLoading ? 'Iniciando...' : 'Iniciar mock'}
+                  {mockLoading ? 'Iniciando...' : 'Iniciar live'}
                 </button>
               ) : (
                 <button
@@ -209,7 +210,7 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
                   onClick={onStopMock}
                   disabled={mockLoading}
                 >
-                  {mockLoading ? 'Parando...' : 'Parar mock'}
+                  {mockLoading ? 'Parando...' : 'Parar live'}
                 </button>
               )}
             </div>

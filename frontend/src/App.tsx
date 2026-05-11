@@ -59,6 +59,7 @@ export function App() {
     setGenerationResult,
     startMock,
     stopMock,
+    checkMockStatus,
     deleteProject,
     mockRunning,
     mockLoading,
@@ -201,6 +202,31 @@ export function App() {
       document.title = 'API Maker Studio'
     }
   }, [project.name])
+
+  // Auto-start mock server on project load
+  useEffect(() => {
+    if (!project.remoteId || !isAuthenticated) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await apiFetch(`/projects/${project.remoteId}/mock/status`).then(r => r.json())
+        if (cancelled) return
+        if (res.status !== 'running') {
+          await apiFetch(`/projects/${project.remoteId}/mock/start`, { method: 'POST' })
+          if (!cancelled) {
+            const { useProjectBuilder } = await import('./hooks/useProjectBuilder')
+            useProjectBuilder.getState().checkMockStatus()
+          }
+        } else {
+          if (!cancelled) checkMockStatus()
+        }
+      } catch {
+        // Mock server not available — don't block the UI
+      }
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.remoteId, isAuthenticated])
 
   // Fetch mappings when project slug changes
   useEffect(() => {

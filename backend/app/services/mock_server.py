@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import random
 from datetime import datetime, timedelta
 from typing import Any
@@ -86,14 +87,54 @@ def _find_dataset_for_endpoint(session: Session, resolved_project_id: str, match
     return (None, [])
 
 
+def _sync_sample_rows(session: Session, project_id: str, dataset_id: str) -> None:
+    """Persist mock data for a dataset back to the database."""
+    store = _mock_data.get(str(project_id), {}).get(dataset_id)
+    if store is not None:
+        dataset = session.get(Dataset, dataset_id)
+        if dataset:
+            dataset.sample_rows = json.dumps(store, ensure_ascii=False, default=str)
+            session.add(dataset)
+            session.commit()
+
+
+def _get_related_data(session: Session, project_id: str, dataset_id: str, requested_includes: list[str]) -> dict:
+    """Build a dict of related data for ?include= queries.
+    
+    Returns { relation_name: [related_records] }.
+    """
+    related = {}
+    project_store = _mock_data.get(str(project_id), {})
+    
+    # Build a dataset name -> id lookup
+    ds_names = {}
+    datasets = session.exec(
+        select(Dataset).where(Dataset.project_id == str(project_id))
+    ).all()
+    for ds in datasets:
+        ds_names[ds.name.lower()] = ds.id
+    
+    # For each requested include, find the dataset and attach its data
+    for name in requested_includes:
+        clean = name.lower()
+        if clean in ds_names:
+            ds_id = ds_names[clean]
+            store = project_store.get(ds_id)
+            if store is not None:
+                related[clean] = store
+    
+    return related
+
+
 @router.get("/{path:path}")
 async def mock_get(
     project_id: str,
     path: str,
     request: Request,
     session: Session = Depends(get_session),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, le=1000),
+    page: int = Query(1, ge=1),
+    limit: int = Query(100, ge=1, le=1000),
+    include: str = Query(None, description="Comma-separated relations to include"),
 ) -> Any:
     """Mock GET — list or get by ID."""
     try:
@@ -152,10 +193,11 @@ async def mock_get(
         # Find the correct dataset for this endpoint
         ds_id, store = _find_dataset_for_endpoint(session, resolved_id, matched_ep)
 
-        # Extract query params for filtering (excluding pagination)
+        # Extract query params for filtering (excluding pagination and include)
         query_params = dict(request.query_params)
-        query_params.pop('skip', None)
+        query_params.pop('page', None)
         query_params.pop('limit', None)
+        query_params.pop('include', None)
 
         # Filter the store based on query parameters if any
         if query_params:
@@ -205,6 +247,10 @@ async def mock_get(
                 if not isinstance(item, dict):
                     continue
                 if str(item.get("_id")) == str(target_id) or str(item.get("id")) == str(target_id):
+                    # Attach related data if requested
+                    if include:
+                        related = _get_related_data(session, resolved_id, ds_id, include.split(","))
+                        item = {**item, "_includes": related}
                     return item
 
             # 2. Try matching any string field (e.g. name, slug, pokedex_id)
@@ -213,43 +259,30 @@ async def mock_get(
                     continue
                 for key, val in item.items():
                     if val is not None and str(val).lower() == str(target_id).lower():
+                        if include:
+                            related = _get_related_data(session, resolved_id, ds_id, include.split(","))
+                            item = {**item, "_includes": related}
                         return item
 
             print(f"[MockServer] No match found for {target_id}")
             raise HTTPException(status_code=404, detail=f"No record found matching '{target_id}'")
 
-        if op_type == "list":
-            # Explicit list endpoint — return paginated list
-            return store[skip:skip + limit]
+        # Build paginated response
+        skip = (page - 1) * limit
+        total = len(store)
+        items = store[skip:skip + limit]
 
-        if op_type == "get":
-            # "get" operation without path param: check if path has multiple segments
-            path_segments = path.strip("/").split("/")
-            if len(path_segments) >= 2:
-                target_id = path_segments[-1]
-                print(f"[MockServer] Searching for record matching '{target_id}' in dataset {ds_id}")
+        # Attach related data if requested
+        if include and items:
+            related = _get_related_data(session, resolved_id, ds_id, include.split(","))
+            items = [{**item, "_includes": related} for item in items]
 
-                for item in store:
-                    if not isinstance(item, dict):
-                        continue
-                    if str(item.get("_id")) == str(target_id) or str(item.get("id")) == str(target_id):
-                        return item
-
-                for item in store:
-                    if not isinstance(item, dict):
-                        continue
-                    for key, val in item.items():
-                        if val is not None and str(val).lower() == str(target_id).lower():
-                            return item
-
-                print(f"[MockServer] No match found for {target_id}")
-                raise HTTPException(status_code=404, detail=f"No record found matching '{target_id}'")
-
-            # Single-segment path with op_type "get" — return list
-            return store[skip:skip + limit]
-
-        # Default: return list for custom operations
-        return store[skip:skip + limit]
+        return {
+            "data": items,
+            "total": total,
+            "page": page,
+            "pages": math.ceil(total / limit) if total > 0 else 0,
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -315,6 +348,9 @@ async def mock_post(
 
     new_item = {"_id": str(uuid4())[:8], "id": len(store) + 1, **body, "created_at": datetime.utcnow().isoformat()}
     store.append(new_item)
+    # Persist to database
+    if ds_id:
+        _sync_sample_rows(session, resolved_id, ds_id)
     # Dispatch webhook
     await dispatch_webhooks(session, str(resolved_id), "create", new_item)
     return new_item
@@ -350,6 +386,8 @@ async def mock_put(
             if item.get("_id") == item_id or str(item.get("id")) == str(item_id):
                 updated = {"_id": item_id, **body}
                 store[i] = updated
+                # Persist to database
+                _sync_sample_rows(session, resolved_id, ds_id)
                 await dispatch_webhooks(session, str(resolved_id), "update", updated)
                 return updated
 
@@ -379,6 +417,8 @@ async def mock_delete(
         for i, item in enumerate(store):
             if item.get("_id") == item_id or str(item.get("id")) == str(item_id):
                 removed = store.pop(i)
+                # Persist to database
+                _sync_sample_rows(session, resolved_id, ds_id)
                 await dispatch_webhooks(session, str(resolved_id), "delete", removed)
                 return
 

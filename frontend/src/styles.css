@@ -3120,6 +3120,23 @@ input[type='password'] {
 }
 
 /* Mock server controls in sidebar */
+.sidebar__status-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.5rem;
+  background: #f8fafc;
+  border-radius: 5px;
+  margin-bottom: 0.5rem;
+}
+.sidebar__status-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  margin-right: auto;
+}
 .sidebar__mock-bar {
   display: flex;
   align-items: center;
