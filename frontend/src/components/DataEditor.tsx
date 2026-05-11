@@ -71,7 +71,7 @@ export function DataEditor({ fields, rows, onUpdateRow, onRemoveRow, onRegenerat
                   onClick={() => onRegenerateRow(rowIndex)}
                   title="Regenerar fila"
                 >
-                  R
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.4-3.9L23 10M1 14l5.1 4.9a9 9 0 0 0 14.4-3.9"/></svg>
                 </button>
                 <button
                   type="button"
@@ -79,7 +79,7 @@ export function DataEditor({ fields, rows, onUpdateRow, onRemoveRow, onRegenerat
                   onClick={() => onRemoveRow(rowIndex)}
                   title="Eliminar fila"
                 >
-                  ✕
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                 </button>
               </td>
               {fields.map((field, fieldIdx) => {
