@@ -1,9 +1,10 @@
-from sqlmodel import Session, create_engine, select
-from app.db_models import Project, Dataset, Endpoint
+import sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-db_path = Path("backend/app/data/apimaker.db").absolute()
-engine = create_engine(f"sqlite:///{db_path}")
+from sqlmodel import Session, select
+from app.db import engine
+from app.db_models import Project, Dataset, Endpoint
 
 with Session(engine) as session:
     project = session.exec(select(Project).where(Project.slug == "pokedex-demo")).first()

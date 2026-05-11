@@ -27,7 +27,10 @@ class Settings(BaseSettings):
     jwt_access_expire_minutes: int = 60 * 24  # 24 hours
     jwt_refresh_expire_days: int = 7
 
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="APIMAKER_")
+    # Database settings
+    database_url: str = "sqlite:///./app/data/apimaker.db"
+
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="APIMAKER_", extra="ignore")
 
 
 @lru_cache(maxsize=1)

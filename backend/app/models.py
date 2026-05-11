@@ -51,7 +51,7 @@ class CreateMappingRuleRequest(BaseModel):
 
 
 class DatasetMeta(BaseModel):
-    id: UUID = Field(default_factory=uuid4)
+    id: str = Field(default_factory=lambda: str(uuid4()))
     name: str
     source_type: Literal["upload", "manual", "database"] = "manual"
     fields: list[FieldSchema] = Field(default_factory=list)
@@ -61,7 +61,7 @@ class DatasetMeta(BaseModel):
 
 
 class ApiEndpoint(BaseModel):
-    id: UUID = Field(default_factory=uuid4)
+    id: str = Field(default_factory=lambda: str(uuid4()))
     name: str
     method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"] = "GET"
     path: str

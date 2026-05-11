@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { ApiPlayground } from './components/ApiPlayground'
+import { SetupWizard } from './components/SetupWizard'
 import { ApiUsagePanel } from './components/ApiUsagePanel'
 import { BackendSyncCard } from './components/BackendSyncCard'
 import { DatabaseImportPanel } from './components/DatabaseImportPanel'
@@ -48,6 +49,7 @@ const apiFetch = async (path: string, init?: RequestInit) => {
 export function App() {
   const isShareView = typeof window !== 'undefined' && window.location.pathname.startsWith('/share/')
   const { isAuthenticated, login, error: authError, logout, resetCredentials, authStatus } = useAuth()
+  const [needsSetup, setNeedsSetup] = useState<boolean | null>(null)
   const toast = useToast()
   const {
     project,
@@ -76,6 +78,9 @@ export function App() {
 
   if (isShareView) {
     return <ShareView />
+  }
+  if (needsSetup) {
+    return <SetupWizard onComplete={() => setNeedsSetup(false)} />
   }
   if (!isAuthenticated) {
     return <LoginScreen onLogin={login} error={authError ?? undefined} />
@@ -188,6 +193,22 @@ export function App() {
   useEffect(() => {
     refreshProjects()
   }, [refreshProjects])
+
+  // Check setup status
+  useEffect(() => {
+    const checkSetup = async () => {
+      try {
+        const res = await fetch(`${readBackendConfig().baseUrl?.replace(/\/$/, '')}/setup/status`)
+        if (res.ok) {
+          const data = await res.json()
+          setNeedsSetup(!data.is_configured)
+        }
+      } catch {
+        // Fallback or ignore
+      }
+    }
+    checkSetup()
+  }, [])
 
   useEffect(() => {
     setResult(project.lastGeneration ?? null)
