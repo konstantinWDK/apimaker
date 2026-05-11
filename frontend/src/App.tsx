@@ -230,7 +230,7 @@ export function App() {
             <div className="datasets-tab-new">
               <div className="dataset-breadcrumb">
                 <button type="button" className="dataset-breadcrumb__link" onClick={() => setIsImportingDB(false)}>
-                  Datasets
+                  Volver atras a Datasets
                 </button>
                 <span className="dataset-breadcrumb__sep">&gt;</span>
                 <span className="dataset-breadcrumb__current">Importar desde BD</span>
@@ -263,7 +263,7 @@ export function App() {
             <div className="datasets-tab-new">
               <div className="dataset-breadcrumb">
                 <button type="button" className="dataset-breadcrumb__link" onClick={() => { setEditingDatasetId(null); setIsImportingDB(false); }}>
-                  Datasets
+                  Volver atras a Datasets
                 </button>
                 <span className="dataset-breadcrumb__sep">&gt;</span>
                 <span className="dataset-breadcrumb__current">Edicion: {currentDataset.name}</span>
