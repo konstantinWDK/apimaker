@@ -1,7 +1,10 @@
 """FastAPI entrypoint for API Maker backend."""
 
-from fastapi import FastAPI
+import logging
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from .config import get_settings
 from .db import create_db_and_tables, get_database_info
@@ -39,6 +42,17 @@ else:
         allow_headers=["*"],
     )
 
+
+# ─── Global Error Handler ──────────────────────────────────────
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logging.error(f"Unhandled error on {request.method} {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal server error: {str(exc)}", "error_code": "INTERNAL_ERROR"},
+    )
+
+
 app.include_router(auth.router)
 app.include_router(projects.router)
 app.include_router(mock_ctrl_router.router)
@@ -51,7 +65,6 @@ app.include_router(db.router)
 @app.on_event("startup")
 def on_startup() -> None:
     """Initialize database tables on startup."""
-    import logging
     logging.basicConfig(level=logging.INFO)
     logging.info("Starting API Maker backend...")
     logging.info(f"Environment: {settings.environment}")

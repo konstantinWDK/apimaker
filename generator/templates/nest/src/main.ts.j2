@@ -1,10 +1,30 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { ValidationPipe } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+
+  const config = new DocumentBuilder()
+    .setTitle('{{ project_name }}')
+    .setDescription('{{ project_description or "" }}')
+    .setVersion('1.0.0')
+{% if auth_method == 'apikey' %}
+    .addApiKey({ type: 'apiKey', in: 'header', name: 'X-API-Key' }, 'apiKey')
+{% elif auth_method == 'jwt' %}
+    .addBearerAuth()
+{% endif %}
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('docs', app, document);
+
   const port = process.env.PORT || 8000;
   await app.listen(port);
-  console.log(`{{ project_name }} running on: ${await app.getUrl()}`);
+  console.log(`🚀 {{ project_name }} running on http://localhost:${port}`);
+  console.log(`📚 Docs: http://localhost:${port}/docs`);
 }
 bootstrap();

@@ -166,6 +166,7 @@ def render_bundle(
                 ("src/main.ts.j2", "src/main.ts"),
                 ("src/app.controller.ts.j2", "src/app.controller.ts"),
                 ("src/app.module.ts.j2", "src/app.module.ts"),
+                ("tsconfig.json.j2", "tsconfig.json"),
                 ("package.json.j2", "package.json"),
                 ("Dockerfile.j2", "Dockerfile"),
                 ("docker-compose.yml.j2", "docker-compose.yml"),
@@ -207,6 +208,23 @@ def render_bundle(
                 '    response = client.get("/health")\n'
                 "    assert response.status_code == 200\n"
                 '    assert response.json()["status"] == "ok"\n',
+            )
+        elif stack == "express":
+            zf.writestr(
+                "tests/test_main.js",
+                'const request = require("supertest");\n'
+                'const app = require("../app");\n\n'
+                'describe("Health", () => {\n'
+                '  it("should return 200", async () => {\n'
+                '    const res = await request(app).get("/health");\n'
+                "    expect(res.status).toBe(200);\n"
+                '    expect(res.body.status).toBe("ok");\n'
+                "  });\n"
+                "});\n",
+            )
+            zf.writestr(
+                "jest.config.js",
+                "module.exports = { testEnvironment: 'node' };\n",
             )
         
         # README

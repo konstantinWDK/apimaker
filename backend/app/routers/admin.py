@@ -422,8 +422,87 @@ def sync_databases(
         counts["shares_synced"],
     ])
 
-    return SyncResponse(
-        success=True,
-        message=f"Sincronización completada: {total} registros transferidos a PostgreSQL ({target_env}) ({counts['skipped']} ya existían)",
-        counts=counts,
-    )
+import subprocess
+from pathlib import Path
+
+
+class RunTestsResponse(BaseModel):
+    success: bool
+    output: str
+    passed: int
+    failed: int
+    total: int
+
+
+@router.post("/run-tests", response_model=RunTestsResponse)
+def run_tests(
+    user: CurrentUser = Depends(require_admin),
+) -> RunTestsResponse:
+    """Run the backend test suite and return results."""
+    backend_dir = Path(__file__).resolve().parent.parent.parent
+    try:
+        result = subprocess.run(
+            ["python", "-m", "pytest", "tests/", "-v", "--tb=short"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            cwd=str(backend_dir),
+        )
+        output = result.stdout + result.stderr
+
+        # Parse test counts from pytest output
+        passed = 0
+        failed = 0
+        for line in output.splitlines():
+            if "passed" in line and "failed" in line and "=" not in line:
+                parts = line.split()
+                for i, p in enumerate(parts):
+                    if p == "passed":
+                        passed += int(parts[i - 1]) if i > 0 else 0
+                    elif p == "failed":
+                        failed += int(parts[i - 1]) if i > 0 else 0
+
+        # Fallback: get counts from summary line
+        if passed == 0 and failed == 0:
+            for line in output.splitlines():
+                if "passed" in line and "failed" in line:
+                    import re
+                    nums = re.findall(r"(\d+)\s+(passed|failed)", line)
+                    for num, status in nums:
+                        if status == "passed":
+                            passed = int(num)
+                        elif status == "failed":
+                            failed = int(num)
+
+        total = passed + failed
+        return RunTestsResponse(
+            success=result.returncode == 0,
+            output=output[-5000:] if len(output) > 5000 else output,
+            passed=passed,
+            failed=failed,
+            total=total,
+        )
+    except subprocess.TimeoutExpired:
+        return RunTestsResponse(
+            success=False,
+            output="Timeout: los tests superaron los 120 segundos.",
+            passed=0,
+            failed=0,
+            total=0,
+        )
+    except FileNotFoundError:
+        return RunTestsResponse(
+            success=False,
+            output="Error: pytest no encontrado. Asegúrate de que está instalado en el entorno virtual.",
+            passed=0,
+            failed=0,
+            total=0,
+        )
+    except Exception as e:
+        return RunTestsResponse(
+            success=False,
+            output=f"Error al ejecutar tests: {str(e)}",
+            passed=0,
+            failed=0,
+            total=0,
+        )

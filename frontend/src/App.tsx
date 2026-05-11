@@ -3,8 +3,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { ApiPlayground } from './components/ApiPlayground'
 import { ApiUsagePanel } from './components/ApiUsagePanel'
 import { BackendSyncCard } from './components/BackendSyncCard'
-import { CredentialPanel } from './components/CredentialPanel'
-import { DatabaseConfigPanel } from './components/DatabaseConfigPanel'
 import { DatabaseImportPanel } from './components/DatabaseImportPanel'
 import { EndpointDesigner } from './components/EndpointDesigner'
 import { EndpointGallery } from './components/EndpointGallery'
@@ -19,6 +17,7 @@ import { SectionCard } from './components/SectionCard'
 import { SecurityConfigPanel } from './components/SecurityConfigPanel'
 import { ShareView } from './components/ShareView'
 import { UserCard } from './components/UserCard'
+import { ConfigPanel } from './components/ConfigPanel'
 import { useProjectBuilder } from './hooks/useProjectBuilder'
 import { useAuth } from './hooks/useAuth'
 import { useToast } from './components/Toast'
@@ -79,7 +78,7 @@ export function App() {
   const [showSuccess, setShowSuccess] = useState(false)
   const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'security' | 'simulator' | 'delivery' | 'result'>('datasets')
   const [isImportingDB, setIsImportingDB] = useState(false)
-  const [activePage, setActivePage] = useState<'builder' | 'info' | 'usage' | 'admin'>('builder')
+  const [activePage, setActivePage] = useState<'builder' | 'info' | 'usage' | 'config'>('builder')
   const localBaseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'
   const backendBaseUrl = readBackendConfig().baseUrl?.replace(/\/$/, '') || 'http://localhost:8000'
 
@@ -392,7 +391,7 @@ export function App() {
           <UserCard
             username={authStatus.username}
             mustChange={authStatus.mustChange}
-            onOpenSettings={() => setActivePage('admin')}
+            onOpenSettings={() => setActivePage('config')}
             onLogout={performLogout}
           />
           <ProjectSidebar
@@ -451,7 +450,7 @@ export function App() {
           {authStatus.mustChange ? (
             <div className="security-banner">
               <span>Estás usando las credenciales por defecto. Cámbialas para evitar accesos no autorizados.</span>
-              <button type="button" onClick={() => setActivePage('admin')}>
+              <button type="button" onClick={() => setActivePage('config')}>
                 Cambiar ahora
               </button>
             </div>
@@ -478,6 +477,13 @@ export function App() {
                   onClick={() => setActivePage('info')}
                 >
                   Información
+                </button>
+                <button
+                  type="button"
+                  className={activePage === 'config' ? 'nav-button active' : 'nav-button'}
+                  onClick={() => setActivePage('config')}
+                >
+                  Configuración
                 </button>
               </div>
               <a className="github-button" href="https://github.com/" target="_blank" rel="noreferrer">
@@ -566,52 +572,36 @@ export function App() {
             </SectionCard>
           )}
 
-          {activePage === 'admin' && (
-            <div className="admin-grid">
-              <SectionCard title="Base de datos" subtitle="Configuración y sincronización" fullWidth>
-                <DatabaseConfigPanel />
-              </SectionCard>
-              <SectionCard title="Administración" subtitle="Control de acceso al builder" fullWidth>
-              <div className="info-panel">
-                <p>
-                  Actualiza el usuario y contraseña que protegen este builder. Tras guardar, deberás iniciar sesión de nuevo. También puedes
-                  restablecer a los valores por defecto (admin / admin) cuando entregues la herramienta a otro equipo.
-                </p>
-                <CredentialPanel
-                  currentUsername={authStatus.username}
-                  onUpdate={async (newUsername, newPassword, currentPassword) => {
-                    // Get current token
-                    const token = readToken()
-                    if (!token) throw new Error('No estás autenticado')
-                    // Change username if different
-                    if (newUsername !== authStatus.username) {
-                      await apiFetch('/auth/change-username', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                        body: JSON.stringify({ new_username: newUsername, current_password: currentPassword }),
-                      })
-                    }
-                    // Change password if provided
-                    if (newPassword) {
-                      await apiFetch('/auth/change-password', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                        body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
-                      })
-                    }
-                    performLogout()
-                  }}
-                  onReset={async () => {
-                    await resetCredentials()
-                    performLogout()
-                  }}
-                />
-                <p className="muted-text">Consejo: cambia estas credenciales después de cada despliegue y guarda el acceso en un gestor seguro.</p>
-              </div>
+          {activePage === 'config' && (
+            <SectionCard title="Configuración" subtitle="Administración del sistema" fullWidth>
+              <ConfigPanel
+                currentUsername={authStatus.username}
+                onUpdateCredentials={async (newUsername, newPassword, currentPassword) => {
+                  const token = readToken()
+                  if (!token) throw new Error('No estás autenticado')
+                  if (newUsername !== authStatus.username) {
+                    await apiFetch('/auth/change-username', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                      body: JSON.stringify({ new_username: newUsername, current_password: currentPassword }),
+                    })
+                  }
+                  if (newPassword) {
+                    await apiFetch('/auth/change-password', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+                    })
+                  }
+                  performLogout()
+                }}
+                onResetCredentials={async () => {
+                  await resetCredentials()
+                  performLogout()
+                }}
+              />
             </SectionCard>
-            </div>
           )}
-
         </div>
       </div>
       <div className="fab-container">

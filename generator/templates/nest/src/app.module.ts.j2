@@ -1,8 +1,42 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 
+// ─── Entity Definitions ────────────────────────────────────────
+{% for ds in datasets %}
+{% set model_name = ds.name | capitalize | replace(" ", "") %}
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+
+@Entity('{{ model_name | lower }}')
+export class {{ model_name }} {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+{% for field in ds.fields %}
+  @Column({ type: '{{ "text" if field.type == "string" else "integer" if field.type == "integer" else "real" if field.type == "float" else "boolean" if field.type == "boolean" else "text" }}', nullable: {{ not field.required }} })
+  {{ field.name }}: {{ "string" if field.type in ["string", "datetime", "email"] else "number" if field.type in ["integer", "float"] else "boolean" }};
+
+{% endfor %}
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
+
+{% endfor %}
+
 @Module({
-  imports: [],
+  imports: [
+    TypeOrmModule.forRoot({
+      type: (process.env.DATABASE_URL || '').startsWith('postgres') ? 'postgres' : 'sqlite',
+      database: process.env.DATABASE_URL?.replace(/^sqlite:/, '') || './data.db',
+      url: process.env.DATABASE_URL?.startsWith('postgres') ? process.env.DATABASE_URL : undefined,
+      entities: [{% for ds in datasets %}{{ ds.name | capitalize | replace(" ", "") }}{% if not loop.last %}, {% endif %}{% endfor %}],
+      synchronize: true,
+    }),
+    TypeOrmModule.forFeature([{% for ds in datasets %}{{ ds.name | capitalize | replace(" ", "") }}{% if not loop.last %}, {% endif %}{% endfor %}]),
+  ],
   controllers: [AppController],
   providers: [],
 })

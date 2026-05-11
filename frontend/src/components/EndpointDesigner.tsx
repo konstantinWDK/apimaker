@@ -25,30 +25,23 @@ const emptyEndpoint = (datasetId?: string): ApiEndpoint => ({
   targetDatasetId: datasetId,
 })
 
-const OPERATION_OPTIONS: Array<{ value: ApiEndpoint['operationType']; label: string }> = [
-  { value: 'list', label: 'Listar (GET)' },
-  { value: 'get', label: 'Obtener uno (GET)' },
-  { value: 'create', label: 'Crear (POST)' },
-  { value: 'update', label: 'Actualizar (PUT)' },
-  { value: 'delete', label: 'Eliminar (DELETE)' },
-  { value: 'custom', label: 'Personalizado' },
+const OPERATION_OPTIONS: Array<{ value: ApiEndpoint['operationType']; label: string; method: string; desc: string }> = [
+  { value: 'list', label: 'GET · Listar', method: 'GET', desc: 'Obtiene todos los registros del dataset' },
+  { value: 'get', label: 'GET · Detalle', method: 'GET', desc: 'Obtiene un registro por su ID' },
+  { value: 'create', label: 'POST · Crear', method: 'POST', desc: 'Crea un nuevo registro' },
+  { value: 'update', label: 'PUT · Actualizar', method: 'PUT', desc: 'Reemplaza un registro existente' },
+  { value: 'delete', label: 'DELETE · Eliminar', method: 'DELETE', desc: 'Elimina un registro' },
+  { value: 'custom', label: 'OTRO · Custom', method: '', desc: 'Define tu propio metodo y ruta' },
 ]
 
 const METHOD_OPTIONS: ApiEndpoint['method'][] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
-const METHOD_DESCRIPTIONS: Record<ApiEndpoint['method'], string> = {
-  GET: 'Lee recursos existentes',
-  POST: 'Crea un nuevo recurso',
-  PUT: 'Reemplaza un recurso',
-  PATCH: 'Actualiza parcialmente',
-  DELETE: 'Elimina un recurso',
-}
 
-const METHOD_CLASS: Record<ApiEndpoint['method'], string> = {
-  GET: 'endpoint-item__method--get',
-  POST: 'endpoint-item__method--post',
-  PUT: 'endpoint-item__method--put',
-  PATCH: 'endpoint-item__method--patch',
-  DELETE: 'endpoint-item__method--delete',
+const METHOD_COLORS: Record<ApiEndpoint['method'], string> = {
+  GET: '#0ea5e9',
+  POST: '#10b981',
+  PUT: '#f97316',
+  PATCH: '#a855f7',
+  DELETE: '#ef4444',
 }
 
 export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewBase, warningMessage, clearWarning }: Props) {
@@ -60,6 +53,10 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (!draft.name.trim() || !draft.path.trim()) {
+      setError('Completa el nombre y la ruta del endpoint')
+      return
+    }
     onAdd(draft)
     setDraft(emptyEndpoint(draft.targetDatasetId))
     setError(null)
@@ -132,173 +129,258 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
   const previewProjectId = project.slug || project.remoteId || project.id
   const previewUrl = useMemo(() => `${resolvedBase}/api/mock/${previewProjectId}${previewPath}`, [resolvedBase, previewPath, previewProjectId])
 
+  const selectedDs = project.datasets.find(d => d.id === draft.targetDatasetId)
+  const selectedDsName = selectedDs?.name || 'items'
+
   return (
     <div className="endpoint-designer">
+      {/* Preview URL */}
       <div className="endpoint-summary endpoint-summary--compact" style={{ padding: '0.5rem', background: 'transparent', border: 'none' }}>
-        <a className="endpoint-preview__link" href={previewUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem', textDecoration: 'none' }}>
-          <span className="icon"></span> {previewUrl}
-        </a>
+        {project.remoteId ? (
+          <a className="endpoint-preview__link" href={previewUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem', textDecoration: 'none' }}>
+            <span className="icon"></span> {previewUrl}
+          </a>
+        ) : (
+          <p className="muted-text" style={{ fontSize: '0.8rem', margin: 0 }}>Guarda el proyecto para ver la URL de prueba del mock.</p>
+        )}
       </div>
 
-      {error ? <p className="error-text">{error}</p> : null}
+      {error ? <p className="error-text" style={{ margin: '0.5rem 0' }}>{error}</p> : null}
 
-      <form onSubmit={handleSubmit} className="endpoint-form">
-        <p className="eyebrow">Endpoint blueprint</p>
-        <p className="method-hint method-hint--standalone" aria-live="polite">
-          <span className="method-hint__icon">i</span>
-          {METHOD_DESCRIPTIONS[draft.method]}
+      {/* ─── Nuevo Endpoint ─── */}
+      <form onSubmit={handleSubmit} className="endpoint-blueprint">
+        <p className="endpoint-blueprint__title">Nuevo endpoint</p>
+        <p className="endpoint-blueprint__desc">
+          Selecciona un dataset, elige el tipo de operacion y completa los datos. La ruta se genera automaticamente segun el tipo.
         </p>
-        <div className="endpoint-form__row">
-          <select
-            value={draft.targetDatasetId}
-            className="field endpoint-form__dataset-select"
-            onChange={(event) => setDraft({ ...draft, targetDatasetId: event.target.value })}
-          >
-            {project.datasets.map((ds) => (
-              <option key={ds.id} value={ds.id}>{ds.name}</option>
-            ))}
-          </select>
 
-          <select
-            value={draft.operationType}
-            className="field endpoint-form__operation-select"
-            onChange={(event) => handleOperationChange(event.target.value as ApiEndpoint['operationType'])}
-          >
-            {OPERATION_OPTIONS.map((op) => (
-              <option key={op.value} value={op.value}>{op.label}</option>
-            ))}
-          </select>
-
-          {draft.operationType === 'custom' && (
-            <select
-              value={draft.method}
-              className="field endpoint-form__method-select"
-              onChange={(event) => setDraft({ ...draft, method: event.target.value as ApiEndpoint['method'] })}
+        {/* Operation type selector */}
+        <div className="endpoint-blueprint__ops">
+          {OPERATION_OPTIONS.map((op) => (
+            <button
+              key={op.value}
+              type="button"
+              className={`endpoint-blueprint__op ${draft.operationType === op.value ? 'active' : ''}`}
+              style={draft.operationType === op.value && op.method ? { borderColor: METHOD_COLORS[op.method as ApiEndpoint['method']], color: METHOD_COLORS[op.method as ApiEndpoint['method']] } : {}}
+              onClick={() => handleOperationChange(op.value)}
             >
-              {METHOD_OPTIONS.map((method) => (
-                <option key={method}>{method}</option>
+              {op.label}
+            </button>
+          ))}
+        </div>
+        <p className="endpoint-blueprint__hint">{OPERATION_OPTIONS.find(o => o.value === draft.operationType)?.desc}</p>
+
+        {/* Fields */}
+        <div className="endpoint-blueprint__fields">
+          <div className="endpoint-blueprint__field">
+            <label>Dataset</label>
+            <select
+              value={draft.targetDatasetId}
+              onChange={(e) => {
+                const newDsId = e.target.value
+                setDraft({ ...draft, targetDatasetId: newDsId })
+                const ds = project.datasets.find(d => d.id === newDsId)
+                if (ds && draft.operationType !== 'custom') {
+                  const updates = getOperationUpdates(draft.operationType, ds.name)
+                  setDraft(prev => ({ ...prev, ...updates, targetDatasetId: newDsId }))
+                }
+              }}
+            >
+              {project.datasets.map((ds) => (
+                <option key={ds.id} value={ds.id}>{ds.name}</option>
               ))}
             </select>
+          </div>
+
+          {draft.operationType === 'custom' && (
+            <div className="endpoint-blueprint__field">
+              <label>Metodo HTTP</label>
+              <select
+                value={draft.method}
+                onChange={(e) => setDraft({ ...draft, method: e.target.value as ApiEndpoint['method'] })}
+              >
+                {METHOD_OPTIONS.map((method) => (
+                  <option key={method} value={method}>{method}</option>
+                ))}
+              </select>
+            </div>
           )}
-          <input
-            value={draft.path}
-            className="field"
-            onChange={(event) => setDraft({ ...draft, path: event.target.value })}
-            placeholder="/resource"
-          />
-          <input
-            value={draft.name}
-            className="field"
-            onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-            placeholder="Nombre corto"
-          />
+
+          <div className="endpoint-blueprint__field">
+            <label>Ruta</label>
+            <input
+              value={draft.path}
+              onChange={(e) => setDraft({ ...draft, path: e.target.value })}
+              placeholder={`/${selectedDsName.toLowerCase().replace(/\s+/g, '-')}`}
+            />
+          </div>
+
+          <div className="endpoint-blueprint__field">
+            <label>Nombre</label>
+            <input
+              value={draft.name}
+              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              placeholder="Ej: Listar usuarios"
+            />
+          </div>
         </div>
-        <div className="endpoint-form__row">
+
+        <div className="endpoint-blueprint__field endpoint-blueprint__field--wide">
+          <label>Descripcion (opcional)</label>
           <input
             value={draft.summary}
-            className="field endpoint-form__summary-field"
-            onChange={(event) => setDraft({ ...draft, summary: event.target.value })}
-            placeholder="Descripción del endpoint (opcional)"
+            onChange={(e) => setDraft({ ...draft, summary: e.target.value })}
+            placeholder="Explica brevemente que hace este endpoint"
           />
         </div>
-        <div className="endpoint-form__actions">
+
+        <div className="endpoint-blueprint__actions">
           <button type="submit" className="btn primary">
-            Añadir endpoint
+            Anadir endpoint
           </button>
         </div>
       </form>
 
-      <div className="endpoint-list">
-        {endpoints.map((endpoint) => (
-          <div key={endpoint.id} className={clsx('endpoint-item', editingId === endpoint.id && 'endpoint-item--editing')}>
-            {editingId === endpoint.id && editDraft ? (
-              <form onSubmit={handleEditSubmit} className="endpoint-form endpoint-form--inline">
-                <div className="endpoint-form__row">
-                  <select
-                    value={editDraft.operationType}
-                    className="field"
-                    onChange={(event) => handleEditOperationChange(event.target.value as ApiEndpoint['operationType'])}
-                  >
-                    {OPERATION_OPTIONS.map((op) => (
-                      <option key={op.value} value={op.value}>{op.label}</option>
-                    ))}
-                  </select>
-                  {editDraft.operationType === 'custom' && (
-                    <select
-                      value={editDraft.method}
-                      className="field"
-                      onChange={(event) => setEditDraft({ ...editDraft, method: event.target.value as ApiEndpoint['method'] })}
-                    >
-                      {METHOD_OPTIONS.map((method) => (
-                        <option key={method}>{method}</option>
-                      ))}
-                    </select>
-                  )}
-                  <input
-                    value={editDraft.path}
-                    className="field"
-                    onChange={(event) => setEditDraft({ ...editDraft, path: event.target.value })}
-                    placeholder="/resource"
-                  />
-                  <input
-                    value={editDraft.name}
-                    className="field"
-                    onChange={(event) => setEditDraft({ ...editDraft, name: event.target.value })}
-                    placeholder="Nombre"
-                  />
-                </div>
-                <div className="endpoint-form__row">
-                  <input
-                    value={editDraft.summary}
-                    className="field endpoint-form__summary-field"
-                    onChange={(event) => setEditDraft({ ...editDraft, summary: event.target.value })}
-                    placeholder="Descripción"
-                  />
-                </div>
-                <div className="endpoint-form__actions">
-                  <button type="submit" className="btn primary btn-small">Guardar</button>
-                  <button type="button" className="btn subtle btn-small" onClick={cancelEdit}>Cancelar</button>
-                </div>
-              </form>
-            ) : (
-              <>
-                <div className="endpoint-item__header">
-                  <span className={clsx('endpoint-item__method', METHOD_CLASS[endpoint.method])}>{endpoint.method}</span>
-                  <code className="endpoint-item__route">{endpoint.path}</code>
-                  {endpoint.operationType && endpoint.operationType !== 'custom' && (
-                    <span className="endpoint-item__type-badge">{endpoint.operationType}</span>
-                  )}
-                </div>
-                <div className="endpoint-item__body">
-                  <p className="endpoint-item__title">{endpoint.name}</p>
-                  {endpoint.summary ? <p className="endpoint-item__summary">{endpoint.summary}</p> : null}
-                  {previewBase && (
-                    <a
-                      href={previewBase + endpoint.path.replace('{id}', '1')}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="endpoint-item__url"
-                    >
-                      {previewBase}{endpoint.path}
-                    </a>
-                  )}
-                </div>
-                <div className="endpoint-item__actions">
-                  <button type="button" className="endpoint-item__edit" onClick={() => handleEdit(endpoint)}>
-                    Editar
-                  </button>
-                  <button type="button" className="endpoint-item__remove" onClick={() => onRemove(endpoint.id)} aria-label={`Eliminar ${endpoint.name}`}>
-                    ×
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        ))}
-        {endpoints.length === 0 ? <p className="endpoint-empty">Añade al menos un endpoint para generar la API.</p> : null}
+      {/* ─── Lista de endpoints ─── */}
+      <div className="endpoint-list" style={{ marginTop: '1.5rem' }}>
+        <p className="endpoint-blueprint__title" style={{ fontSize: '0.95rem', marginBottom: '0.75rem' }}>
+          Endpoints definidos ({endpoints.length})
+        </p>
+        {endpoints.length === 0 ? (
+          <p className="endpoint-empty" style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8', fontSize: '0.85rem' }}>
+            No hay endpoints. Usa el formulario de arriba para anadir uno.
+          </p>
+        ) : (
+          endpoints.map((endpoint) => (
+            <div key={endpoint.id} className={clsx('endpoint-item', editingId === endpoint.id && 'endpoint-item--editing')}>
+              {editingId === endpoint.id && editDraft ? (
+                <form onSubmit={handleEditSubmit} className="endpoint-edit-form">
+                  <div className="endpoint-blueprint__fields">
+                    <div className="endpoint-blueprint__field">
+                      <label>Tipo</label>
+                      <select value={editDraft.operationType} onChange={(e) => handleEditOperationChange(e.target.value as ApiEndpoint['operationType'])}>
+                        {OPERATION_OPTIONS.map((op) => (
+                          <option key={op.value} value={op.value}>{op.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {editDraft.operationType === 'custom' && (
+                      <div className="endpoint-blueprint__field">
+                        <label>Metodo</label>
+                        <select value={editDraft.method} onChange={(e) => setEditDraft({ ...editDraft, method: e.target.value as ApiEndpoint['method'] })}>
+                          {METHOD_OPTIONS.map((m) => (<option key={m} value={m}>{m}</option>))}
+                        </select>
+                      </div>
+                    )}
+                    <div className="endpoint-blueprint__field">
+                      <label>Ruta</label>
+                      <input value={editDraft.path} onChange={(e) => setEditDraft({ ...editDraft, path: e.target.value })} />
+                    </div>
+                    <div className="endpoint-blueprint__field">
+                      <label>Nombre</label>
+                      <input value={editDraft.name} onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="endpoint-blueprint__field endpoint-blueprint__field--wide">
+                    <label>Descripcion</label>
+                    <input value={editDraft.summary} onChange={(e) => setEditDraft({ ...editDraft, summary: e.target.value })} placeholder="Opcional" />
+                  </div>
+                  <div className="endpoint-blueprint__actions" style={{ marginTop: '0.5rem' }}>
+                    <button type="submit" className="btn primary btn-small">Guardar</button>
+                    <button type="button" className="btn subtle btn-small" onClick={cancelEdit}>Cancelar</button>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <div className="endpoint-item__header">
+                    <span className="endpoint-item__method" style={{ backgroundColor: `${METHOD_COLORS[endpoint.method]}1a`, color: METHOD_COLORS[endpoint.method] }}>
+                      {endpoint.method}
+                    </span>
+                    <code className="endpoint-item__route">{endpoint.path}</code>
+                    {endpoint.operationType && endpoint.operationType !== 'custom' && (
+                      <span className="endpoint-item__type-badge">{endpoint.operationType}</span>
+                    )}
+                    <span className="endpoint-item__dataset">
+                      {project.datasets.find(d => d.id === endpoint.targetDatasetId)?.name || 'Sin dataset'}
+                    </span>
+                  </div>
+                  <div className="endpoint-item__body">
+                    <p className="endpoint-item__title">{endpoint.name}</p>
+                    {endpoint.summary ? <p className="endpoint-item__summary">{endpoint.summary}</p> : null}
+                  </div>
+                  <div className="endpoint-item__actions">
+                    <button type="button" className="endpoint-item__edit" onClick={() => handleEdit(endpoint)}>Editar</button>
+                    <button type="button" className="endpoint-item__remove" onClick={() => onRemove(endpoint.id)} aria-label={`Eliminar ${endpoint.name}`}>&times;</button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))
+        )}
       </div>
 
-      {warningMessage ? <p className="error-text">{warningMessage}</p> : null}
+      {warningMessage ? <p className="error-text" style={{ marginTop: '0.5rem' }}>{warningMessage}</p> : null}
+
+      <style>{`
+        .endpoint-blueprint {
+          border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.25rem;
+          background: #fafbfc; margin-top: 0.75rem;
+        }
+        .endpoint-blueprint__title {
+          margin: 0 0 0.25rem; font-weight: 600; font-size: 1rem; color: #1e293b;
+        }
+        .endpoint-blueprint__desc {
+          margin: 0 0 1rem; font-size: 0.8rem; color: #64748b;
+        }
+        .endpoint-blueprint__ops {
+          display: flex; gap: 0.35rem; flex-wrap: wrap; margin-bottom: 0.35rem;
+        }
+        .endpoint-blueprint__op {
+          padding: 0.4rem 0.85rem; border-radius: 6px; border: 1px solid #e2e8f0;
+          background: #fff; font-size: 0.8rem; cursor: pointer; color: #475569;
+          transition: all 0.12s; font-weight: 500;
+        }
+        .endpoint-blueprint__op:hover { border-color: #93c5fd; color: #2563eb; }
+        .endpoint-blueprint__op.active {
+          background: #eff6ff; border-color: #3b82f6; color: #1d4ed8; font-weight: 600;
+        }
+        .endpoint-blueprint__hint {
+          font-size: 0.75rem; color: #64748b; margin: 0 0 1rem; padding-left: 0.15rem;
+        }
+        .endpoint-blueprint__fields {
+          display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem;
+        }
+        .endpoint-blueprint__field { display: flex; flex-direction: column; gap: 0.25rem; flex: 1; min-width: 140px; }
+        .endpoint-blueprint__field--wide { min-width: 100%; }
+        .endpoint-blueprint__field label {
+          font-size: 0.75rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.03em;
+        }
+        .endpoint-blueprint__field input, .endpoint-blueprint__field select {
+          padding: 0.45rem 0.6rem; border: 1px solid #e2e8f0; border-radius: 6px;
+          font-size: 0.85rem; background: #fff; outline: none;
+        }
+        .endpoint-blueprint__field input:focus, .endpoint-blueprint__field select:focus {
+          border-color: #3b82f6; box-shadow: 0 0 0 2px #bfdbfe;
+        }
+        .endpoint-blueprint__actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+
+        .endpoint-item__dataset {
+          margin-left: auto; font-size: 0.7rem; color: #94a3b8;
+          background: #f1f5f9; padding: 0.15rem 0.45rem; border-radius: 4px;
+        }
+        .endpoint-item__type-badge {
+          font-size: 0.65rem; background: #e0e7ff; color: #4338ca;
+          padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 600;
+          text-transform: uppercase; margin-left: 0.35rem;
+        }
+        .endpoint-edit-form {
+          border: 1px solid #bfdbfe; border-radius: 8px; padding: 0.75rem;
+          background: #f8faff;
+        }
+        .endpoint-empty {
+          text-align: center; padding: 1.5rem; color: #94a3b8; font-size: 0.85rem;
+        }
+      `}</style>
     </div>
   )
 }

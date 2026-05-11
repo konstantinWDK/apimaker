@@ -121,3 +121,9 @@ class GenerationResult(BaseModel):
     openapi_path: str
     bundle_path: str
     sdk_paths: list[str]
+
+
+class ErrorResponse(BaseModel):
+    detail: str
+    error_code: str | None = None
+    errors: list[dict] | None = None
