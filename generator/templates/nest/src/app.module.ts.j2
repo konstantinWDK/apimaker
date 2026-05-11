@@ -5,7 +5,7 @@ import { AppController } from './app.controller';
 // ─── Entity Definitions ────────────────────────────────────────
 {% for ds in datasets %}
 {% set model_name = ds.name | capitalize | replace(" ", "") %}
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 
 @Entity('{{ model_name | lower }}')
 export class {{ model_name }} {
@@ -13,10 +13,27 @@ export class {{ model_name }} {
   id: number;
 
 {% for field in ds.fields %}
-  @Column({ type: '{{ "text" if field.type == "string" else "integer" if field.type == "integer" else "real" if field.type == "float" else "boolean" if field.type == "boolean" else "text" }}', nullable: {{ not field.required }} })
+  {% if field.references %}
+  @Column({ type: '{{ "text" if field.type == "string" else "integer" if field.type == "integer" else "real" if field.type == "float" else "boolean" if field.type == "boolean" else "text" }}', nullable: {{ (not field.required) | js_bool }} })
   {{ field.name }}: {{ "string" if field.type in ["string", "datetime", "email"] else "number" if field.type in ["integer", "float"] else "boolean" }};
 
+  @ManyToOne(() => {{ field.references.dataset_name | capitalize | replace(" ", "") }}, (parent: {{ field.references.dataset_name | capitalize | replace(" ", "") }}) => parent.{{ ds.name | lower | replace(" ", "_") }}Items)
+  @JoinColumn({ name: '{{ field.name }}' })
+  {{ field.references.dataset_name | lower }}: {{ field.references.dataset_name | capitalize | replace(" ", "") }};
+
+  {% else %}
+  @Column({ type: '{{ "text" if field.type == "string" else "integer" if field.type == "integer" else "real" if field.type == "float" else "boolean" if field.type == "boolean" else "text" }}', nullable: {{ (not field.required) | js_bool }} })
+  {{ field.name }}: {{ "string" if field.type in ["string", "datetime", "email"] else "number" if field.type in ["integer", "float"] else "boolean" }};
+
+  {% endif %}
 {% endfor %}
+  {% if ds.referenced_by %}
+{% for ref in ds.referenced_by %}
+  @OneToMany(() => {{ ref.dataset_name | capitalize | replace(" ", "") }}, (child: {{ ref.dataset_name | capitalize | replace(" ", "") }}) => child.{{ ds.name | lower }})
+  {{ ref.dataset_name | lower | replace(" ", "_") }}Items: {{ ref.dataset_name | capitalize | replace(" ", "") }}[];
+
+{% endfor %}
+  {% endif %}
   @CreateDateColumn()
   createdAt: Date;
 

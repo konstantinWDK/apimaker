@@ -67,16 +67,21 @@ const createDefaultProject = (): ProjectDraft => {
 
 const sanitizeDataset = (dataset?: DatasetMeta): DatasetMeta | undefined => {
   if (!dataset) return undefined
-  // Explicitly preserve sampleRows from the source dataset
+  // Explicitly preserve all properties from the source dataset
   const sampleRows = (dataset as any).sampleRows ?? dataset.sampleRows ?? []
   const savedRequests = (dataset as any).savedRequests ?? (dataset as any).saved_requests ?? dataset.savedRequests ?? []
   return {
     id: dataset.id,
     name: dataset.name,
     sourceType: dataset.sourceType ?? 'manual',
-    fields: dataset.fields ?? [],
+    fields: (dataset.fields ?? []).map((f) => ({
+      ...f,
+      id: f.id || crypto.randomUUID(),
+    })),
     sampleRows,
     savedRequests,
+    description: dataset.description,
+    icon: dataset.icon,
     uploadedFrom: (dataset as any).uploadedFrom,
   }
 }
@@ -126,11 +131,16 @@ const api = {
         name: d.name,
         sourceType: d.source_type,
         fields: (d.fields || []).map((f: any) => ({
-          id: createId(),
+          id: f.id || createId(),
           name: f.name,
           type: f.type,
-          required: f.required,
+          required: f.required ?? true,
           description: f.description,
+          isPrimaryKey: f.is_primary_key ?? false,
+          defaultValue: f.default_value,
+          fakerCategory: f.faker_category,
+          enum: f.enum_values || undefined,
+          references: f.references || undefined,
         })),
         sampleRows: d.sample_rows || [],
         savedRequests: d.saved_requests || [],
@@ -139,11 +149,16 @@ const api = {
         name: p.dataset.name,
         sourceType: p.dataset.source_type,
         fields: (p.dataset.fields || []).map((f: any) => ({
-          id: createId(),
+          id: f.id || createId(),
           name: f.name,
           type: f.type,
-          required: f.required,
+          required: f.required ?? true,
           description: f.description,
+          isPrimaryKey: f.is_primary_key ?? false,
+          defaultValue: f.default_value,
+          fakerCategory: f.faker_category,
+          enum: f.enum_values || undefined,
+          references: f.references || undefined,
         })),
         sampleRows: p.dataset.sample_rows || [],
         savedRequests: p.dataset.saved_requests || [],
@@ -176,6 +191,11 @@ const api = {
           type: f.type,
           required: f.required ?? true,
           description: f.description,
+          is_primary_key: f.isPrimaryKey ?? false,
+          default_value: f.defaultValue,
+          faker_category: f.fakerCategory,
+          enum_values: f.enum || null,
+          references: f.references || null,
         })),
         sample_rows: ds.sampleRows || [],
         saved_requests: ds.savedRequests || [],
@@ -215,11 +235,16 @@ const api = {
         name: d.name,
         sourceType: d.source_type,
         fields: (d.fields || []).map((f: any) => ({
-          id: createId(),
+          id: f.id || createId(),
           name: f.name,
           type: f.type,
-          required: f.required,
+          required: f.required ?? true,
           description: f.description,
+          isPrimaryKey: f.is_primary_key ?? false,
+          defaultValue: f.default_value,
+          fakerCategory: f.faker_category,
+          enum: f.enum_values || undefined,
+          references: f.references || undefined,
         })),
         sampleRows: d.sample_rows || [],
         savedRequests: d.saved_requests || [],
@@ -250,6 +275,11 @@ const api = {
           type: f.type,
           required: f.required ?? true,
           description: f.description,
+          is_primary_key: f.isPrimaryKey ?? false,
+          default_value: f.defaultValue,
+          faker_category: f.fakerCategory,
+          enum_values: f.enum || null,
+          references: f.references || null,
         })),
         sample_rows: dataset.sampleRows,
         saved_requests: dataset.savedRequests,
@@ -690,7 +720,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
 
         if (created) {
           effectiveId = created.slug || created.id
-          currentProject = { ...currentProject, remoteId: effectiveId }
+          currentProject = { ...currentProject, id: created.id, remoteId: effectiveId }
           set({ project: currentProject })
           persist(currentProject, get().selectedDatasetId)
         } else {
@@ -714,14 +744,14 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
           const existing = all.find(p => p.slug === currentProject.slug)
           if (existing) {
             effectiveId = existing.slug || existing.id
-            currentProject = { ...currentProject, remoteId: effectiveId }
+            currentProject = { ...currentProject, id: existing.id, remoteId: effectiveId }
             set({ project: currentProject })
             persist(currentProject, get().selectedDatasetId)
           } else {
             let created = await api.createProject(currentProject)
             if (created) {
               effectiveId = created.slug || created.id
-              currentProject = { ...currentProject, remoteId: effectiveId }
+              currentProject = { ...currentProject, id: created.id, remoteId: effectiveId }
               set({ project: currentProject })
               persist(currentProject, get().selectedDatasetId)
             } else {

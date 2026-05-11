@@ -17,8 +17,8 @@ from typing import Optional, Annotated, List, Dict, Any
 from fastapi import FastAPI, HTTPException, Query, Request, Depends, Security
 from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
-from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+from sqlalchemy import create_engine, ForeignKey
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, relationship
 import jwt
 
 # ─── Configuration ───────────────────────────────────────────────
@@ -60,10 +60,21 @@ class {{ ds.name | capitalize | replace(" ", "") }}Record(Base):
     __tablename__ = "{{ ds.name | lower | replace(" ", "_") }}_records"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 {% for field in ds.fields %}
+  {% if field.references %}
+    {{ field.name }}: Mapped[{{ field.python_type }}]{% if not field.required %} | None{% endif %} = mapped_column(ForeignKey("{{ field.references.dataset_name | lower | replace(" ", "_") }}_records.{{ field.references.field_name }}"){% if not field.required %}, nullable=True{% endif %})
+    {{ field.name }}_rel: Mapped[Optional["{{ field.references.dataset_name | capitalize | replace(" ", "") }}Record"]] = relationship(back_populates="{{ ds.name | lower | replace(" ", "_") }}_items")
+  {% else %}
     {{ field.name }}: Mapped[{{ field.python_type }}]{% if not field.required %} | None{% endif %} = mapped_column({% if not field.required %}nullable=True{% else %}nullable=False{% endif %})
+  {% endif %}
 {% endfor %}
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+  {% if ds.referenced_by %}
+{% for ref in ds.referenced_by %}
+    {{ ref.dataset_name | lower | replace(" ", "_") }}_items: Mapped[list["{{ ref.dataset_name | capitalize | replace(" ", "") }}Record"]] = relationship(back_populates="{{ ref.field_name }}_rel")
+{% endfor %}
+  {% endif %}
 
 class {{ ds.name | capitalize | replace(" ", "") }}Create(BaseModel):
 {% for field in ds.fields %}

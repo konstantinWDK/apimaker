@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from sqlmodel import Session, select
 
-from ..db_models import Dataset, DatasetField, Endpoint, Project
+from ..db_models import Dataset, DatasetField, Endpoint, FieldMappingRule, Project
 
 
 
@@ -191,6 +191,14 @@ class ProjectService:
         session.flush()
 
         for f in fields:
+            refs = f.get("references")
+            if refs and isinstance(refs, dict):
+                import json as _json
+                refs = _json.dumps(refs)
+            enum_vals = f.get("enum_values")
+            if enum_vals and isinstance(enum_vals, list):
+                import json as _json
+                enum_vals = _json.dumps(enum_vals)
             session.add(
                 DatasetField(
                     dataset_id=dataset.id,
@@ -198,6 +206,11 @@ class ProjectService:
                     field_type=f["type"],
                     required=f.get("required", True),
                     description=f.get("description"),
+                    is_primary_key=f.get("is_primary_key", False),
+                    default_value=f.get("default_value"),
+                    faker_category=f.get("faker_category"),
+                    enum_values=enum_vals,
+                    references=refs,
                 )
             )
 
@@ -254,6 +267,66 @@ class ProjectService:
         session.refresh(project)
         return project
 
+    # ─── Mapping CRUD ─────────────────────────────────────────────────
+    def list_mappings(self, session: Session, project_id: str) -> list[FieldMappingRule]:
+        return session.exec(
+            select(FieldMappingRule).where(FieldMappingRule.project_id == str(project_id))
+        ).all()
+
+    def create_mapping(
+        self,
+        session: Session,
+        project_id: str,
+        source_dataset_id: str,
+        source_field_id: str,
+        target_dataset_id: str,
+        target_field_id: str,
+        transformation: str | None = None,
+    ) -> FieldMappingRule:
+        mapping = FieldMappingRule(
+            project_id=str(project_id),
+            source_dataset_id=source_dataset_id,
+            source_field_id=source_field_id,
+            target_dataset_id=target_dataset_id,
+            target_field_id=target_field_id,
+            transformation=transformation,
+        )
+        session.add(mapping)
+
+        # Update DatasetField.references on the target field to point to the source
+        target_field = session.get(DatasetField, target_field_id)
+        if target_field:
+            source_field = session.get(DatasetField, source_field_id)
+            source_dataset = session.get(Dataset, source_dataset_id)
+            if source_field and source_dataset:
+                ref_payload = {
+                    "datasetId": source_dataset_id,
+                    "fieldName": source_field.name,
+                    "datasetName": source_dataset.name,
+                }
+                import json
+                target_field.references = json.dumps(ref_payload)
+                session.add(target_field)
+
+        session.commit()
+        session.refresh(mapping)
+        return mapping
+
+    def delete_mapping(self, session: Session, mapping_id: str) -> None:
+        mapping = session.get(FieldMappingRule, mapping_id)
+        if not mapping:
+            raise KeyError("Mapping not found")
+
+        # Clear references on the target field
+        if mapping.target_field_id:
+            target_field = session.get(DatasetField, mapping.target_field_id)
+            if target_field:
+                target_field.references = None
+                session.add(target_field)
+
+        session.delete(mapping)
+        session.commit()
+
     def delete_project(self, session: Session, project_id: str) -> None:
         project = self.get_project(session, project_id)
 
@@ -274,6 +347,13 @@ class ProjectService:
             for f in existing_fields:
                 session.delete(f)
             session.delete(ds)
+
+        # Delete mapping rules
+        existing_mappings = session.exec(
+            select(FieldMappingRule).where(FieldMappingRule.project_id == str(project_id))
+        ).all()
+        for m in existing_mappings:
+            session.delete(m)
 
         # Delete share snapshots
         from ..db_models import ShareSnapshot

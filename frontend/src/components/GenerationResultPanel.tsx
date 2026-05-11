@@ -12,8 +12,6 @@ interface Props {
 export function GenerationResultPanel({ result, projectId }: Props) {
   const [copied, setCopied] = useState(false)
   const [downloading, setDownloading] = useState(false)
-  const [sharing, setSharing] = useState(false)
-  const [shareUrl, setShareUrl] = useState<string | null>(result.shareUrl || null)
   const [exporting, setExporting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)

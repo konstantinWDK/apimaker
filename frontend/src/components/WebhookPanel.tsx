@@ -24,7 +24,7 @@ export function WebhookPanel({ projectId }: Props) {
   const [loading, setLoading] = useState(true)
   const [url, setUrl] = useState('')
   const [selectedEvents, setSelectedEvents] = useState<string[]>(['create'])
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [testingId, setTestingId] = useState<string | null>(null)
 

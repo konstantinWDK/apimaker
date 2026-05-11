@@ -284,9 +284,7 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
 
     // 2. Update query params if we found any in the path
     if (newQueryParams.length > 0) {
-      setQueryParams(prev => {
-        const existing = prev.filter(q => q.key !== '')
-        // We prioritize the typed ones
+      setQueryParams(() => {
         return [...newQueryParams, { key: '', value: '' }]
       })
     }

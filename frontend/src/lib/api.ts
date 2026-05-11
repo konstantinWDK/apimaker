@@ -1,4 +1,4 @@
-import type { ProjectDraft } from '../types/schemas'
+import type { MappingRule, ProjectDraft } from '../types/schemas'
 import { readBackendConfig } from './backendConfig'
 
 const cleanBaseUrl = (value: string) => value.replace(/\/$/, '')
@@ -53,17 +53,24 @@ const ensureBaseUrl = (): string => {
   return cleanBaseUrl(baseUrl)
 }
 
+const toFieldPayload = (field: ProjectDraft['datasets'][0]['fields'][0]) => ({
+  name: field.name,
+  type: field.type,
+  required: field.required,
+  description: field.description,
+  is_primary_key: field.isPrimaryKey ?? false,
+  default_value: field.defaultValue,
+  faker_category: field.fakerCategory,
+  enum_values: field.enum ?? null,
+  references: field.references ?? null,
+})
+
 const toDatasetsPayload = (project: ProjectDraft) => {
   return project.datasets.map((dataset) => ({
     id: dataset.id,
     name: dataset.name,
     source_type: dataset.sourceType ?? 'manual',
-    fields: dataset.fields.map((field) => ({
-      name: field.name,
-      type: field.type,
-      required: field.required,
-      description: field.description,
-    })),
+    fields: dataset.fields.map(toFieldPayload),
     sample_rows: dataset.sampleRows || [],
   }))
 }
@@ -162,13 +169,24 @@ export const fetchRemoteProjects = async (): Promise<ProjectDraft[]> => {
     description: item.description,
     authMethod: (item.auth_method as any) || 'none',
     targetStack: item.target_stack,
-    datasets: (item.datasets || []).map((ds: any) => ({
-      id: ds.id,
-      name: ds.name,
-      sourceType: ds.source_type,
-      fields: ds.fields || [],
-      sampleRows: ds.sample_rows || [],
-    })),
+      datasets: (item.datasets || []).map((ds: any) => ({
+        id: ds.id,
+        name: ds.name,
+        sourceType: ds.source_type,
+        fields: (ds.fields || []).map((f: any) => ({
+          id: f.id || crypto.randomUUID(),
+          name: f.name,
+          type: f.type,
+          required: f.required ?? true,
+          description: f.description,
+          isPrimaryKey: f.is_primary_key ?? false,
+          defaultValue: f.default_value,
+          fakerCategory: f.faker_category,
+          enum: f.enum_values || undefined,
+          references: f.references || undefined,
+        })),
+        sampleRows: ds.sample_rows || [],
+      })),
     endpoints: item.endpoints || [],
     updatedAt: item.updated_at,
   }))
@@ -202,7 +220,18 @@ export const createRemoteProject = async (
       id: ds.id,
       name: ds.name,
       sourceType: ds.source_type,
-      fields: ds.fields || [],
+      fields: (ds.fields || []).map((f: any) => ({
+        id: f.id || crypto.randomUUID(),
+        name: f.name,
+        type: f.type,
+        required: f.required ?? true,
+        description: f.description,
+        isPrimaryKey: f.is_primary_key ?? false,
+        defaultValue: f.default_value,
+        fakerCategory: f.faker_category,
+        enum: f.enum_values || undefined,
+        references: f.references || undefined,
+      })),
       sampleRows: ds.sample_rows || [],
     })),
     endpoints: data.endpoints || [],
@@ -242,21 +271,23 @@ export const fetchRemoteProject = async (projectId: string): Promise<ProjectDraf
       id: ds.id,
       name: ds.name,
       sourceType: ds.source_type,
-      fields: ds.fields || [],
+      fields: (ds.fields || []).map((f: any) => ({
+        id: f.id || crypto.randomUUID(),
+        name: f.name,
+        type: f.type,
+        required: f.required ?? true,
+        description: f.description,
+        isPrimaryKey: f.is_primary_key ?? false,
+        defaultValue: f.default_value,
+        fakerCategory: f.faker_category,
+        enum: f.enum_values || undefined,
+        references: f.references || undefined,
+      })),
       sampleRows: ds.sample_rows || [],
     })),
     endpoints: data.endpoints || [],
     updatedAt: data.project.updated_at,
   }
-}
-
-/**
- * Health check the backend.
- */
-export const healthCheck = async (): Promise<{ status: string; environment: string }> => {
-  const baseUrl = ensureBaseUrl()
-  const response = await fetch(`${baseUrl}/health`)
-  return handleResponse(response)
 }
 
 /**
@@ -302,6 +333,58 @@ export const createShare = async (
 /**
  * Get a share snapshot (public).
  */
+// ─── Mapping Rules API ─────────────────────────────────────────
+
+export interface MappingPayload {
+  source_dataset_id: string
+  source_field_id: string
+  target_dataset_id: string
+  target_field_id: string
+  transformation?: Record<string, any> | null
+}
+
+const mapMappingResponse = (m: any): MappingRule => ({
+  id: m.id,
+  projectId: m.project_id,
+  sourceDatasetId: m.source_dataset_id,
+  sourceFieldId: m.source_field_id,
+  targetDatasetId: m.target_dataset_id,
+  targetFieldId: m.target_field_id,
+  transformation: m.transformation || undefined,
+  createdAt: m.created_at,
+  updatedAt: m.updated_at,
+})
+
+export const fetchMappings = async (projectId: string): Promise<MappingRule[]> => {
+  const baseUrl = ensureBaseUrl()
+  const headers = buildHeaders()
+  const response = await fetch(`${baseUrl}/projects/${projectId}/mappings`, { headers })
+  const data = await handleResponse(response)
+  return (data || []).map(mapMappingResponse)
+}
+
+export const createMapping = async (projectId: string, payload: MappingPayload): Promise<MappingRule> => {
+  const baseUrl = ensureBaseUrl()
+  const headers = buildHeaders()
+  const response = await fetch(`${baseUrl}/projects/${projectId}/mappings`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  })
+  const data = await handleResponse(response)
+  return mapMappingResponse(data)
+}
+
+export const deleteMapping = async (projectId: string, mappingId: string): Promise<void> => {
+  const baseUrl = ensureBaseUrl()
+  const headers = buildHeaders()
+  const response = await fetch(`${baseUrl}/projects/${projectId}/mappings/${mappingId}`, {
+    method: 'DELETE',
+    headers,
+  })
+  await handleResponse(response)
+}
+
 export const getShareSnapshot = async (
   snapshotId: string,
   slug: string,

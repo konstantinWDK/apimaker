@@ -30,13 +30,39 @@ const {{ model_name }} = sequelize.define('{{ model_name }}', {
 {% for field in ds.fields %}
   {{ field.name }}: {
     type: DataTypes.{{ field.type | upper }},
-    allowNull: {{ not field.required }},
+    allowNull: {{ (not field.required) | js_bool }}{% if field.references %},
+    references: {
+      model: '{{ field.references.dataset_name | capitalize | replace(" ", "") }}',
+      key: '{{ field.references.field_name }}',
+    },
+    onUpdate: 'CASCADE',
+    onDelete: 'SET NULL'{% endif %}
   },
 {% endfor %}
   createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
   updatedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
 });
 
+{% endfor %}
+
+// ─── Associations (Foreign Keys) ──────────────────────────────
+{% for ds in datasets %}
+{% for field in ds.fields %}
+  {% if field.references %}
+const {{ ds.name | capitalize | replace(" ", "") }} = sequelize.models['{{ ds.name | capitalize | replace(" ", "") }}'];
+const {{ field.references.dataset_name | capitalize | replace(" ", "") }} = sequelize.models['{{ field.references.dataset_name | capitalize | replace(" ", "") }}'];
+if ({{ ds.name | capitalize | replace(" ", "") }} && {{ field.references.dataset_name | capitalize | replace(" ", "") }}) {
+  {{ ds.name | capitalize | replace(" ", "") }}.belongsTo({{ field.references.dataset_name | capitalize | replace(" ", "") }}, {
+    foreignKey: '{{ field.name }}',
+    as: '{{ field.references.dataset_name | lower | replace(" ", "_") }}',
+  });
+  {{ field.references.dataset_name | capitalize | replace(" ", "") }}.hasMany({{ ds.name | capitalize | replace(" ", "") }}, {
+    foreignKey: '{{ field.name }}',
+    as: '{{ ds.name | lower | replace(" ", "_") }}_items',
+  });
+}
+  {% endif %}
+{% endfor %}
 {% endfor %}
 
 // ─── Swagger Setup ─────────────────────────────────────────────

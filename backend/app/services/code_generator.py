@@ -49,29 +49,92 @@ def _build_context(
     include_data: bool = True,
 ) -> dict:
     """Build the Jinja2 template context."""
+    import json
+    
+    # Build a name lookup for datasets (id -> name) to resolve FK references
+    dataset_name_map = {}
+    for entry in datasets_with_fields:
+        ds = entry["dataset"]
+        dataset_name_map[ds.id] = ds.name
+    
+    # First pass: collect all field references
+    field_references = {}  # child_dataset_id -> [(child_field_name, ref_dataset_id, ref_field_name)]
+    for entry in datasets_with_fields:
+        ds = entry["dataset"]
+        fields = entry["fields"]
+        for f in fields:
+            ref_raw = f.references
+            ref_parsed = None
+            if ref_raw:
+                try:
+                    ref_parsed = json.loads(ref_raw) if isinstance(ref_raw, str) else ref_raw
+                except Exception:
+                    pass
+            if ref_parsed:
+                ref_ds_id = ref_parsed.get("datasetId")
+                ref_field = ref_parsed.get("fieldName", "id")
+                if ref_ds_id and ref_ds_id in dataset_name_map:
+                    field_references.setdefault(ds.id, []).append(
+                        (f.name, ref_ds_id, ref_field)
+                    )
+    
+    # Build reverse references: for each dataset, which child datasets reference it
+    reverse_refs = {}  # ref_dataset_id -> [(child_ds_name, child_field_name)]
+    for child_id, refs in field_references.items():
+        child_name = dataset_name_map.get(child_id)
+        if not child_name:
+            continue
+        for (field_name, ref_ds_id, ref_field) in refs:
+            reverse_refs.setdefault(ref_ds_id, []).append({
+                "dataset_name": child_name,
+                "field_name": field_name,
+            })
+    
     processed_datasets = []
     for entry in datasets_with_fields:
         ds = entry["dataset"]
         fields = entry["fields"]
         
+        ds_fields = []
+        for f in fields:
+            ref_raw = f.references
+            ref_parsed = None
+            if ref_raw:
+                try:
+                    ref_parsed = json.loads(ref_raw) if isinstance(ref_raw, str) else ref_raw
+                except Exception:
+                    pass
+            
+            resolved_ref = None
+            if ref_parsed:
+                ref_ds_id = ref_parsed.get("datasetId")
+                ref_field_name = ref_parsed.get("fieldName", "id")
+                ref_ds_name = dataset_name_map.get(ref_ds_id) if ref_ds_id else None
+                if ref_ds_name:
+                    resolved_ref = {
+                        "dataset_id": ref_ds_id,
+                        "dataset_name": ref_ds_name,
+                        "field_name": ref_field_name,
+                    }
+            
+            ds_fields.append({
+                "name": f.name,
+                "type": f.field_type,
+                "python_type": _get_python_type(f.field_type),
+                "required": f.required,
+                "description": f.description,
+                "references": resolved_ref,
+            })
+        
         ds_ctx = {
             "id": ds.id,
             "name": ds.name,
-            "fields": [
-                {
-                    "name": f.name,
-                    "type": f.field_type,
-                    "python_type": _get_python_type(f.field_type),
-                    "required": f.required,
-                    "description": f.description,
-                }
-                for f in fields
-            ],
+            "fields": ds_fields,
             "sample_rows": [],
+            "referenced_by": reverse_refs.get(ds.id, []),
         }
         
         if ds.sample_rows:
-            import json
             try:
                 ds_ctx["sample_rows"] = json.loads(ds.sample_rows) if isinstance(ds.sample_rows, str) else ds.sample_rows
             except:
@@ -133,6 +196,7 @@ def render_bundle(
     env.filters["lower"] = lambda s: s.lower() if s else ""
     env.filters["replace"] = lambda s, old, new: s.replace(old, new) if s else ""
     env.filters["extract_path_param"] = _extract_path_param
+    env.filters["js_bool"] = lambda v: "true" if v else "false"
 
     context = _build_context(
         project_name, project_description, auth_method, api_key, jwt_secret, rate_limit, 
