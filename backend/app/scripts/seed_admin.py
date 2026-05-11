@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sqlmodel import Session, select
+from sqlmodel import Session, SQLModel, select
 
 from app.db import engine
 from app.db_models import User, Workspace, WorkspaceMember
@@ -20,6 +20,7 @@ def seed_admin_user(
     email: str | None = None,
 ) -> None:
     """Create an admin user if no users exist."""
+    SQLModel.metadata.create_all(engine)
     with Session(engine) as session:
         existing = session.exec(select(User)).first()
         if existing:

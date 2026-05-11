@@ -397,8 +397,8 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       const nextProjects = state.projects.map(p => p.id === nextProject.id ? nextProject : p)
 
       // Queue API save
-      if (nextProject.remoteId || nextProject.id) {
-        const saveId = nextProject.remoteId || nextProject.id
+      if (nextProject.remoteId) {
+        const saveId = nextProject.remoteId
         queueSave(async () => {
           const changes: any = {}
           if (payload.name !== undefined) changes.name = payload.name
@@ -428,12 +428,12 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       persist(nextProject, state.selectedDatasetId)
 
       const nextProjects = state.projects.map(p => p.id === nextProject.id ? nextProject : p)
-      const saveId = nextProject.remoteId || nextProject.id
-      queueSave(async () => {
-        // For now, we still use syncDataset but we'll need to update it to handle multiple
-        // Or send the first one as primary for compatibility
-        await api.syncDataset(saveId, dataset)
-      })
+      if (nextProject.remoteId) {
+        const saveId = nextProject.remoteId
+        queueSave(async () => {
+          await api.syncDataset(saveId, dataset)
+        })
+      }
       return { project: nextProject, projects: nextProjects }
     }),
 
