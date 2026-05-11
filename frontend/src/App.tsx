@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Routes, Route, NavLink, useNavigate } from 'react-router-dom'
+import { Routes, Route, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom'
 
 import { SetupWizard } from './components/SetupWizard'
 import { ApiUsagePanel } from './components/ApiUsagePanel'
@@ -20,7 +20,8 @@ import { readBackendConfig } from './lib/backendConfig'
 import { apiFetch } from './lib/api'
 
 export function App() {
-  const isShareView = typeof window !== 'undefined' && window.location.pathname.startsWith('/share/')
+  const location = useLocation()
+  const isShareView = location.pathname.startsWith('/share/')
   const { isAuthenticated, login, error: authError, logout, authStatus } = useAuth()
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null)
   const toast = useToast()
@@ -233,6 +234,7 @@ export function App() {
             <Route path="/info" element={<InfoPage />} />
             <Route path="/config" element={<ConfigPage authStatus={authStatus} onLogout={performLogout} />} />
             <Route path="/docs" element={<DocsPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
       </div>
