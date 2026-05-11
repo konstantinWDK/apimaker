@@ -23,7 +23,7 @@ def seed_admin_user(
     with Session(engine) as session:
         existing = session.exec(select(User)).first()
         if existing:
-            print(f"⚠️  User '{existing.username}' already exists. Skipping.")
+            print(f"[!] User '{existing.username}' already exists. Skipping.")
             return
 
         user = User(
@@ -45,7 +45,7 @@ def seed_admin_user(
         session.add(WorkspaceMember(workspace_id=workspace.id, user_id=user.id, role="owner"))
         session.commit()
 
-        print(f"✅ Admin user '{username}' created with default workspace.")
+        print(f"[+] Admin user '{username}' created with default workspace.")
 
 
 if __name__ == "__main__":

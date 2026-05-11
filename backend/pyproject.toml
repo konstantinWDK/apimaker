@@ -31,3 +31,6 @@ dev = [
 
 [project.scripts]
 apimaker-backend = "app.main:app"
+
+[tool.setuptools]
+packages = ["app"]

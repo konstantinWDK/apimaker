@@ -109,7 +109,7 @@ def list_shares(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.delete("/{share_id}", status_code=204)
+@router.delete("/{share_id}", status_code=204, response_model=None)
 def delete_share(
     share_id: str,
     session: Session = Depends(get_session),
@@ -120,7 +120,7 @@ def delete_share(
         raise HTTPException(status_code=404, detail="Share not found")
 
 
-@router.post("/cleanup", status_code=204)
+@router.post("/cleanup", status_code=204, response_model=None)
 def cleanup_shares(
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(require_admin),

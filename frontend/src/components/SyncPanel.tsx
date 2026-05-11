@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { readBackendConfig } from '../lib/backendConfig'
 
 export function SyncPanel() {
   const [syncing, setSyncing] = useState(false)
@@ -18,9 +19,7 @@ export function SyncPanel() {
   } | null>(null)
 
   const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
-  const backendBaseUrl = typeof window !== 'undefined'
-    ? (localStorage.getItem('apimaker-backend-url') || 'http://localhost:8000')
-    : 'http://localhost:8000'
+  const { baseUrl: backendBaseUrl } = readBackendConfig()
 
   const authHeaders = {
     'Content-Type': 'application/json',

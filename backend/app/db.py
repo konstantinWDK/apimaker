@@ -8,6 +8,9 @@ from pathlib import Path
 from typing import Generator
 
 from sqlmodel import SQLModel, Session, create_engine
+from alembic.config import Config
+from alembic import command
+import logging
 
 from .config import get_settings
 
@@ -64,7 +67,20 @@ engine = create_engine(DATABASE_URL, echo=settings.environment == "development",
 
 def create_db_and_tables() -> None:
     """Create all SQLModel tables. In production, use Alembic migrations."""
+    # Create all tables and columns defined in the current models
     SQLModel.metadata.create_all(engine)
+    
+    # Stamp Alembic so it knows the schema is up-to-date
+    alembic_ini_path = Path(__file__).resolve().parent.parent / "alembic.ini"
+    if alembic_ini_path.exists():
+        try:
+            alembic_cfg = Config(str(alembic_ini_path))
+            alembic_cfg.set_main_option("sqlalchemy.url", DATABASE_URL)
+            from alembic import command as alembic_cmd
+            alembic_cmd.stamp(alembic_cfg, "head")
+            logging.info("Alembic schema stamped to head.")
+        except Exception as e:
+            logging.warning(f"Alembic stamp failed: {e}")
 
 
 def get_session() -> Generator[Session, None, None]:

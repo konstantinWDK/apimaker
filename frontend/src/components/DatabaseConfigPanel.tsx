@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { readBackendConfig } from '../lib/backendConfig'
 
 interface DbConfig {
   database_type: 'sqlite' | 'postgresql'
@@ -45,9 +46,7 @@ export function DatabaseConfigPanel() {
   const [useConnectionString, setUseConnectionString] = useState(false)
 
   const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
-  const backendBaseUrl = typeof window !== 'undefined'
-    ? (localStorage.getItem('apimaker-backend-url') || 'http://localhost:8000')
-    : 'http://localhost:8000'
+  const { baseUrl: backendBaseUrl } = readBackendConfig()
 
   const authHeaders = {
     'Content-Type': 'application/json',

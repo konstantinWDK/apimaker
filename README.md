@@ -14,19 +14,25 @@ Plataforma que permite definir datasets, endpoints y generar APIs listas para de
 
 ### Backend
 
-```bash
+#### Windows (PowerShell)
+```powershell
 cd backend
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+.\.venv\Scripts\activate
 pip install -e .[dev]
 
-# Opcional: configurar token de administrador
-export APIMAKER_BUILDER_TOKEN="mi_token_super_seguro"
+# Iniciar servidor
+.\start.ps1
+```
 
-# Aplicar las migraciones de base de datos
-alembic upgrade head
+#### Linux / macOS (Bash)
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .[dev]
 
-# Iniciar servidor de desarrollo
+# Iniciar servidor
 ./start.sh
 ```
 
@@ -43,5 +49,5 @@ npm run dev
 ## Próximos pasos
 
 1. **Generador de Código Real**: Implementar plantillas Jinja2 para exportar el diseño a repositorios listos para producción.
-2. **Sistema de Equipos**: Roles de Editor y Viewer (inspirado en Apiary) para colaboración profesional.
+2. **Sistema de Equipos**: Roles de Editor y Viewer para colaboración profesional.
 3. **Webhooks**: Permitir que el servidor mock notifique a servicios externos cuando cambien los datos.

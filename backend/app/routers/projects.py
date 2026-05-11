@@ -113,7 +113,7 @@ def list_projects(
 def create_project(
     payload: CreateProjectRequest,
     session: Session = Depends(get_session),
-    user: CurrentUser = Depends(require_admin),
+    user: CurrentUser = Depends(get_current_user_from_header),
 ) -> PydanticProject:
     db_project = project_service.create_project(
         session,
@@ -127,16 +127,24 @@ def create_project(
     # Handle initial datasets if provided
     if payload.datasets:
         for ds in payload.datasets:
-            fields_data = [f.model_dump() for f in ds.fields]
-            project_service.attach_dataset(
-                session,
-                project_id=db_project.id,
-                name=ds.name,
-                source_type=ds.source_type,
-                fields=fields_data,
-                sample_rows=ds.sample_rows,
-                dataset_id=str(ds.id)
-            )
+            try:
+                fields_data = [f.model_dump() for f in ds.fields]
+                project_service.attach_dataset(
+                    session,
+                    project_id=db_project.id,
+                    name=ds.name,
+                    source_type=ds.source_type,
+                    fields=fields_data,
+                    sample_rows=ds.sample_rows,
+                    dataset_id=str(ds.id)
+                )
+            except Exception as e:
+                import logging
+                logging.error(f"Failed to attach dataset '{ds.name}': {e}", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Error al adjuntar dataset '{ds.name}': {str(e)}"
+                )
 
     data = project_service.get_project_with_data(session, db_project.id)
     return _db_to_pydantic(
@@ -203,7 +211,7 @@ def update_project(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def delete_project(
     project_id: str,
     session: Session = Depends(get_session),

@@ -183,7 +183,7 @@ def get_me(
     }
 
 
-@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def change_password(
     payload: ChangePasswordRequest,
     session: Session = Depends(get_session),
@@ -211,7 +211,7 @@ class ChangeCredentialsRequest(BaseModel):
     current_password: str
 
 
-@router.post("/change-username", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/change-username", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def change_username(
     payload: ChangeCredentialsRequest,
     session: Session = Depends(get_session),
@@ -242,7 +242,7 @@ def auth_status(session: Session = Depends(get_session)) -> dict:
     return {"hasUsers": count > 0, "userCount": count}
 
 
-@router.post("/reset", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/reset", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def reset_credentials(
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(require_admin),

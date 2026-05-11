@@ -11,7 +11,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     project_name: str = "API Maker"
     environment: str = "development"
-    allow_origins: list[str] = ["http://localhost:5173", "http://localhost:4173"]
+    allow_origins: list[str] = [
+        "http://localhost:5173", 
+        "http://localhost:4173",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:4173"
+    ]
     builder_token: str | None = None
     artifacts_dir: str = "artifacts"
 

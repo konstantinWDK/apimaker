@@ -22,13 +22,22 @@ if settings.environment == "production" and settings.jwt_secret_key == _DEFAULT_
 
 app = FastAPI(title=settings.project_name)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.allow_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# En desarrollo, permitir todos los orígenes CORS
+if settings.environment == "development":
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.allow_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 app.include_router(auth.router)
 app.include_router(projects.router)
@@ -42,7 +51,17 @@ app.include_router(db.router)
 @app.on_event("startup")
 def on_startup() -> None:
     """Initialize database tables on startup."""
-    create_db_and_tables()
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logging.info("Starting API Maker backend...")
+    logging.info(f"Environment: {settings.environment}")
+    logging.info(f"CORS origins: {'*' if settings.environment == 'development' else settings.allow_origins}")
+    try:
+        create_db_and_tables()
+        logging.info("Database initialized successfully")
+    except Exception as e:
+        logging.error(f"Database initialization failed: {e}")
+        raise
 
 
 @app.get("/health", tags=["health"])

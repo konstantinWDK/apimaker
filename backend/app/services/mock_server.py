@@ -351,7 +351,7 @@ async def mock_put(
     raise HTTPException(status_code=404, detail="Not found")
 
 
-@router.delete("/{path:path}", status_code=204)
+@router.delete("/{path:path}", status_code=204, response_model=None)
 async def mock_delete(
     project_id: str,
     path: str,

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 
 import type { ApiEndpoint, DatasetMeta, ProjectDraft } from '../types/schemas'
 import { fireToast } from '../components/Toast'
+import { readBackendConfig } from '../lib/backendConfig'
 
 interface BuilderState {
   project: ProjectDraft
@@ -82,8 +83,8 @@ const sanitizeDataset = (dataset?: DatasetMeta): DatasetMeta | undefined => {
 
 // ─── API helpers ────────────────────────────────────────────────
 const getBaseUrl = (): string => {
-  if (typeof window === 'undefined') return 'http://localhost:8000'
-  return (localStorage.getItem('apimaker-backend-url') || 'http://localhost:8000').replace(/\/$/, '')
+  const { baseUrl } = readBackendConfig()
+  return baseUrl.replace(/\/$/, '')
 }
 
 const getAuthHeaders = (): HeadersInit => {
@@ -185,7 +186,11 @@ const api = {
       headers: getAuthHeaders(),
       body: JSON.stringify(body),
     })
-    if (!res.ok) return null
+    if (!res.ok) {
+      const errorText = await res.text()
+      console.error('[createProject] Backend error:', res.status, errorText)
+      return null
+    }
     const data = await res.json()
     return {
       id: data.id,
