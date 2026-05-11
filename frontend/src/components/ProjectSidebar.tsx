@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ProjectDraft } from '../types/schemas'
 import { readBackendConfig } from '../lib/backendConfig'
 
@@ -27,14 +27,15 @@ const formatDate = (value?: string) => {
 export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, onDelete, onSync, mockRunning, mockLoading, mockError, onStartMock, onStopMock }: Props) {
   const [backendStatus, setBackendStatus] = useState<'online' | 'offline' | 'checking'>('checking')
   const [dbStatus, setDbStatus] = useState<{ dev: string; prod: string; current: string } | null>(null)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const checkStatus = async () => {
       try {
         const config = readBackendConfig()
         const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
-        
-        // Check general health
+
         const healthRes = await fetch(`${config.baseUrl?.replace(/\/$/, '')}/health`)
         if (healthRes.ok) {
           setBackendStatus('online')
@@ -42,7 +43,6 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
           setBackendStatus('offline')
         }
 
-        // Check admin config for DBs
         if (token) {
           const adminRes = await fetch(`${config.baseUrl?.replace(/\/$/, '')}/admin/config`, {
             headers: { 'Authorization': `Bearer ${token}` }
@@ -65,6 +65,16 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
     return () => clearInterval(interval)
   }, [])
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   const datasetsCount = project.datasets.length
   const fieldsCount = project.datasets.reduce((acc, ds) => acc + ds.fields.length, 0)
   const rowsCount = project.datasets.reduce((acc, ds) => acc + (ds.sampleRows?.length ?? 0), 0)
@@ -72,51 +82,90 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
   const sizeKb = sizeBytes > 0 ? `${Math.max(1, Math.round(sizeBytes / 1024))} KB` : '0 KB'
   const endpoints = project.endpoints.length
 
+  const sortedProjects = [...projects].sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
+
   return (
     <aside className="sidebar">
-      <div className="sidebar__list">
-        <div className="sidebar__list-header">
-          <p className="sidebar__list-title">Proyectos</p>
-        </div>
-        <button type="button" className="btn ghost btn-small sidebar__new" onClick={onCreate}>
-          + Nuevo proyecto
+      {/* Project selector dropdown */}
+      <div className="sidebar__project-selector" ref={dropdownRef}>
+        <button
+          type="button"
+          className="sidebar__project-trigger"
+          onClick={() => setDropdownOpen(!dropdownOpen)}
+        >
+          <div className="sidebar__project-trigger-info">
+            <span className="sidebar__project-trigger-name">{project.name || 'Nuevo Proyecto'}</span>
+            <span className="sidebar__project-trigger-meta">
+              {project.targetStack} · {endpoints} endpoints · {datasetsCount} datasets
+            </span>
+          </div>
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className={`sidebar__project-chevron ${dropdownOpen ? 'open' : ''}`}
+          >
+            <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </button>
-        {projects.length === 0 ? (
-          <p className="muted-text">Guarda tu proyecto para verlo aquí.</p>
-        ) : (
-          <ul>
-            {projects
-              .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
-              .map((item) => {
-                const isActive = item.id === project.id
-                return (
-                  <li key={item.id} className={`sidebar__list-item${isActive ? ' active' : ''}`}>
-                    <button type="button" className="sidebar__list-button" onClick={() => onSwitchProject(item)}>
-                      <div>
-                        <p className="sidebar__list-name">{item.name}</p>
-                        <p className="sidebar__list-meta">{item.endpoints.length} endpoints · {formatDate(item.updatedAt)}</p>
-                      </div>
-                    </button>
+
+        {dropdownOpen && (
+          <div className="sidebar__project-dropdown">
+            <div className="sidebar__project-dropdown-header">
+              <span>Proyectos</span>
+              <button type="button" className="sidebar__project-dropdown-new" onClick={onCreate}>
+                + Nuevo
+              </button>
+            </div>
+            <div className="sidebar__project-dropdown-list">
+              {sortedProjects.length === 0 ? (
+                <p className="sidebar__project-dropdown-empty">Guarda tu proyecto para verlo aqui.</p>
+              ) : (
+                sortedProjects.map((item) => {
+                  const isActive = item.id === project.id
+                  const epCount = item.endpoints?.length ?? 0
+                  const dsCount = item.datasets?.length ?? 0
+                  return (
                     <button
+                      key={item.id}
                       type="button"
-                      className="sidebar__delete-btn"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onDelete(item.id)
+                      className={`sidebar__project-dropdown-item ${isActive ? 'active' : ''}`}
+                      onClick={() => {
+                        onSwitchProject(item)
+                        setDropdownOpen(false)
                       }}
-                      aria-label={`Eliminar ${item.name}`}
                     >
-                      ×
+                      <div className="sidebar__project-dropdown-item-main">
+                        <span className="sidebar__project-dropdown-item-name">{item.name}</span>
+                        <span className="sidebar__project-dropdown-item-meta">
+                          {item.targetStack} · {epCount} endp · {dsCount} ds · {formatDate(item.updatedAt)}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="sidebar__project-dropdown-delete"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onDelete(item.id)
+                        }}
+                        aria-label={`Eliminar ${item.name}`}
+                      >
+                        ×
+                      </button>
                     </button>
-                  </li>
-                )
-              })}
-          </ul>
+                  )
+                })
+              )}
+            </div>
+          </div>
         )}
       </div>
 
       <div className="sidebar__section">
-        <p className="sidebar__section-title">Información del Proyecto</p>
+        <p className="sidebar__section-title">Informacion del Proyecto</p>
         <div className="sidebar__status-card" style={{ padding: '1rem' }}>
           <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #f1f5f9' }}>
             <h1 className="sidebar__h1-title">{project.name || 'Nuevo Proyecto'}</h1>
@@ -159,7 +208,7 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
               {backendStatus === 'online' ? 'Backend Online' : (backendStatus === 'offline' ? 'Backend Offline' : 'Comprobando...')}
             </span>
           </div>
-          
+
           {dbStatus && (
             <div className="sidebar__db-status-group">
               <div className="sidebar__status-indicator">
@@ -183,7 +232,7 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
             </div>
           )}
         </div>
-        
+
         <div className="sidebar__card sidebar__card--status">
           <div className="sidebar__status-item">
             <div className="sidebar__status-bar">
