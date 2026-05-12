@@ -251,7 +251,7 @@ def deploy_remote(req: RemoteDeployRequest, session: Session = Depends(get_sessi
             return DeployStatus(status="error", logs=logs)
 
         url = f"http://{req.host}:{req.api_port}"
-        logs.append(f"✅ API desplegada en {url}/api")
+        logs.append(f"✅ API desplegada en {url}")
 
         # Track deployment
         tracking = _load_tracking()
@@ -471,9 +471,9 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
     _save_tracking(tracking)
 
     url = f"http://localhost:{port}"
-    logs.append(f"✅ API en {url}/api")
+    logs.append(f"✅ API en {url}")
     logs.append(f"📌 Deployments activos:")
     for s, d in _load_tracking().items():
-        logs.append(f"   {d['name']}: {d['url']}/api")
+        logs.append(f"   {d['name']}: {d['url']}")
 
     return DeployStatus(status="running", url=url, logs=logs, message=f"Deploy exitoso en puerto {port}")

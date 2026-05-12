@@ -163,11 +163,19 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                   <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
                     onClick={() => window.open(dep.url + '/api', '_blank')}>Abrir</button>
                   {dep.docker_status === 'running' ? (
-                    <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                      onClick={() => handleAction(dep.slug, 'restart')}>Reconstruir</button>
+                    <>
+                      <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#dc2626' }}
+                        onClick={() => handleAction(dep.slug, 'stop')}>Detener</button>
+                      <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                        onClick={() => handleAction(dep.slug, 'restart')}>Reconstruir</button>
+                    </>
                   ) : (
-                    <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#166534' }}
-                      onClick={() => handleAction(dep.slug, 'restart')}>Reconstruir</button>
+                    <>
+                      <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#166534' }}
+                        onClick={() => handleAction(dep.slug, 'start')}>Iniciar</button>
+                      <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                        onClick={() => handleAction(dep.slug, 'restart')}>Reconstruir</button>
+                    </>
                   )}
                   <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#dc2626' }}
                     onClick={() => handleAction(dep.slug, 'delete')}>Eliminar</button>
