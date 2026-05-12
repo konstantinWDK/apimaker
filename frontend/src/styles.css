@@ -4653,6 +4653,7 @@ input[type='password'] {
 /* ─── Docs sub-sections reused from usage ────────────────── */
 .docs-deploy-grid {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 1rem 0;
+  min-width: 0;
 }
 .docs-deploy-card {
   border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.25rem; background: #fff;
@@ -4667,6 +4668,7 @@ input[type='password'] {
 .docs-deploy-code {
   background: #1e293b; color: #e2e8f0; border-radius: 6px; padding: 0.75rem;
   font-size: 0.75rem; line-height: 1.5; overflow-x: auto; margin: 0;
+  white-space: pre-wrap; word-break: break-word; max-width: 100%;
 }
 .docs-recommended-badge {
   font-size: 0.6rem; font-weight: 700; padding: 0.15rem 0.4rem; border-radius: 4px;
