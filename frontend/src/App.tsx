@@ -56,7 +56,6 @@ export function App() {
 
   const performLogout = () => {
     logout()
-    navigate('/', { replace: true })
   }
 
   const handleGenerate = useCallback(async () => {
