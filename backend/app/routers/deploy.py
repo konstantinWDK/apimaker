@@ -457,6 +457,11 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
         logs.append("⏱️ Timeout (>5min)")
         return DeployStatus(status="timeout", logs=logs)
 
+    # Build endpoint list from the generated project
+    deployed_endpoints = sorted(set(
+        f"{ep.method} {ep.path}" for ep in endpoints
+    ))
+
     # Track deployment
     tracking = _load_tracking()
     tracking[slug] = {
@@ -465,6 +470,7 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
         "url": f"http://localhost:{port}",
         "stack": project.target_stack,
         "status": "running",
+        "endpoints": deployed_endpoints,
         "deployed_at": str(subprocess.run(
             ["date"], capture_output=True, text=True
         ).stdout.strip()),

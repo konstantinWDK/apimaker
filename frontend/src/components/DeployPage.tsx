@@ -149,37 +149,51 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {deployments.map((dep: any) => (
               <div key={dep.slug} style={{
-                display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem 1rem',
+                padding: '0.75rem 1rem',
                 border: '1px solid #e2e8f0', borderRadius: '8px', background: '#fff',
               }}>
-                <span style={{ width: 10, height: 10, borderRadius: '50%', background: statusColor(dep.docker_status), flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{dep.name}</div>
-                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                    {dep.url} · {dep.stack} · {statusLabel(dep.docker_status)}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: statusColor(dep.docker_status), flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{dep.name}</div>
+                    <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                      {dep.url} · {dep.stack} · {statusLabel(dep.docker_status)}
+                    </div>
                   </div>
-                </div>
-                <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
-                  <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                    onClick={() => window.open(dep.url, '_blank')}>Abrir</button>
-                  {dep.docker_status === 'running' ? (
-                    <>
+                  <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
+                    <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                      onClick={() => window.open(dep.url, '_blank')}>Abrir</button>
+                    {dep.docker_status === 'running' ? (
                       <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#dc2626' }}
                         onClick={() => handleAction(dep.slug, 'stop')}>Detener</button>
-                      <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                        onClick={() => handleAction(dep.slug, 'restart')}>Reconstruir</button>
-                    </>
-                  ) : (
-                    <>
+                    ) : (
                       <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#166534' }}
                         onClick={() => handleAction(dep.slug, 'start')}>Iniciar</button>
-                      <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                        onClick={() => handleAction(dep.slug, 'restart')}>Reconstruir</button>
-                    </>
-                  )}
-                  <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#dc2626' }}
-                    onClick={() => handleAction(dep.slug, 'delete')}>Eliminar</button>
+                    )}
+                    <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                      onClick={() => handleAction(dep.slug, 'restart')}>Reconstruir</button>
+                    <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#dc2626' }}
+                      onClick={() => handleAction(dep.slug, 'delete')}>Eliminar</button>
+                  </div>
                 </div>
+                {dep.endpoints && dep.endpoints.length > 0 && (
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9' }}>
+                    {dep.endpoints.map((ep: string) => {
+                      const [method, ...pathParts] = ep.split(' ')
+                      const path = pathParts.join(' ')
+                      const colors: Record<string, string> = { GET: '#0ea5e9', POST: '#10b981', PUT: '#f59e0b', DELETE: '#f43f5e' }
+                      return (
+                        <a key={ep} href={dep.url + path} target="_blank" rel="noreferrer"
+                          style={{ fontSize: '0.72rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <span style={{
+                            fontWeight: 700, color: colors[method] || '#64748b',
+                          }}>{method}</span>
+                          <span style={{ color: '#475569', fontFamily: 'monospace' }}>{path}</span>
+                        </a>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             ))}
           </div>
