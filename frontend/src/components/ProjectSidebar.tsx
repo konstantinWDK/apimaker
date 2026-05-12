@@ -26,7 +26,8 @@ const formatDate = (value?: string) => {
 
 export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, onDelete, onSync, mockRunning, mockLoading, mockError, onStartMock, onStopMock }: Props) {
   const [backendStatus, setBackendStatus] = useState<'online' | 'offline' | 'checking'>('checking')
-  const [dbStatus, setDbStatus] = useState<{ dev: string; prod: string; current: string } | null>(null)
+  const [dbType, setDbType] = useState<string | null>(null)
+  const [dockerAvail, setDockerAvail] = useState<{ available: boolean; version?: string; containers_running?: number } | null>(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -35,28 +36,37 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
       try {
         const config = readBackendConfig()
         const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
+        const baseUrl = config.baseUrl?.replace(/\/$/, '')
 
-        const healthRes = await fetch(`${config.baseUrl?.replace(/\/$/, '')}/health`)
-        if (healthRes.ok) {
+        const [healthRes, dockerRes] = await Promise.allSettled([
+          fetch(`${baseUrl}/health`),
+          fetch(`${baseUrl}/api/deploy/docker-status`).then(r => r.json()).catch(() => null),
+        ])
+
+        if (healthRes.status === 'fulfilled' && healthRes.value.ok) {
           setBackendStatus('online')
         } else {
           setBackendStatus('offline')
         }
 
-        if (token) {
-          const adminRes = await fetch(`${config.baseUrl?.replace(/\/$/, '')}/admin/config`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          })
-          if (adminRes.ok) {
-            const adminData = await adminRes.json()
-            setDbStatus({
-              dev: adminData.dev.database_type,
-              prod: adminData.prod.database_type,
-              current: adminData.environment
-            })
-          }
+        if (dockerRes.status === 'fulfilled' && dockerRes.value?.available) {
+          setDockerAvail(dockerRes.value)
+        } else {
+          setDockerAvail(null)
         }
-      } catch (e) {
+
+        if (token) {
+          try {
+            const adminRes = await fetch(`${baseUrl}/admin/config`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            })
+            if (adminRes.ok) {
+              const adminData = await adminRes.json()
+              setDbType(adminData.current_database_info?.database_type || adminData.dev?.database_type || 'sqlite')
+            }
+          } catch { /* ignore */ }
+        }
+      } catch {
         setBackendStatus('offline')
       }
     }
@@ -209,25 +219,25 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
             </span>
           </div>
 
-          {dbStatus && (
+          {dbType && (
             <div className="sidebar__db-status-group">
               <div className="sidebar__status-indicator">
-                <span className={`sidebar__mock-dot ${dbStatus.current === 'development' && dbStatus.dev === 'sqlite' ? 'on' : 'idle'}`} />
+                <span className="sidebar__mock-dot on" />
                 <span className="sidebar__status-text">
-                  SQLite <span className="sidebar__status-tag">dev</span>
+                  BD: {dbType === 'postgresql' ? 'PostgreSQL' : 'SQLite'}
                 </span>
               </div>
+            </div>
+          )}
+
+          {dockerAvail && (
+            <div className="sidebar__db-status-group">
               <div className="sidebar__status-indicator">
-                <span className={`sidebar__mock-dot ${dbStatus.current === 'development' && dbStatus.dev === 'postgresql' ? 'on' : 'idle'}`} />
+                <span className="sidebar__mock-dot on" />
                 <span className="sidebar__status-text">
-                  Postgres <span className="sidebar__status-tag">dev</span>
+                  Docker v{dockerAvail.version}
                 </span>
-              </div>
-              <div className="sidebar__status-indicator">
-                <span className={`sidebar__mock-dot ${dbStatus.current === 'production' ? 'on' : 'idle'}`} />
-                <span className="sidebar__status-text">
-                  Postgres <span className="sidebar__status-tag">prod</span>
-                </span>
+                <span className="sidebar__status-tag">{dockerAvail.containers_running} contenedores</span>
               </div>
             </div>
           )}
