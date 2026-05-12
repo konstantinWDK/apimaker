@@ -36,11 +36,16 @@ def create_refresh_token(user_id: str) -> str:
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
-def decode_token(token: str) -> dict:
-    """Decode and validate a JWT token."""
+def decode_token(token: str, secret: str | None = None) -> dict:
+    """Decode and validate a JWT token.
+
+    Uses global settings secret by default, or a project-specific secret.
+    """
     settings = get_settings()
+    key = secret or settings.jwt_secret_key
+    algorithm = settings.jwt_algorithm
     try:
-        return jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        return jwt.decode(token, key, algorithms=[algorithm])
     except jwt.ExpiredSignatureError:
         raise ValueError("Token expired")
     except jwt.InvalidTokenError:

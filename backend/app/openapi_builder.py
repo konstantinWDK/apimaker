@@ -132,6 +132,29 @@ def build_openapi_document(project: Project) -> dict:
             operation["requestBody"] = request_body
         paths.setdefault(endpoint.path, {})[method] = operation
 
+    # Build security schemes
+    security_schemes: dict[str, object] = {}
+    security_global: list[dict[str, list[str]]] | None = None
+    auth_method = getattr(project, "auth_method", "none")
+    if auth_method == "apikey":
+        security_schemes["ApiKeyAuth"] = {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-API-Key",
+        }
+        security_global = [{"ApiKeyAuth": []}]
+    elif auth_method == "jwt":
+        security_schemes["BearerAuth"] = {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+        }
+        security_global = [{"BearerAuth": []}]
+
+    components: dict[str, object] = {"schemas": schemas} if schemas else {}
+    if security_schemes:
+        components["securitySchemes"] = security_schemes  # type: ignore
+
     document: dict[str, object] = {
         "openapi": "3.1.0",
         "info": {
@@ -140,8 +163,10 @@ def build_openapi_document(project: Project) -> dict:
             "version": project.updated_at.isoformat() if project.updated_at else "1.0.0",
         },
         "paths": paths or {"/": {"get": {"responses": {"200": {"description": "OK"}}}}},
-        "components": {"schemas": schemas} if schemas else {},
+        "components": components,
         "servers": [{"url": "http://localhost"}],
     }
+    if security_global:
+        document["security"] = security_global
 
     return document

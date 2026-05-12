@@ -134,6 +134,17 @@ async def verify_mock_auth(
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="Missing or invalid Bearer Token")
+        token = auth_header.split(" ", 1)[1] if " " in auth_header else ""
+        if project.jwt_secret:
+            try:
+                from ..services.jwt_service import decode_token
+                decode_token(token, secret=project.jwt_secret)
+            except HTTPException:
+                raise
+            except ValueError:
+                raise HTTPException(status_code=401, detail="Invalid or expired JWT token")
+            except Exception:
+                raise HTTPException(status_code=401, detail="Invalid or expired JWT token")
     return True
 
 
