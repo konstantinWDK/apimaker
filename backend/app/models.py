@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Literal
 from uuid import UUID, uuid4
@@ -38,8 +38,8 @@ class MappingRule(BaseModel):
     target_dataset_id: str
     target_field_id: str
     transformation: str | None = None  # JSON: {"type": "direct|cast|concat|format|expression", "config": {}}
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class CreateMappingRuleRequest(BaseModel):
@@ -51,17 +51,17 @@ class CreateMappingRuleRequest(BaseModel):
 
 
 class DatasetMeta(BaseModel):
-    id: UUID = Field(default_factory=uuid4)
+    id: str = Field(default_factory=lambda: str(uuid4()))
     name: str
     source_type: Literal["upload", "manual", "database"] = "manual"
     fields: list[FieldSchema] = Field(default_factory=list)
     sample_rows: list[dict] = Field(default_factory=list)
     saved_requests: list[dict] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ApiEndpoint(BaseModel):
-    id: UUID = Field(default_factory=uuid4)
+    id: str = Field(default_factory=lambda: str(uuid4()))
     name: str
     method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"] = "GET"
     path: str
@@ -90,8 +90,8 @@ class Project(BaseModel):
     datasets: list[DatasetMeta] = Field(default_factory=list)
     endpoints: list[ApiEndpoint] = Field(default_factory=list)
     status: ProjectStatus = ProjectStatus.DRAFT
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 

@@ -21,11 +21,10 @@ ADMIN_CONFIG_PATH = Path(__file__).resolve().parent / "data" / "admin_config.jso
 
 
 def _get_database_url() -> str:
-    """Get database URL from env var or environment-specific admin config."""
-    # Environment variable takes priority
-    env_url = os.getenv("APIMAKER_DATABASE_URL")
-    if env_url:
-        return env_url
+    """Get database URL from settings or legacy config."""
+    # Settings (from env or .env) takes priority
+    if settings.database_url and not settings.database_url.startswith("sqlite:///./app/data/apimaker.db"):
+        return settings.database_url
 
     default_sqlite = f"sqlite:///{Path(__file__).resolve().parent / 'data' / 'apimaker.db'}"
 

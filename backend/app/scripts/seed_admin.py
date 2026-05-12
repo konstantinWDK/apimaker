@@ -50,4 +50,9 @@ def seed_admin_user(
 
 
 if __name__ == "__main__":
-    seed_admin_user()
+    import argparse
+    parser = argparse.ArgumentParser(description="Seed initial admin user.")
+    parser.add_argument("--username", default="admin", help="Admin username")
+    parser.add_argument("--password", default="admin", help="Admin password")
+    args = parser.parse_args()
+    seed_admin_user(username=args.username, password=args.password)

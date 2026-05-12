@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from sqlmodel import Session, select
@@ -90,7 +90,7 @@ class ProjectService:
             project.target_stack = target_stack
         if status is not None:
             project.status = status
-        project.updated_at = datetime.utcnow()
+        project.updated_at = datetime.now(timezone.utc)
         session.add(project)
         session.commit()
         session.refresh(project)
@@ -214,7 +214,7 @@ class ProjectService:
                 )
             )
 
-        project.updated_at = datetime.utcnow()
+        project.updated_at = datetime.now(timezone.utc)
         session.add(project)
         session.commit()
         session.refresh(project)
@@ -250,7 +250,7 @@ class ProjectService:
                 )
             )
 
-        project.updated_at = datetime.utcnow()
+        project.updated_at = datetime.now(timezone.utc)
         session.add(project)
         session.commit()
         session.refresh(project)
@@ -261,7 +261,7 @@ class ProjectService:
     ) -> Project:
         project = self.get_project(session, project_id)
         project.status = status
-        project.updated_at = datetime.utcnow()
+        project.updated_at = datetime.now(timezone.utc)
         session.add(project)
         session.commit()
         session.refresh(project)

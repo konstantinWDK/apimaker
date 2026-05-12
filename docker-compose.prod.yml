@@ -1,0 +1,42 @@
+# Production deployment with PostgreSQL, reverse proxy, and SSL-ready setup
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-apimaker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-apimaker}
+      POSTGRES_DB: ${POSTGRES_DB:-apimaker}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-apimaker} -d ${POSTGRES_DB:-apimaker}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    environment:
+      - APIMAKER_DATABASE_URL=postgresql://${POSTGRES_USER:-apimaker}:${POSTGRES_PASSWORD:-apimaker}@postgres:5432/${POSTGRES_DB:-apimaker}
+      - APIMAKER_ENVIRONMENT=production
+      - APIMAKER_JWT_SECRET_KEY=${APIMAKER_JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    ports:
+      - "80:80"
+    environment:
+      - VITE_API_URL=${API_URL:-http://localhost:8000}
+
+volumes:
+  pgdata:

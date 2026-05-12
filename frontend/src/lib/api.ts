@@ -3,6 +3,26 @@ import { readBackendConfig } from './backendConfig'
 
 const cleanBaseUrl = (value: string) => value.replace(/\/$/, '')
 
+export const readToken = (): string | null =>
+  typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
+
+export const apiFetch = async (path: string, init?: RequestInit) => {
+  const token = readToken()
+  const config = readBackendConfig()
+  const baseUrl = config.baseUrl?.replace(/\/$/, '') || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000')
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  const response = await fetch(`${baseUrl}${path}`, {
+    ...init,
+    headers: { ...headers, ...(init?.headers as Record<string, string> || {}) },
+  })
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(message || 'Error al contactar el backend')
+  }
+  return response
+}
+
 const handleResponse = async (response: Response) => {
   if (response.ok) {
     if (response.status === 204) return null

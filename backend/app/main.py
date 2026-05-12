@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 
 from .config import get_settings
 from .db import create_db_and_tables, get_database_info
-from .routers import admin as admin_router
+from .routers import admin as admin_router, setup as setup_router
 from .routers import auth, mock as mock_ctrl_router, projects, share as share_router, db
 from .routers import webhooks as webhooks_router
 from .routers import versions as versions_router
@@ -62,6 +62,7 @@ app.include_router(mock_api_router)
 app.include_router(share_router.router)
 app.include_router(admin_router.router)
 app.include_router(db.router)
+app.include_router(setup_router.router)
 app.include_router(webhooks_router.router)
 app.include_router(versions_router.router)
 
@@ -79,6 +80,43 @@ def on_startup() -> None:
     except Exception as e:
         logging.error(f"Database initialization failed: {e}")
         raise
+
+    # Auto-seed demo data if DB has no projects and projects.json exists
+    try:
+        from pathlib import Path
+        from sqlmodel import Session, select
+        from .db import engine
+        from .db_models import Project
+
+        projects_json = Path(__file__).resolve().parent / "data" / "projects.json"
+        with Session(engine) as session:
+            existing = session.exec(select(Project)).first()
+            if not existing and projects_json.exists():
+                logging.info("No projects found. Auto-seeding from projects.json...")
+                import subprocess, sys
+                seed_script = Path(__file__).resolve().parent / "scripts" / "seed_admin.py"
+                # Run migrate_json_to_db as subprocess
+                migrate_script = Path(__file__).resolve().parent.parent / "migrate_json_to_db.py"
+                if migrate_script.exists():
+                    result = subprocess.run(
+                        [sys.executable, str(migrate_script)],
+                        capture_output=True, text=True,
+                        cwd=str(migrate_script.parent)
+                    )
+                    if result.returncode == 0:
+                        logging.info("Demo data seeded successfully")
+                        # Also repair pokedex endpoints
+                        repair_script = Path(__file__).resolve().parent.parent / "repair_pokedex.py"
+                        if repair_script.exists():
+                            subprocess.run(
+                                [sys.executable, str(repair_script)],
+                                capture_output=True, text=True,
+                                cwd=str(repair_script.parent)
+                            )
+                    else:
+                        logging.warning(f"Migration script failed: {result.stderr}")
+    except Exception as e:
+        logging.warning(f"Auto-seed skipped: {e}")
 
 
 @app.get("/health", tags=["health"])

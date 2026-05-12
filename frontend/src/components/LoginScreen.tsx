@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { LoginParticles } from './LoginParticles'
 
 interface Props {
   onLogin: (username: string, password: string) => Promise<boolean>
@@ -28,10 +29,16 @@ export function LoginScreen({ onLogin, error }: Props) {
 
   return (
     <div className="login-shell">
-      <div className="login-card">
+      <LoginParticles />
+      <div className="login-card" style={{ position: 'relative', zIndex: 1 }}>
+        <div className="login-logo">
+          <svg viewBox="0 0 40 40" width="40" height="40" fill="none">
+            <rect width="40" height="40" rx="10" fill="#6366f1" />
+            <path d="M20 12v16m-6-10l6-6 6 6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
         <h1>API Maker</h1>
-        <p>Inicia sesión para acceder al builder. Usuario y contraseña por defecto: <code>admin/admin</code>.</p>
-        <p className="muted-text">Por seguridad, cambia estas credenciales en cuanto ingreses (pestaña Información &gt; Credenciales del builder).</p>
+        <p className="login-desc">Constructor visual de APIs. Disena, simula y despliega en minutos.</p>
         <form onSubmit={handleSubmit} className="login-form">
           <label className="label" htmlFor="login-username">
             Usuario
@@ -44,7 +51,7 @@ export function LoginScreen({ onLogin, error }: Props) {
             placeholder="admin"
           />
           <label className="label" htmlFor="login-password">
-            Contraseña
+            Contrasena
           </label>
           <input
             id="login-password"
@@ -58,6 +65,9 @@ export function LoginScreen({ onLogin, error }: Props) {
             {loading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
+        <p className="muted-text login-hint">
+          Credenciales por defecto: <code>admin</code> / <code>admin</code>
+        </p>
       </div>
     </div>
   )

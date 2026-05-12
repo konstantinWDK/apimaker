@@ -3,98 +3,193 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
-from uuid import UUID
+from typing import Any, List, Dict
 
 from sqlmodel import Session, select
 
 # Add parent directory to path so we can import app modules
 import sys
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from app.db import engine, create_db_and_tables
-from app.db_models import Project, Dataset, DatasetField, Endpoint
+from app.db_models import Project, Dataset, DatasetField, Endpoint, User, Workspace
 from app.models import Project as PydanticProject
 
+ROOT_DIR = Path(__file__).resolve().parent
+FRONTEND_DEMO = ROOT_DIR.parent / "frontend" / "public" / "demo-project.json"
+BACKEND_DEMO = ROOT_DIR / "app" / "data" / "projects.json"
 
-DATA_DIR = Path(__file__).resolve().parent / "app" / "data"
-PROJECTS_FILE = DATA_DIR / "projects.json"
+
+def _camel_to_snake(name: str) -> str:
+    """Convert camelCase to snake_case."""
+    s1 = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", name)
+    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
 
 
-def migrate() -> None:
-    """Read projects.json and insert into SQLite."""
-    print(f"📦 Migrating {PROJECTS_FILE} → SQLite...")
+def _convert_keys(obj: Any) -> Any:
+    """Recursively convert all dict keys from camelCase to snake_case."""
+    if isinstance(obj, dict):
+        return {_camel_to_snake(k): _convert_keys(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_convert_keys(item) for item in obj]
+    return obj
 
-    if not PROJECTS_FILE.exists():
+
+def migrate(force: bool = False) -> None:
+    """Read projects.json (or fallback to demo) and insert into database."""
+    
+    # Ensure data directory exists
+    BACKEND_DEMO.parent.mkdir(parents=True, exist_ok=True)
+    
+    # If projects.json doesn't exist, try to copy from frontend demo
+    if not BACKEND_DEMO.exists() and FRONTEND_DEMO.exists():
+        print(f"💡 Copying demo from {FRONTEND_DEMO}...")
+        content = json.loads(FRONTEND_DEMO.read_text(encoding="utf-8"))
+        # Wrap in a list if it's a single object
+        if isinstance(content, dict):
+            content = [content]
+        BACKEND_DEMO.write_text(json.dumps(content, indent=2), encoding="utf-8")
+
+    if not BACKEND_DEMO.exists():
         print("⚠️  No projects.json found. Nothing to migrate.")
         return
+
+    print(f"📦 Migrating {BACKEND_DEMO} → Database...")
 
     # Create tables
     create_db_and_tables()
 
     # Read JSON
-    raw = json.loads(PROJECTS_FILE.read_text(encoding="utf-8"))
+    try:
+        raw = json.loads(BACKEND_DEMO.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"❌ Error reading JSON: {e}")
+        return
+
     if not raw:
         print("✅ projects.json is empty. Nothing to migrate.")
         return
 
+    if isinstance(raw, dict):
+        raw = [raw]
+
+    # Convert all keys from camelCase to snake_case
+    raw = [_convert_keys(item) for item in raw]
+
     print(f"📋 Found {len(raw)} project(s) to migrate.")
 
     with Session(engine) as session:
+        # Get first admin and workspace for ownership
+        admin = session.exec(select(User).where(User.role == "admin")).first()
+        workspace = session.exec(select(Workspace)).first()
+        
         for item in raw:
-            project_data = PydanticProject.model_validate(item)
-            print(f"  → Migrating project: {project_data.name} ({project_data.id})")
+            # Handle "dataset" vs "datasets" mismatch
+            if "dataset" in item and "datasets" not in item:
+                item["datasets"] = [item.pop("dataset")]
+            
+            # Ensure slug exists
+            if not item.get("slug"):
+                item["slug"] = item["name"].lower().replace(" ", "-").replace("é", "e").replace("á", "a")
+                if "pokedex" in item["slug"]:
+                    item["slug"] = "pokedex-demo"
+
+            try:
+                project_data = PydanticProject.model_validate(item)
+            except Exception as e:
+                print(f"❌ Validation error for {item.get('name')}: {e}")
+                continue
 
             # Check if already exists
-            existing = session.get(Project, str(project_data.id))
+            existing = session.exec(select(Project).where(Project.slug == project_data.slug)).first()
             if existing:
-                print(f"    ⏭️  Already exists, skipping.")
-                continue
+                if force:
+                    print(f"    ♻️  Re-migrating (force): {project_data.name}")
+                    # Delete existing endpoints, datasets, fields
+                    session.exec(
+                        DatasetField.__table__.delete().where(
+                            DatasetField.dataset_id.in_(
+                                select(Dataset.id).where(Dataset.project_id == existing.id)
+                            )
+                        )
+                    )
+                    session.exec(
+                        Dataset.__table__.delete().where(Dataset.project_id == existing.id)
+                    )
+                    session.exec(
+                        Endpoint.__table__.delete().where(Endpoint.project_id == existing.id)
+                    )
+                    session.exec(
+                        Project.__table__.delete().where(Project.id == existing.id)
+                    )
+                    session.commit()
+                else:
+                    print(f"    ⏭️  Already exists, skipping.")
+                    continue
+
+            print(f"  → Migrating project: {project_data.name} (Slug: {project_data.slug})")
 
             # Insert project
             db_project = Project(
                 id=str(project_data.id),
                 name=project_data.name,
+                slug=project_data.slug,
                 description=project_data.description,
                 target_stack=project_data.target_stack,
-                status=project_data.status,
+                status=project_data.status.value if hasattr(project_data.status, 'value') else project_data.status,
+                created_by=admin.id if admin else None,
+                workspace_id=workspace.id if workspace else None,
                 created_at=project_data.created_at,
                 updated_at=project_data.updated_at,
             )
             session.add(db_project)
             session.flush()
 
-            # Insert dataset if exists
-            if project_data.dataset:
+            # Insert datasets
+            for ds_meta in project_data.datasets:
                 dataset = Dataset(
-                    id=str(project_data.dataset.id),
-                    project_id=str(project_data.id),
-                    name=project_data.dataset.name,
-                    source_type=project_data.dataset.source_type,
+                    id=str(ds_meta.id),
+                    project_id=str(db_project.id),
+                    name=ds_meta.name,
+                    source_type=ds_meta.source_type,
+                    sample_rows=json.dumps(ds_meta.sample_rows)
                 )
                 session.add(dataset)
                 session.flush()
 
-                for field in project_data.dataset.fields:
+                for field in ds_meta.fields:
                     session.add(
                         DatasetField(
                             dataset_id=str(dataset.id),
                             name=field.name,
-                            field_type=field.type,
+                            field_type=field.type.value if hasattr(field.type, 'value') else field.type,
                             required=field.required,
                             description=field.description,
+                            is_primary_key=field.is_primary_key
                         )
                     )
 
             # Insert endpoints
             for ep in project_data.endpoints:
+                # Try to link to dataset if path matches
+                target_ds_id = None
+                if project_data.datasets:
+                    for ds_meta in project_data.datasets:
+                        if ds_meta.name.lower() in ep.path.lower():
+                            target_ds_id = str(ds_meta.id)
+                            break
+
                 session.add(
                     Endpoint(
-                        project_id=str(project_data.id),
+                        project_id=str(db_project.id),
                         name=ep.name,
                         method=ep.method,
                         path=ep.path,
                         summary=ep.summary,
+                        operation_type=ep.operation_type,
+                        target_dataset_id=target_ds_id
                     )
                 )
 
@@ -104,4 +199,5 @@ def migrate() -> None:
 
 
 if __name__ == "__main__":
-    migrate()
+    force = "--force" in sys.argv
+    migrate(force=force)
