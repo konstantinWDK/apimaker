@@ -145,7 +145,8 @@ def deploy_remote(req: RemoteDeployRequest, session: Session = Depends(get_sessi
 
     logs: list[str] = []
 
-    data = project_service.get_project_with_data(session, req.project_id)
+    resolved = project_service.resolve_id(session, req.project_id)
+    data = project_service.get_project_with_data(session, resolved)
     project = data["project"]
     slug = project.slug or str(project.id)
     remote_dir = f"/opt/apimaker/{slug}"
@@ -331,7 +332,8 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
     """Deploy a project locally using Docker."""
     logs: list[str] = []
 
-    data = project_service.get_project_with_data(session, req.project_id)
+    resolved = project_service.resolve_id(session, req.project_id)
+    data = project_service.get_project_with_data(session, resolved)
     project = data["project"]
     datasets_with_fields = data["datasets"]
     endpoints = data["endpoints"]
