@@ -1,155 +1,70 @@
-{
-  "id": "demo-project-001",
-  "name": "Pokédex demo",
-  "description": "API en memoria para listar, registrar y actualizar Pokémon favoritos",
-  "authMethod": "none",
-  "targetStack": "fastapi",
-  "dataset": {
-    "id": "dataset-demo-001",
-    "name": "pokemon",
-    "sourceType": "upload",
-    "uploadedFrom": "demo-project.json",
-    "fields": [
-      { "id": "col-1", "name": "pokedex_id", "type": "integer", "required": true },
-      { "id": "col-2", "name": "name", "type": "string", "required": true },
-      { "id": "col-3", "name": "type", "type": "string", "required": true },
-      { "id": "col-4", "name": "secondary_type", "type": "string", "required": false },
-      { "id": "col-5", "name": "ability", "type": "string", "required": true },
-      { "id": "col-6", "name": "region", "type": "string", "required": true },
-      { "id": "col-7", "name": "level", "type": "integer", "required": true },
-      { "id": "col-8", "name": "hp", "type": "integer", "required": true },
-      { "id": "col-9", "name": "attack", "type": "integer", "required": true },
-      { "id": "col-10", "name": "defense", "type": "integer", "required": true },
-      { "id": "col-11", "name": "speed", "type": "integer", "required": true },
-      { "id": "col-12", "name": "legendary", "type": "boolean", "required": true },
-      { "id": "col-13", "name": "caught_at", "type": "datetime", "required": false }
-    ],
-    "sampleRows": [
+[
+  {
+    "id": "demo-project-001",
+    "name": "Pok\u00e9dex demo",
+    "description": "API en memoria para listar, registrar y actualizar Pok\u00e9mon y entrenadores favoritos",
+    "authMethod": "none",
+    "targetStack": "fastapi",
+    "datasets": [
       {
-        "pokedex_id": "25",
-        "name": "Pikachu",
-        "type": "electric",
-        "secondary_type": "",
-        "ability": "Static",
-        "region": "Kanto",
-        "level": "32",
-        "hp": "35",
-        "attack": "55",
-        "defense": "40",
-        "speed": "90",
-        "legendary": "false",
-        "caught_at": "2024-05-10T14:23:00Z"
+        "id": "dataset-demo-001",
+        "name": "pokemon",
+        "sourceType": "upload",
+        "uploadedFrom": "demo-project.json",
+        "fields": [
+          { "id": "col-1", "name": "pokedex_id", "type": "integer", "required": true },
+          { "id": "col-2", "name": "name", "type": "string", "required": true },
+          { "id": "col-3", "name": "type", "type": "string", "required": true },
+          { "id": "col-4", "name": "secondary_type", "type": "string", "required": false },
+          { "id": "col-5", "name": "ability", "type": "string", "required": true },
+          { "id": "col-6", "name": "region", "type": "string", "required": true },
+          { "id": "col-7", "name": "level", "type": "integer", "required": true },
+          { "id": "col-8", "name": "hp", "type": "integer", "required": true },
+          { "id": "col-9", "name": "attack", "type": "integer", "required": true },
+          { "id": "col-10", "name": "defense", "type": "integer", "required": true },
+          { "id": "col-11", "name": "speed", "type": "integer", "required": true },
+          { "id": "col-12", "name": "legendary", "type": "boolean", "required": true },
+          { "id": "col-13", "name": "caught_at", "type": "datetime", "required": false }
+        ],
+        "sampleRows": [
+          { "pokedex_id": "25", "name": "Pikachu", "type": "electric", "secondary_type": "", "ability": "Static", "region": "Kanto", "level": "32", "hp": "35", "attack": "55", "defense": "40", "speed": "90", "legendary": "false", "caught_at": "2024-05-10T14:23:00Z" },
+          { "pokedex_id": "6", "name": "Charizard", "type": "fire", "secondary_type": "flying", "ability": "Blaze", "region": "Kanto", "level": "58", "hp": "78", "attack": "84", "defense": "78", "speed": "100", "legendary": "false", "caught_at": "2023-11-02T08:11:00Z" },
+          { "pokedex_id": "131", "name": "Lapras", "type": "water", "secondary_type": "ice", "ability": "Water Absorb", "region": "Kanto", "level": "44", "hp": "130", "attack": "85", "defense": "80", "speed": "60", "legendary": "false", "caught_at": "2024-01-18T18:45:00Z" },
+          { "pokedex_id": "150", "name": "Mewtwo", "type": "psychic", "secondary_type": "", "ability": "Pressure", "region": "Kanto", "level": "70", "hp": "106", "attack": "110", "defense": "90", "speed": "130", "legendary": "true", "caught_at": "2022-08-30T21:05:00Z" },
+          { "pokedex_id": "149", "name": "Dragonite", "type": "dragon", "secondary_type": "flying", "ability": "Inner Focus", "region": "Kanto", "level": "55", "hp": "91", "attack": "134", "defense": "95", "speed": "80", "legendary": "false", "caught_at": "2024-03-12T10:17:00Z" }
+        ]
       },
       {
-        "pokedex_id": "6",
-        "name": "Charizard",
-        "type": "fire",
-        "secondary_type": "flying",
-        "ability": "Blaze",
-        "region": "Kanto",
-        "level": "58",
-        "hp": "78",
-        "attack": "84",
-        "defense": "78",
-        "speed": "100",
-        "legendary": "false",
-        "caught_at": "2023-11-02T08:11:00Z"
-      },
-      {
-        "pokedex_id": "131",
-        "name": "Lapras",
-        "type": "water",
-        "secondary_type": "ice",
-        "ability": "Water Absorb",
-        "region": "Kanto",
-        "level": "44",
-        "hp": "130",
-        "attack": "85",
-        "defense": "80",
-        "speed": "60",
-        "legendary": "false",
-        "caught_at": "2024-01-18T18:45:00Z"
-      },
-      {
-        "pokedex_id": "150",
-        "name": "Mewtwo",
-        "type": "psychic",
-        "secondary_type": "",
-        "ability": "Pressure",
-        "region": "Kanto",
-        "level": "70",
-        "hp": "106",
-        "attack": "110",
-        "defense": "90",
-        "speed": "130",
-        "legendary": "true",
-        "caught_at": "2022-08-30T21:05:00Z"
-      },
-      {
-        "pokedex_id": "149",
-        "name": "Dragonite",
-        "type": "dragon",
-        "secondary_type": "flying",
-        "ability": "Inner Focus",
-        "region": "Kanto",
-        "level": "55",
-        "hp": "91",
-        "attack": "134",
-        "defense": "95",
-        "speed": "80",
-        "legendary": "false",
-        "caught_at": "2024-03-12T10:17:00Z"
+        "id": "dataset-demo-002",
+        "name": "trainers",
+        "sourceType": "manual",
+        "fields": [
+          { "id": "col-t1", "name": "trainer_id", "type": "integer", "required": true },
+          { "id": "col-t2", "name": "name", "type": "string", "required": true },
+          { "id": "col-t3", "name": "team", "type": "string", "required": true },
+          { "id": "col-t4", "name": "badge_count", "type": "integer", "required": true },
+          { "id": "col-t5", "name": "region", "type": "string", "required": true },
+          { "id": "col-t6", "name": "pokemon_ids", "type": "string", "required": false }
+        ],
+        "sampleRows": [
+          { "trainer_id": "1", "name": "Ash Ketchum", "team": "Valor", "badge_count": "8", "region": "Kanto", "pokemon_ids": "25,6,131" },
+          { "trainer_id": "2", "name": "Misty", "team": "Mystic", "badge_count": "7", "region": "Kanto", "pokemon_ids": "131" },
+          { "trainer_id": "3", "name": "Brock", "team": "Instinct", "badge_count": "8", "region": "Kanto", "pokemon_ids": "" }
+        ]
       }
+    ],
+    "endpoints": [
+      { "id": "ep-1", "name": "List pokemon", "method": "GET", "path": "/pokemon", "summary": "Lista paginada de Pok\u00e9mon", "operationType": "list" },
+      { "id": "ep-2", "name": "Search pokemon", "method": "GET", "path": "/pokemon/search", "summary": "Filtra por nombre, regi\u00f3n o tipo", "operationType": "custom" },
+      { "id": "ep-3", "name": "Pokemon detail", "method": "GET", "path": "/pokemon/{id}", "summary": "Obtiene el detalle de un Pok\u00e9mon", "operationType": "get" },
+      { "id": "ep-4", "name": "Create pokemon", "method": "POST", "path": "/pokemon", "summary": "Registra un nuevo Pok\u00e9mon descubierto", "operationType": "create" },
+      { "id": "ep-5", "name": "Update pokemon", "method": "PUT", "path": "/pokemon/{id}", "summary": "Actualiza stats o metadatos de un Pok\u00e9mon", "operationType": "update" },
+      { "id": "ep-6", "name": "Delete pokemon", "method": "DELETE", "path": "/pokemon/{id}", "summary": "Elimina registros duplicados o err\u00f3neos", "operationType": "delete" },
+      { "id": "ep-7", "name": "List trainers", "method": "GET", "path": "/trainers", "summary": "Lista paginada de entrenadores", "operationType": "list" },
+      { "id": "ep-8", "name": "Trainer detail", "method": "GET", "path": "/trainers/{id}", "summary": "Obtiene el detalle de un entrenador", "operationType": "get" },
+      { "id": "ep-9", "name": "Create trainer", "method": "POST", "path": "/trainers", "summary": "Registra un nuevo entrenador", "operationType": "create" },
+      { "id": "ep-10", "name": "Update trainer", "method": "PUT", "path": "/trainers/{id}", "summary": "Actualiza los datos de un entrenador", "operationType": "update" },
+      { "id": "ep-11", "name": "Delete trainer", "method": "DELETE", "path": "/trainers/{id}", "summary": "Elimina un entrenador", "operationType": "delete" }
     ]
-  },
-  "endpoints": [
-    {
-      "id": "ep-1",
-      "name": "List pokemon",
-      "method": "GET",
-      "path": "/pokemon",
-      "summary": "Lista paginada de Pokémon",
-      "operationType": "list"
-    },
-    {
-      "id": "ep-2",
-      "name": "Search pokemon",
-      "method": "GET",
-      "path": "/pokemon/search",
-      "summary": "Filtra por nombre, región o tipo",
-      "operationType": "custom"
-    },
-    {
-      "id": "ep-3",
-      "name": "Pokemon detail",
-      "method": "GET",
-      "path": "/pokemon/{id}",
-      "summary": "Obtiene el detalle de un Pokémon",
-      "operationType": "get"
-    },
-    {
-      "id": "ep-4",
-      "name": "Create pokemon",
-      "method": "POST",
-      "path": "/pokemon",
-      "summary": "Registra un nuevo Pokémon descubierto",
-      "operationType": "create"
-    },
-    {
-      "id": "ep-5",
-      "name": "Update pokemon",
-      "method": "PUT",
-      "path": "/pokemon/{id}",
-      "summary": "Actualiza stats o metadatos de un Pokémon",
-      "operationType": "update"
-    },
-    {
-      "id": "ep-6",
-      "name": "Delete pokemon",
-      "method": "DELETE",
-      "path": "/pokemon/{id}",
-      "summary": "Elimina registros duplicados o erróneos",
-      "operationType": "delete"
-    }
-  ]
-}
+  }
+]

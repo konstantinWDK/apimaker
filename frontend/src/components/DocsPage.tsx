@@ -364,48 +364,53 @@ res = requests.post(BASE + "/pokemon", json={
             <span className="docs-recommended-badge">Recomendado</span>
             <h3>CLI Deploy</h3>
           </div>
-          <p>Despliega tu API exportada con un solo comando. Crea DB, importa datos y levanta el servidor al instante.</p>
+          <p>Despliega tu API exportada con un solo comando. El CLI crea la base de datos, importa los datos del proyecto y levanta el servidor con URLs limpias. No necesitas Docker ni configurar nada.</p>
           <pre className="docs-deploy-code">apimaker deploy proyecto.json --port 8080</pre>
         </div>
+
         <div className="docs-deploy-card">
           <div className="docs-deploy-header">
             <h3>Docker</h3>
           </div>
-          <p>El bundle incluye un Dockerfile listo para producción. Construye y ejecuta en cualquier servidor.</p>
+          <p>El bundle generado incluye un Dockerfile listo para producción. Construye la imagen y ejecuta el contenedor en cualquier servidor con Docker instalado.</p>
           <pre className="docs-deploy-code">docker build -t my-api .
 docker run -p 8000:8000 my-api</pre>
         </div>
+
         <div className="docs-deploy-card">
           <div className="docs-deploy-header">
             <h3>Docker Compose</h3>
           </div>
-          <p>El bundle incluye docker-compose.yml con API + PostgreSQL. La opción más completa.</p>
+          <p>El bundle incluye docker-compose.yml con API + PostgreSQL configurado. Es la opción más completa para entornos de producción.</p>
           <pre className="docs-deploy-code">docker compose up -d --build
 # API en http://localhost:8000
 # Docs en http://localhost:8000/docs</pre>
         </div>
+
         <div className="docs-deploy-card">
           <div className="docs-deploy-header">
             <h3>Railway</h3>
           </div>
-          <p>Incluye deploy/railway.json. Conecta tu repo y Railway lo detecta automáticamente.</p>
+          <p>Railway detecta automáticamente el proyecto. El bundle incluye <code className="docs-code--inline">deploy/railway.json</code> con la configuración. Conecta tu repositorio de GitHub y Railway lo despliega solo.</p>
           <pre className="docs-deploy-code">railway login
 railway up</pre>
         </div>
+
         <div className="docs-deploy-card">
           <div className="docs-deploy-header">
             <h3>Render</h3>
           </div>
-          <p>Incluye deploy/render.yaml. Sube a GitHub y conéctalo en Render.</p>
+          <p>Render despliega desde GitHub. El bundle incluye <code className="docs-code--inline">deploy/render.yaml</code> con la configuración del servicio. Sube el proyecto a GitHub y conéctalo desde el dashboard de Render.</p>
           <pre className="docs-deploy-code">1. Sube el proyecto a GitHub
-2. Ve a https://render.com
-          3. Nuevo Blueprint {'>'} conecta tu repo</pre>
+2. Ve a render.com
+3. Nuevo Blueprint {'>'} conecta tu repo</pre>
         </div>
+
         <div className="docs-deploy-card">
           <div className="docs-deploy-header">
             <h3>CI/CD (GitHub Actions)</h3>
           </div>
-          <p>Automatiza el despliegue en tu VPS al hacer push a main.</p>
+          <p>Automatiza el despliegue en tu VPS al hacer push a main. El bundle incluye un workflow en <code className="docs-code--inline">.github/workflows/deploy.yml</code> que se conecta por SSH y ejecuta docker compose.</p>
           <pre className="docs-deploy-code"># .github/workflows/deploy.yml
 on: push
 jobs:
@@ -415,26 +420,28 @@ jobs:
       - uses: actions/checkout@v4
       - run: ssh user@host "cd /app && docker compose up -d --build"</pre>
         </div>
+
         <div className="docs-deploy-card">
           <div className="docs-deploy-header">
             <h3>SSH Remoto</h3>
           </div>
-          <p>Despliega desde el CLI directamente a cualquier VPS con Docker.</p>
+          <p>Usa <code className="docs-code--inline">apimaker deploy --ssh</code> para desplegar directamente en cualquier VPS con Docker. El CLI copia el archivo, genera el docker-compose y levanta los contenedores automáticamente.</p>
           <pre className="docs-deploy-code">apimaker deploy proyecto.json \
   --ssh usuario@midominio.com \
   --port 80</pre>
         </div>
+
         <div className="docs-deploy-card">
           <div className="docs-deploy-header">
             <h3>VPS Manual</h3>
           </div>
-          <p>Instalación directa con Python/Node en tu servidor.</p>
-          <pre className="docs-deploy-code"># FastAPI
+          <p>Instalación directa en tu servidor. Para FastAPI necesitas Python 3.11+, para Express/NestJS necesitas Node.js 18+.</p>
+          <pre className="docs-deploy-code"># FastAPI (Python)
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 8000
 
-# Express / NestJS
+# Express / NestJS (Node.js)
 npm install && npm start</pre>
         </div>
       </div>

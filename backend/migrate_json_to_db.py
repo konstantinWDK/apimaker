@@ -107,7 +107,14 @@ def migrate(force: bool = False) -> None:
             if existing:
                 if force:
                     print(f"    ♻️  Re-migrating (force): {project_data.name}")
-                    # Delete existing endpoints, datasets, fields
+                    # Delete existing mock data, fields, endpoints, datasets, project
+                    from app.db_models import MockRecord
+                    session.exec(
+                        MockRecord.__table__.delete().where(MockRecord.project_id == existing.id)
+                    )
+                    session.exec(
+                        Endpoint.__table__.delete().where(Endpoint.project_id == existing.id)
+                    )
                     session.exec(
                         DatasetField.__table__.delete().where(
                             DatasetField.dataset_id.in_(
@@ -117,9 +124,6 @@ def migrate(force: bool = False) -> None:
                     )
                     session.exec(
                         Dataset.__table__.delete().where(Dataset.project_id == existing.id)
-                    )
-                    session.exec(
-                        Endpoint.__table__.delete().where(Endpoint.project_id == existing.id)
                     )
                     session.exec(
                         Project.__table__.delete().where(Project.id == existing.id)

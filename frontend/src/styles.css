@@ -4652,19 +4652,18 @@ input[type='password'] {
 
 /* ─── Docs sub-sections reused from usage ────────────────── */
 .docs-deploy-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 1rem 0;
-  min-width: 0;
+  display: flex; flex-direction: column; gap: 1rem; margin: 1rem 0;
 }
 .docs-deploy-card {
-  border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.25rem; background: #fff;
+  border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem 1.5rem; background: #fff;
   transition: box-shadow 0.15s;
 }
 .docs-deploy-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
 .docs-deploy-card--recommended { border-color: #a5b4fc; background: #f8faff; }
-.docs-deploy-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
-.docs-deploy-header h3 { font-size: 0.9rem; font-weight: 600; margin: 0; }
+.docs-deploy-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
+.docs-deploy-header h3 { font-size: 0.95rem; font-weight: 600; margin: 0; }
 .docs-deploy-icon { width: 20px; height: 20px; color: #6366f1; }
-.docs-deploy-card p { font-size: 0.8rem; color: #64748b; line-height: 1.4; margin: 0 0 0.75rem; }
+.docs-deploy-card p { font-size: 0.82rem; color: #475569; line-height: 1.5; margin: 0 0 0.75rem; }
 .docs-deploy-code {
   background: #1e293b; color: #e2e8f0; border-radius: 6px; padding: 0.75rem;
   font-size: 0.75rem; line-height: 1.5; overflow-x: auto; margin: 0;
