@@ -124,6 +124,54 @@ def stop_deployment(req: SlugRequest) -> DeployStatus:
     return DeployStatus(status="stopped", message="Deployment stopped")
 
 
+@router.post("/local/start")
+def start_deployment(req: SlugRequest) -> DeployStatus:
+    """Start a stopped deployment."""
+    slug = req.slug
+    deploy_dir = DEPLOY_ROOT / slug
+    if not deploy_dir.exists():
+        raise HTTPException(status_code=404, detail="Deployment not found")
+    try:
+        subprocess.run(
+            ["docker", "compose", "up", "-d"],
+            cwd=str(deploy_dir), capture_output=True, text=True, timeout=120,
+        )
+    except subprocess.TimeoutExpired:
+        return DeployStatus(status="timeout", message="Timeout starting container")
+    except Exception as e:
+        return DeployStatus(status="error", message=str(e))
+    tracking = _load_tracking()
+    if slug in tracking:
+        tracking[slug]["status"] = "running"
+        _save_tracking(tracking)
+    return DeployStatus(status="running", message="Deployment started")
+
+
+@router.post("/local/restart")
+def restart_deployment(req: SlugRequest) -> DeployStatus:
+    """Rebuild and restart a deployment (docker compose up -d --build)."""
+    slug = req.slug
+    deploy_dir = DEPLOY_ROOT / slug
+    if not deploy_dir.exists():
+        raise HTTPException(status_code=404, detail="Deployment not found")
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "up", "-d", "--build"],
+            cwd=str(deploy_dir), capture_output=True, text=True, timeout=300,
+        )
+        if result.returncode != 0:
+            return DeployStatus(status="error", message=result.stderr.strip()[:300], logs=[result.stderr.strip()])
+    except subprocess.TimeoutExpired:
+        return DeployStatus(status="timeout", message="Timeout rebuilding")
+    except Exception as e:
+        return DeployStatus(status="error", message=str(e))
+    tracking = _load_tracking()
+    if slug in tracking:
+        tracking[slug]["status"] = "running"
+        _save_tracking(tracking)
+    return DeployStatus(status="running", message="Deployment rebuilt and restarted")
+
+
 class SlugRequest(BaseModel):
     slug: str
 

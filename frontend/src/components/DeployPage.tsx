@@ -77,10 +77,11 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
 
   const log = useCallback((msg: string) => setDeployLog((prev: string[]) => [...prev, msg]), [])
 
-  const handleAction = async (slug: string, action: 'stop' | 'delete' | 'restart') => {
+  const handleAction = async (slug: string, action: 'stop' | 'delete' | 'restart' | 'start') => {
     if (action === 'delete' && !window.confirm('¿Eliminar deployment? Se borrarán contenedor y archivos.')) return
     try {
-      const res = await apiFetch(`/api/deploy/local/${action}`, {
+      const endpoint = action === 'restart' ? 'restart' : action
+      const res = await apiFetch(`/api/deploy/local/${endpoint}`, {
         method: 'POST', body: JSON.stringify({ slug }),
       })
       if (!res.ok) { const e = await res.text(); alert(e); return }
@@ -161,6 +162,13 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                 <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
                   <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
                     onClick={() => window.open(dep.url + '/api', '_blank')}>Abrir</button>
+                  {dep.docker_status === 'running' ? (
+                    <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                      onClick={() => handleAction(dep.slug, 'restart')}>Reconstruir</button>
+                  ) : (
+                    <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#166534' }}
+                      onClick={() => handleAction(dep.slug, 'restart')}>Reconstruir</button>
+                  )}
                   <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#dc2626' }}
                     onClick={() => handleAction(dep.slug, 'delete')}>Eliminar</button>
                 </div>
