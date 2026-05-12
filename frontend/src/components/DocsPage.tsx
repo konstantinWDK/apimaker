@@ -1,424 +1,514 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
-const SECTIONS = [
-  { id: 'cli', label: 'CLI - Apimaker', sub: [
-    { id: 'cli-install', label: 'Instalación' },
-    { id: 'cli-deploy', label: 'apimaker deploy' },
-    { id: 'cli-serve', label: 'apimaker serve' },
-    { id: 'cli-init', label: 'apimaker init' },
-    { id: 'cli-ssh', label: 'Deploy remoto (SSH)' },
-  ]},
-  { id: 'arquitectura', label: 'Arquitectura' },
-  { id: 'instalacion', label: 'Instalación' },
-  { id: 'stacks', label: 'Stacks' },
-  { id: 'flujo', label: 'Flujo de Trabajo' },
-  { id: 'funcionalidades', label: 'Funcionalidades' },
-  { id: 'recursos', label: 'Recursos y APIs' },
+const METHOD_COLORS: Record<string, string> = {
+  GET: '#0ea5e9', POST: '#10b981', PUT: '#f59e0b', PATCH: '#a855f7', DELETE: '#f43f5e',
+}
+
+type DocTab = 'overview' | 'tutorial' | 'cli' | 'codigo' | 'desplegar'
+
+const TABS: { id: DocTab; label: string; icon: string }[] = [
+  { id: 'overview', label: 'Visión General', icon: '★' },
+  { id: 'tutorial', label: 'Tutorial', icon: '✓' },
+  { id: 'cli', label: 'CLI', icon: '⌘' },
+  { id: 'codigo', label: 'Código', icon: '</>' },
+  { id: 'desplegar', label: 'Desplegar', icon: '▲' },
+]
+
+const CLI_SECTIONS = [
+  { id: 'cli-install', label: 'Instalación' },
+  { id: 'cli-deploy', label: 'apimaker deploy' },
+  { id: 'cli-serve', label: 'apimaker serve' },
+  { id: 'cli-init', label: 'apimaker init' },
+  { id: 'cli-ssh', label: 'Deploy remoto (SSH)' },
 ]
 
 export function DocsPage() {
-  const [activeSection, setActiveSection] = useState('cli')
+  const [activeTab, setActiveTab] = useState<DocTab>('overview')
+  const [activeSection, setActiveSection] = useState('')
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setActiveSection(entry.target.id)
-          }
-        }
-      },
-      { rootMargin: '-80px 0px -50% 0px', threshold: 0 }
-    )
-    for (const s of SECTIONS) {
-      const el = document.getElementById(s.id)
-      if (el) observer.observe(el)
-      if (s.sub) for (const sub of s.sub) {
-        const el2 = document.getElementById(sub.id)
-        if (el2) observer.observe(el2)
-      }
-    }
-    return () => observer.disconnect()
-  }, [])
-
-  const scrollTo = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
-    setActiveSection(id)
-  }
-
-  return (
-    <div className="docs-layout">
-      <div className="docs-content">
-        {/* ========== CLI ========== */}
-        <div className="docs-block">
-          <div className="docs-header" id="cli">
-            <h1 className="docs-header__title">CLI — Apimaker</h1>
-            <p className="docs-header__desc">
-              La interfaz de línea de comandos permite desplegar, servir y exportar
-              proyectos de API Maker desde cualquier entorno, sin depender de la interfaz gráfica.
-            </p>
-          </div>
-
-          <div className="docs-section" id="cli-install">
-            <h2 className="docs-section__title">Instalación</h2>
-            <p className="docs-section__text">
-              El CLI viene incluido en el paquete <code className="docs-code--inline">apimaker-backend</code>.
-              Se instala automáticamente con <code className="docs-code--inline">pip install apimaker-backend</code>
-              o al ejecutar el instalador del proyecto.
-            </p>
-            <div className="docs-code">pip install apimaker-backend</div>
-            <p className="docs-section__text">Verificar instalación:</p>
-            <div className="docs-code">apimaker --help</div>
-          </div>
-
-          <div className="docs-section" id="cli-deploy">
-            <h2 className="docs-section__title">apimaker deploy</h2>
-            <p className="docs-section__text">
-              Despliega un proyecto exportado como una API independiente. Lee el archivo JSON,
-              crea la base de datos, importa los datos y levanta un servidor con los endpoints limpios.
-            </p>
-            <div className="docs-code">apimaker deploy &lt;archivo.json&gt; [opciones]</div>
-            <table className="docs-table">
-              <thead><tr><th>Opción</th><th>Default</th><th>Descripción</th></tr></thead>
-              <tbody>
-                <tr><td><code className="docs-code--inline">--port</code></td><td>8080</td><td>Puerto del servidor</td></tr>
-                <tr><td><code className="docs-code--inline">--host</code></td><td>0.0.0.0</td><td>Host de escucha</td></tr>
-                <tr><td><code className="docs-code--inline">--db</code></td><td>SQLite</td><td>URL de base de datos (SQLite o PostgreSQL)</td></tr>
-                <tr><td><code className="docs-code--inline">--ssh</code></td><td>-</td><td>Destino SSH para deploy remoto</td></tr>
-              </tbody>
-            </table>
-            <p className="docs-subsection__text">Ejemplo — desplegar localmente:</p>
-            <div className="docs-code"><span className="comment"># Exportar proyecto desde el builder</span>
-apimaker init pokedex-demo
-
-<span className="comment"># Desplegar como API independiente</span>
-apimaker deploy pokedex-demo.json --port 8080</div>
-            <p className="docs-section__text">El servidor levanta con URLs limpias:</p>
-            <div className="docs-code">GET    /api/pokemon          <span className="comment"># Listar todos</span>
-GET    /api/pokemon/25       <span className="comment"># Detalle por ID</span>
-POST   /api/pokemon          <span className="comment"># Crear</span>
-PUT    /api/pokemon/25       <span className="comment"># Actualizar</span>
-DELETE /api/pokemon/25       <span className="comment"># Eliminar</span></div>
-          </div>
-
-          <div className="docs-section" id="cli-serve">
-            <h2 className="docs-section__title">apimaker serve</h2>
-            <p className="docs-section__text">
-              Sirve un proyecto existente de la base de datos del builder como una API independiente
-              en un puerto separado. Útil para tener el mock corriendo sin depender del builder.
-            </p>
-            <div className="docs-code">apimaker serve &lt;slug&gt; [opciones]</div>
-            <table className="docs-table">
-              <thead><tr><th>Opción</th><th>Default</th><th>Descripción</th></tr></thead>
-              <tbody>
-                <tr><td><code className="docs-code--inline">--port</code></td><td>8081</td><td>Puerto del servidor</td></tr>
-                <tr><td><code className="docs-code--inline">--host</code></td><td>0.0.0.0</td><td>Host de escucha</td></tr>
-              </tbody>
-            </table>
-            <p className="docs-subsection__text">Ejemplo:</p>
-            <div className="docs-code"><span className="comment"># Servir proyecto existente de la DB</span>
-apimaker serve pokedex-demo --port 8081
-
-<span className="comment"># El builder sigue en :8000, el mock en :8081</span></div>
-          </div>
-
-          <div className="docs-section" id="cli-init">
-            <h2 className="docs-section__title">apimaker init</h2>
-            <p className="docs-section__text">
-              Exporta un proyecto de la base de datos del builder a un archivo JSON listo para
-              desplegar con <code className="docs-code--inline">apimaker deploy</code>.
-            </p>
-            <div className="docs-code">apimaker init &lt;slug&gt; [-o archivo.json]</div>
-            <table className="docs-table">
-              <thead><tr><th>Opción</th><th>Descripción</th></tr></thead>
-              <tbody>
-                <tr><td><code className="docs-code--inline">--output, -o</code></td><td>Ruta del archivo JSON de salida (default: &lt;slug&gt;.json)</td></tr>
-              </tbody>
-            </table>
-            <p className="docs-subsection__text">Ejemplo:</p>
-            <div className="docs-code"><span className="comment"># Exportar a archivo</span>
-apimaker init pokedex-demo -o mi-api.json
-
-<span className="comment"># Desplegarlo después</span>
-apimaker deploy mi-api.json --port 3000</div>
-          </div>
-
-          <div className="docs-section" id="cli-ssh">
-            <h2 className="docs-section__title">Deploy remoto (SSH)</h2>
-            <p className="docs-section__text">
-              Despliega el proyecto directamente en un servidor remoto vía SSH + Docker.
-              El CLI copia el archivo, genera un <code className="docs-code--inline">docker-compose.yml</code>
-              y levanta los contenedores automáticamente.
-            </p>
-            <div className="docs-code"><span className="comment"># Desplegar en VPS</span>
-apimaker deploy proyecto.json --ssh usuario@midominio.com --port 80
-
-<span className="comment"># El servidor remoto debe tener Docker instalado</span></div>
-            <p className="docs-section__text">
-              Una vez completado, la API estará disponible en <code className="docs-code--inline">http://midominio.com/api</code>.
-            </p>
-          </div>
-        </div>
-
-        {/* ========== Arquitectura ========== */}
-        <div className="docs-section" id="arquitectura">
-          <h2 className="docs-section__title">Arquitectura</h2>
-          <p className="docs-section__text">
-            API Maker genera código listo para producción separado en capas bien definidas.
+  const renderOverview = () => (
+    <div>
+      <div className="info-hero" style={{ marginBottom: '1.5rem' }}>
+        <div className="info-hero__content">
+          <h1 className="info-hero__title">API Maker</h1>
+          <p className="info-hero__subtitle">
+            Constructor de APIs visual y open source. Define datasets, diseña endpoints y genera código
+            listo para producción en FastAPI, Express o NestJS.
           </p>
-          <div className="info-stacks">
-            <div className="info-stack">
-              <div className="info-stack__head">
-                <span className="info-stack__dot" style={{ background: '#6366f1' }} />
-                <strong>Modelos / Schemas</strong>
-              </div>
-              <p className="info-stack__desc">
-                Define tus datasets con tipos, validaciones, relaciones y generación con Faker. Se traducen a SQLModel (Python),
-                Sequelize (Express) o TypeORM (NestJS) según el stack.
-              </p>
+          <div className="info-hero__stats">
+            <div className="info-hero__stat">
+              <span className="info-hero__stat-value">3</span>
+              <span className="info-hero__stat-label">Stacks</span>
             </div>
-            <div className="info-stack">
-              <div className="info-stack__head">
-                <span className="info-stack__dot" style={{ background: '#0ea5e9' }} />
-                <strong>Controladores / Routers</strong>
-              </div>
-              <p className="info-stack__desc">
-                Endpoints REST generados automáticamente con CRUD completo (list, get, create, update, delete)
-                más rutas personalizadas. Rutas con parámetros dinámicos {'{id}'} y vinculación directa a datasets.
-              </p>
+            <div className="info-hero__stat">
+              <span className="info-hero__stat-value">30+</span>
+              <span className="info-hero__stat-label">Endpoints API</span>
             </div>
-            <div className="info-stack">
-              <div className="info-stack__head">
-                <span className="info-stack__dot" style={{ background: '#10b981' }} />
-                <strong>Seguridad</strong>
-              </div>
-              <p className="info-stack__desc">
-                Autenticación JWT con tokens de acceso (24h) y refresh (7 días). API Key opcional para machine-to-machine.
-                Rate limiting configurable por endpoint.
-              </p>
+            <div className="info-hero__stat">
+              <span className="info-hero__stat-value">2</span>
+              <span className="info-hero__stat-label">SDKs</span>
             </div>
-            <div className="info-stack">
-              <div className="info-stack__head">
-                <span className="info-stack__dot" style={{ background: '#f59e0b' }} />
-                <strong>Despliegue</strong>
-              </div>
-              <p className="info-stack__desc">
-                Docker Compose multi-etapa, seeds automáticos, health checks, variables de entorno incluidos en el bundle generado.
-                Templates para Railway, Render y CI/CD con GitHub Actions.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* ========== Instalación ========== */}
-        <div className="docs-section" id="instalacion">
-          <h2 className="docs-section__title">Instalación</h2>
-          <div className="info-grid">
-            <div className="info-card">
-              <h3 className="info-card__title">1 comando</h3>
-              <p className="info-card__desc">
-                <code className="docs-code--inline">./install.sh</code> en Linux/macOS o <code className="docs-code--inline">install.bat</code> en Windows.
-                El instalador crea el entorno virtual, instala dependencias y lanza el Setup Wizard.
-              </p>
-            </div>
-            <div className="info-card">
-              <h3 className="info-card__title">Setup Wizard</h3>
-              <p className="info-card__desc">
-                Al primer arranque, el wizard guía la configuración del administrador (usuario + contraseña) y la base de datos
-                (SQLite sin configuración o PostgreSQL con datos de conexión).
-              </p>
-            </div>
-            <div className="info-card">
-              <h3 className="info-card__title">Base de Datos</h3>
-              <p className="info-card__desc">
-                Soporte nativo para SQLite (default, zero-config) y PostgreSQL. La configuración se persiste en
-                <code className="docs-code--inline"> admin_config.json</code>.
-              </p>
-            </div>
-            <div className="info-card">
-              <h3 className="info-card__title">Docker</h3>
-              <p className="info-card__desc">
-                Opción de levantar con <code className="docs-code--inline">docker compose up -d --build</code> directamente desde el instalador.
-                Backend en :8000, frontend en :5173.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* ========== Stacks ========== */}
-        <div className="docs-section" id="stacks">
-          <h2 className="docs-section__title">Stacks de Implementación</h2>
-          <div className="info-stacks" style={{ gap: '0.75rem' }}>
-            <div className="info-stack">
-              <div className="info-stack__head">
-                <span className="info-stack__dot" style={{ background: '#3b82f6' }} />
-                <strong>FastAPI (Python)</strong>
-                <span className="info-stack__badge">Recomendado</span>
-              </div>
-              <p className="info-stack__desc">
-                Framework moderno con soporte async, documentación OpenAPI automática, Pydantic v2 para validación,
-                SQLAlchemy + SQLModel. Incluye Alembic para migraciones y uvicorn como servidor ASGI.
-              </p>
-            </div>
-            <div className="info-stack">
-              <div className="info-stack__head">
-                <span className="info-stack__dot" style={{ background: '#10b981' }} />
-                <strong>Express (Node.js)</strong>
-              </div>
-              <p className="info-stack__desc">
-                Framework Node.js maduro con Sequelize ORM, Swagger automático, JWT, rate limiting y
-                Docker Compose con PostgreSQL. Ideal para equipos full-stack JavaScript.
-              </p>
-            </div>
-            <div className="info-stack">
-              <div className="info-stack__head">
-                <span className="info-stack__dot" style={{ background: '#8b5cf6' }} />
-                <strong>NestJS (Node.js)</strong>
-              </div>
-              <p className="info-stack__desc">
-                Arquitectura modular con TypeORM, decoradores Swagger, AuthGuard, DTOs tipados y
-                estructura empresarial lista para producción con soporte de inyección de dependencias.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* ========== Flujo ========== */}
-        <div className="docs-section" id="flujo">
-          <h2 className="docs-section__title">Flujo de Trabajo</h2>
-          <div className="info-steps">
-            <div className="info-step">
-              <span className="info-step__num">1</span>
-              <div>
-                <strong>Instala y configura</strong>
-                <p>Ejecuta <code className="docs-code--inline">./install.sh</code>. El Setup Wizard te guía en la creación del admin, elección de BD y carga opcional de datos demo (Pokedex).</p>
-              </div>
-            </div>
-            <div className="info-step">
-              <span className="info-step__num">2</span>
-              <div>
-                <strong>Define tus Datasets</strong>
-                <p>Crea modelos con tipos de campo, valores por defecto, enumeraciones, claves primarias y foráneas. Importa desde CSV, Excel o introspecciona bases de datos externas.</p>
-              </div>
-            </div>
-            <div className="info-step">
-              <span className="info-step__num">3</span>
-              <div>
-                <strong>Diseña Endpoints REST</strong>
-                <p>Genera rutas CRUD automáticas vinculadas a tus datasets o crea endpoints personalizados con método, path y parámetros propios.</p>
-              </div>
-            </div>
-            <div className="info-step">
-              <span className="info-step__num">4</span>
-              <div>
-                <strong>Configura Relaciones (Mappings)</strong>
-                <p>Conecta campos entre datasets con el editor visual de mappings. Soporta transformaciones directas, conversión de tipos, concatenación y formateo condicional.</p>
-              </div>
-            </div>
-            <div className="info-step">
-              <span className="info-step__num">5</span>
-              <div>
-                <strong>Prueba con el Simulador</strong>
-                <p>Lanza el mock server integrado y prueba todos tus endpoints en tiempo real. Soporta filtros por query params y búsqueda por ID.</p>
-              </div>
-            </div>
-            <div className="info-step">
-              <span className="info-step__num">6</span>
-              <div>
-                <strong>Despliega</strong>
-                <p>Usa <code className="docs-code--inline">apimaker deploy</code> para levantar tu API al instante, descarga el bundle .zip, o despliega vía SSH + Docker con un solo comando.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ========== Funcionalidades ========== */}
-        <div className="docs-section" id="funcionalidades">
-          <h2 className="docs-section__title">Funcionalidades</h2>
-          <div className="info-grid">
-            <div className="info-card">
-              <h3 className="info-card__title">Mock Server</h3>
-              <p className="info-card__desc">Servidor mock integrado que se levanta por proyecto. Simula endpoints con datos realistas. Datos persistentes en base de datos.</p>
-            </div>
-            <div className="info-card">
-              <h3 className="info-card__title">Versionado</h3>
-              <p className="info-card__desc">Cada proyecto mantiene un historial de snapshots. Puedes crear versiones manualmente y restaurar cualquier versión anterior.</p>
-            </div>
-            <div className="info-card">
-              <h3 className="info-card__title">Webhooks</h3>
-              <p className="info-card__desc">Registra URLs externas que reciben notificaciones en tiempo real cuando los datos del mock server cambian. Soporta eventos create, update y delete.</p>
-            </div>
-            <div className="info-card">
-              <h3 className="info-card__title">Share Links</h3>
-              <p className="info-card__desc">Genera enlaces públicos de solo lectura con protección por contraseña y fecha de expiración configurable.</p>
-            </div>
-            <div className="info-card">
-              <h3 className="info-card__title">SDKs Generados</h3>
-              <p className="info-card__desc">Clientes TypeScript y Python generados automáticamente en cada bundle. Incluyen tipado completo de tus datasets.</p>
-            </div>
-            <div className="info-card">
-              <h3 className="info-card__title">Base de Datos Externa</h3>
-              <p className="info-card__desc">Conecta e introspecciona esquemas de PostgreSQL, MySQL o SQLite. Convierte tablas en datasets editables automáticamente.</p>
-            </div>
-            <div className="info-card">
-              <h3 className="info-card__title">Mappings</h3>
-              <p className="info-card__desc">Editor visual de relaciones entre campos de distintos datasets. Define transformaciones: copia directa, cast, concat o expresiones.</p>
-            </div>
-            <div className="info-card">
-              <h3 className="info-card__title">CLI Deploy</h3>
-              <p className="info-card__desc">
-                <span className="docs-badge docs-badge--new">NUEVO</span>{' '}
-                Despliega tu API en cualquier servidor con un solo comando. Exporta, sirve o despliega vía SSH sin depender de la UI.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* ========== Recursos ========== */}
-        <div className="docs-section" id="recursos">
-          <h2 className="docs-section__title">Recursos y APIs</h2>
-          <div className="info-grid">
-            <div className="info-card">
-              <h3 className="info-card__title">OpenAPI / Swagger</h3>
-              <p className="info-card__desc">Cada proyecto expone un documento OpenAPI 3.1 y una interfaz Redoc interactiva. Compatible con Postman, Insomnia y Swagger UI.</p>
-            </div>
-            <div className="info-card">
-              <h3 className="info-card__title">API del Backend</h3>
-              <p className="info-card__desc">30+ endpoints REST documentados para gestionar proyectos, datasets, endpoints, mappings, shares, webhooks, versiones y mock servers.</p>
-            </div>
-            <div className="info-card">
-              <h3 className="info-card__title">Instalador</h3>
-              <p className="info-card__desc"><code className="docs-code--inline">./install.sh</code> para Linux/macOS y <code className="docs-code--inline">install.bat</code> para Windows. Un solo comando configura todo el entorno.</p>
-            </div>
-            <div className="info-card">
-              <h3 className="info-card__title">Docker Compose</h3>
-              <p className="info-card__desc">docker-compose.yml + docker-compose.prod.yml con PostgreSQL, health checks y configuración vía variables de entorno.</p>
+            <div className="info-hero__stat">
+              <span className="info-hero__stat-value">1</span>
+              <span className="info-hero__stat-label">Comando</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Right Sidebar TOC */}
+      <div className="info-grid">
+        <div className="info-card">
+          <h3 className="info-card__title">Datasets</h3>
+          <p className="info-card__desc">Define esquemas con tipos, relaciones y datos de ejemplo. Importa desde CSV, Excel o base de datos externa.</p>
+        </div>
+        <div className="info-card">
+          <h3 className="info-card__title">Endpoints REST</h3>
+          <p className="info-card__desc">CRUD automático + rutas personalizadas vinculadas a datasets. GET, POST, PUT, PATCH y DELETE.</p>
+        </div>
+        <div className="info-card">
+          <h3 className="info-card__title">Generación de código</h3>
+          <p className="info-card__desc">Bundle listo para producción con modelos, controladores, seguridad, Docker y SDKs en TypeScript y Python.</p>
+        </div>
+        <div className="info-card">
+          <h3 className="info-card__title">Mock server</h3>
+          <p className="info-card__desc">Simula tu API en tiempo real con datos persistentes en base de datos, filtros y autenticación.</p>
+        </div>
+        <div className="info-card">
+          <h3 className="info-card__title">CLI Deploy</h3>
+          <p className="info-card__desc">Despliega tu API en cualquier servidor con un solo comando. Exporta, sirve o despliega vía SSH sin depender de la UI.</p>
+        </div>
+        <div className="info-card">
+          <h3 className="info-card__title">Share Links</h3>
+          <p className="info-card__desc">Snapshots de solo lectura con contraseña y expiración. Comparte tu API documentada sin exponer el editor.</p>
+        </div>
+      </div>
+
+      <div className="docs-section" id="arquitectura">
+        <h2 className="docs-section__title">Arquitectura</h2>
+        <div className="info-stacks">
+          <div className="info-stack">
+            <div className="info-stack__head">
+              <span className="info-stack__dot" style={{ background: '#6366f1' }} />
+              <strong>Modelos / Schemas</strong>
+            </div>
+            <p className="info-stack__desc">Define datasets con tipos, validaciones y relaciones. Se traducen a SQLModel, Sequelize o TypeORM según el stack.</p>
+          </div>
+          <div className="info-stack">
+            <div className="info-stack__head">
+              <span className="info-stack__dot" style={{ background: '#0ea5e9' }} />
+              <strong>Controladores / Routers</strong>
+            </div>
+            <p className="info-stack__desc">Endpoints REST con CRUD completo y rutas personalizadas. Parámetros dinámicos {'{id}'} y vinculación directa a datasets.</p>
+          </div>
+          <div className="info-stack">
+            <div className="info-stack__head">
+              <span className="info-stack__dot" style={{ background: '#10b981' }} />
+              <strong>Seguridad</strong>
+            </div>
+            <p className="info-stack__desc">JWT con tokens de acceso (24h) y refresh (7 días). API Key opcional. Rate limiting configurable.</p>
+          </div>
+          <div className="info-stack">
+            <div className="info-stack__head">
+              <span className="info-stack__dot" style={{ background: '#f59e0b' }} />
+              <strong>Despliegue</strong>
+            </div>
+            <p className="info-stack__desc">Docker Compose multi-etapa, seeds automáticos, health checks y CI/CD incluidos en el bundle generado.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
+  const renderTutorial = () => (
+    <div>
+      <div className="docs-header">
+        <h1 className="docs-header__title">Tutorial paso a paso</h1>
+        <p className="docs-header__desc">Crea tu primera API en 10 pasos. Ejemplo práctico: API de usuarios de un banco.</p>
+      </div>
+
+      {[
+        {
+          num: 1, title: 'Instala API Maker',
+          desc: 'Ejecuta el instalador desde la terminal. Crea el admin, elige base de datos y carga datos demo:',
+          code: './install.sh\n\n# El Setup Wizard te guía:\n# - Usuario admin (por defecto: admin / admin)\n# - BD: SQLite (sin config) o PostgreSQL\n# - Datos demo: proyecto Pokedex',
+        },
+        {
+          num: 2, title: 'Inicia sesión',
+          desc: 'Accede a http://localhost:5173 con las credenciales que configuraste en el wizard.',
+          code: 'Usuario: admin\nContraseña: admin',
+        },
+        {
+          num: 3, title: 'Configura tu proyecto',
+          desc: 'Define nombre, descripción y stack tecnológico desde el panel Editor.',
+          fields: [
+            { label: 'Nombre', value: 'API Usuarios Banco' },
+            { label: 'Descripción', value: 'API REST para gestión de clientes bancarios' },
+            { label: 'Stack', value: 'fastapi' },
+          ],
+        },
+        {
+          num: 4, title: 'Define el dataset',
+          desc: 'Ve a la pestaña "Datasets" y añade los campos del modelo. Puedes importar desde CSV, Excel o una BD externa:',
+          table: [
+            { name: 'id_cliente', type: 'integer', req: true },
+            { name: 'nombre', type: 'string', req: true },
+            { name: 'email', type: 'string', req: true },
+            { name: 'tipo_cuenta', type: 'string', req: true },
+            { name: 'saldo', type: 'float', req: true },
+            { name: 'activo', type: 'boolean', req: true },
+            { name: 'fecha_alta', type: 'datetime', req: true },
+          ],
+        },
+        {
+          num: 5, title: 'Diseña los endpoints',
+          desc: 'En la pestaña "Endpoints" añade las rutas REST. Cada endpoint se vincula a un dataset:',
+          endpoints: [
+            { method: 'GET', path: '/clientes', summary: 'Listar todos los clientes' },
+            { method: 'GET', path: '/clientes/{id}', summary: 'Obtener un cliente por ID' },
+            { method: 'POST', path: '/clientes', summary: 'Crear un nuevo cliente' },
+            { method: 'PUT', path: '/clientes/{id}', summary: 'Actualizar un cliente' },
+            { method: 'DELETE', path: '/clientes/{id}', summary: 'Eliminar un cliente' },
+          ],
+        },
+        {
+          num: 6, title: 'Prueba en el Simulador',
+          desc: 'En la pestaña "Simulador", lanza el mock server y prueba tus endpoints con datos realistas generados automáticamente.',
+        },
+        {
+          num: 7, title: 'Configura Seguridad',
+          desc: 'Elige autenticación (JWT, API Key), rate limiting y configura secretos. Todo se incluye en el código generado.',
+        },
+        {
+          num: 8, title: 'Genera la API',
+          desc: 'Pulsa "Guardar y lanzar API" para sincronizar con el backend y obtener URL del sandbox, docs Redoc y share link.',
+        },
+        {
+          num: 9, title: 'Descarga el bundle',
+          desc: 'En la pestaña "API generada" encontrarás el bundle .zip con código listo para producción: modelos, controladores, Docker, seeds, tests y SDKs.',
+        },
+        {
+          num: 10, title: 'Despliega a producción',
+          desc: 'Usa el CLI, Docker o tu plataforma favorita para poner tu API en producción.',
+          code: '# Docker (recomendado)\ndocker compose up -d --build\n\n# CLI Deploy\napimaker deploy proyecto.json --port 80\n\n# O manual\npip install -r requirements.txt\nuvicorn main:app --host 0.0.0.0 --port 8000',
+        },
+      ].map((step) => (
+        <div key={step.num} className="info-step" style={{ marginBottom: '0.75rem' }}>
+          <span className="info-step__num">{step.num}</span>
+          <div>
+            <strong>{step.title}</strong>
+            <p>{step.desc}</p>
+            {step.code && <div className="docs-tutorial-code">{step.code}</div>}
+            {step.fields && (
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                {step.fields.map((f) => (
+                  <div key={f.label} style={{ fontSize: '0.82rem' }}>
+                    <span style={{ color: '#64748b', marginRight: '0.3rem' }}>{f.label}:</span>
+                    <code className="docs-code--inline">{f.value}</code>
+                  </div>
+                ))}
+              </div>
+            )}
+            {step.table && (
+              <table className="docs-tutorial-table">
+                <thead><tr><th>Campo</th><th>Tipo</th><th>Requerido</th></tr></thead>
+                <tbody>
+                  {step.table.map((f) => (
+                    <tr key={f.name}>
+                      <td><code>{f.name}</code></td><td>{f.type}</td><td>{f.req ? 'Sí' : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {step.endpoints && (
+              <div style={{ marginTop: '0.5rem' }}>
+                {step.endpoints.map((ep) => (
+                  <div key={`${ep.method}-${ep.path}`} className="docs-endpoint-row">
+                    <span className="docs-endpoint-method" style={{ backgroundColor: METHOD_COLORS[ep.method] }}>{ep.method}</span>
+                    <span className="docs-endpoint-path">{ep.path}</span>
+                    <span className="docs-endpoint-summary">{ep.summary}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+
+  const renderCli = () => (
+    <div>
+      <div className="docs-header">
+        <h1 className="docs-header__title">CLI — Apimaker</h1>
+        <p className="docs-header__desc">
+          La interfaz de línea de comandos permite desplegar, servir y exportar proyectos de API Maker
+          desde cualquier entorno, sin depender de la interfaz gráfica.
+        </p>
+      </div>
+
+      <div className="docs-section" id="cli-install">
+        <h2 className="docs-section__title">Instalación</h2>
+        <p className="docs-section__text">
+          El CLI viene incluido en el paquete <code className="docs-code--inline">apimaker-backend</code>.
+        </p>
+        <div className="docs-code">pip install apimaker-backend</div>
+        <div className="docs-code">apimaker --help</div>
+      </div>
+
+      <div className="docs-section" id="cli-deploy">
+        <h2 className="docs-section__title">apimaker deploy</h2>
+        <p className="docs-section__text">Despliega un proyecto exportado como API independiente. Lee el JSON, crea la DB, importa datos y levanta el servidor.</p>
+        <div className="docs-code">apimaker deploy &lt;archivo.json&gt; [opciones]</div>
+        <table className="docs-table">
+          <thead><tr><th>Opción</th><th>Default</th><th>Descripción</th></tr></thead>
+          <tbody>
+            <tr><td><code className="docs-code--inline">--port</code></td><td>8080</td><td>Puerto del servidor</td></tr>
+            <tr><td><code className="docs-code--inline">--host</code></td><td>0.0.0.0</td><td>Host de escucha</td></tr>
+            <tr><td><code className="docs-code--inline">--db</code></td><td>SQLite</td><td>URL de base de datos</td></tr>
+            <tr><td><code className="docs-code--inline">--ssh</code></td><td>-</td><td>Destino SSH para deploy remoto</td></tr>
+          </tbody>
+        </table>
+        <div className="docs-code"><span className="comment"># Exportar y desplegar</span>
+apimaker init pokedex-demo
+apimaker deploy pokedex-demo.json --port 8080
+
+<span className="comment"># URLs limpias:</span>
+GET    /api/pokemon          <span className="comment"># Listar</span>
+GET    /api/pokemon/25       <span className="comment"># Detalle</span>
+POST   /api/pokemon          <span className="comment"># Crear</span></div>
+      </div>
+
+      <div className="docs-section" id="cli-serve">
+        <h2 className="docs-section__title">apimaker serve</h2>
+        <p className="docs-section__text">Sirve un proyecto existente de la DB del builder como API independiente en un puerto separado.</p>
+        <div className="docs-code">apimaker serve &lt;slug&gt; --port 8081</div>
+      </div>
+
+      <div className="docs-section" id="cli-init">
+        <h2 className="docs-section__title">apimaker init</h2>
+        <p className="docs-section__text">Exporta un proyecto de la DB a JSON para desplegar con <code className="docs-code--inline">apimaker deploy</code>.</p>
+        <div className="docs-code">apimaker init pokedex-demo -o mi-api.json</div>
+      </div>
+
+      <div className="docs-section" id="cli-ssh">
+        <h2 className="docs-section__title">Deploy remoto (SSH)</h2>
+        <p className="docs-section__text">Despliega directamente en un VPS vía SSH + Docker. El CLI copia el archivo, genera docker-compose y levanta los contenedores.</p>
+        <div className="docs-code">apimaker deploy proyecto.json --ssh usuario@midominio.com --port 80</div>
+      </div>
+    </div>
+  )
+
+  const renderCodigo = () => (
+    <div>
+      <div className="docs-header">
+        <h1 className="docs-header__title">Ejemplos de código</h1>
+        <p className="docs-header__desc">Ejemplos en múltiples lenguajes para consumir tu API. Los endpoints se generan dinámicamente desde tu proyecto.</p>
+      </div>
+
+      <div className="docs-section">
+        <h2 className="docs-section__title">cURL</h2>
+        <div className="docs-code">curl http://localhost:8000/api/mock/pokedex-demo/pokemon</div>
+        <div className="docs-code">{`curl -X POST http://localhost:8000/api/mock/pokedex-demo/pokemon \\
+  -H "Content-Type: application/json" \\
+  -d '{"name": "Pikachu", "type": "electric", "pokedex_id": 25}'`}</div>
+        <div className="docs-code">{`curl -X DELETE http://localhost:8000/api/mock/pokedex-demo/pokemon/25`}</div>
+      </div>
+
+      <div className="docs-section">
+        <h2 className="docs-section__title">JavaScript (fetch)</h2>
+        <div className="docs-code">{`const BASE = "http://localhost:8000/api/mock/pokedex-demo"
+
+// Listar
+const res = await fetch(BASE + "/pokemon")
+const data = await res.json()
+
+// Crear
+await fetch(BASE + "/pokemon", {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ name: 'Pikachu', type: 'electric' })
+})`}</div>
+      </div>
+
+      <div className="docs-section">
+        <h2 className="docs-section__title">Python (requests)</h2>
+        <div className="docs-code">{`import requests
+
+BASE = "http://localhost:8000/api/mock/pokedex-demo"
+
+# Listar
+res = requests.get(BASE + "/pokemon")
+print(res.json())
+
+# Crear
+res = requests.post(BASE + "/pokemon", json={
+    "name": "Pikachu",
+    "type": "electric",
+    "pokedex_id": 25,
+})`}</div>
+      </div>
+    </div>
+  )
+
+  const renderDesplegar = () => (
+    <div>
+      <div className="docs-header">
+        <h1 className="docs-header__title">Despliegue</h1>
+        <p className="docs-header__desc">Todas las formas de llevar tu API a producción.</p>
+      </div>
+
+      <div className="docs-deploy-grid">
+        <div className="docs-deploy-card docs-deploy-card--recommended">
+          <div className="docs-deploy-header">
+            <span className="docs-recommended-badge">Recomendado</span>
+            <h3>CLI Deploy</h3>
+          </div>
+          <p>Despliega tu API exportada con un solo comando. Crea DB, importa datos y levanta el servidor al instante.</p>
+          <pre className="docs-deploy-code">apimaker deploy proyecto.json --port 8080</pre>
+        </div>
+        <div className="docs-deploy-card">
+          <div className="docs-deploy-header">
+            <h3>Docker</h3>
+          </div>
+          <p>El bundle incluye un Dockerfile listo para producción. Construye y ejecuta en cualquier servidor.</p>
+          <pre className="docs-deploy-code">docker build -t my-api .
+docker run -p 8000:8000 my-api</pre>
+        </div>
+        <div className="docs-deploy-card">
+          <div className="docs-deploy-header">
+            <h3>Docker Compose</h3>
+          </div>
+          <p>El bundle incluye docker-compose.yml con API + PostgreSQL. La opción más completa.</p>
+          <pre className="docs-deploy-code">docker compose up -d --build
+# API en http://localhost:8000
+# Docs en http://localhost:8000/docs</pre>
+        </div>
+        <div className="docs-deploy-card">
+          <div className="docs-deploy-header">
+            <h3>Railway</h3>
+          </div>
+          <p>Incluye deploy/railway.json. Conecta tu repo y Railway lo detecta automáticamente.</p>
+          <pre className="docs-deploy-code">railway login
+railway up</pre>
+        </div>
+        <div className="docs-deploy-card">
+          <div className="docs-deploy-header">
+            <h3>Render</h3>
+          </div>
+          <p>Incluye deploy/render.yaml. Sube a GitHub y conéctalo en Render.</p>
+          <pre className="docs-deploy-code">1. Sube el proyecto a GitHub
+2. Ve a https://render.com
+          3. Nuevo Blueprint {'>'} conecta tu repo</pre>
+        </div>
+        <div className="docs-deploy-card">
+          <div className="docs-deploy-header">
+            <h3>CI/CD (GitHub Actions)</h3>
+          </div>
+          <p>Automatiza el despliegue en tu VPS al hacer push a main.</p>
+          <pre className="docs-deploy-code"># .github/workflows/deploy.yml
+on: push
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ssh user@host "cd /app && docker compose up -d --build"</pre>
+        </div>
+        <div className="docs-deploy-card">
+          <div className="docs-deploy-header">
+            <h3>SSH Remoto</h3>
+          </div>
+          <p>Despliega desde el CLI directamente a cualquier VPS con Docker.</p>
+          <pre className="docs-deploy-code">apimaker deploy proyecto.json \
+  --ssh usuario@midominio.com \
+  --port 80</pre>
+        </div>
+        <div className="docs-deploy-card">
+          <div className="docs-deploy-header">
+            <h3>VPS Manual</h3>
+          </div>
+          <p>Instalación directa con Python/Node en tu servidor.</p>
+          <pre className="docs-deploy-code"># FastAPI
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8000
+
+# Express / NestJS
+npm install && npm start</pre>
+        </div>
+      </div>
+
+      <div className="docs-checklist">
+        <h3>Checklist de Producción</h3>
+        <ul>
+          <li><span className="docs-checkmark">✓</span> <strong>Base de Datos:</strong> Usa PostgreSQL persistente en lugar de SQLite.</li>
+          <li><span className="docs-checkmark">✓</span> <strong>Seguridad:</strong> Cambia las claves secretas en el archivo <code className="docs-code--inline">.env</code>.</li>
+          <li><span className="docs-checkmark">✓</span> <strong>HTTPS:</strong> Obligatorio en producción. Usa Certbot o Cloudflare.</li>
+          <li><span className="docs-checkmark">✓</span> <strong>Workers:</strong> Usa múltiples workers (gunicorn, pm2).</li>
+          <li><span className="docs-checkmark">✓</span> <strong>CORS:</strong> Restringe orígenes permitidos en producción.</li>
+          <li><span className="docs-checkmark">✓</span> <strong>SDK:</strong> Los bundles incluyen clientes TypeScript y Python en <code className="docs-code--inline">sdks/</code>.</li>
+        </ul>
+      </div>
+    </div>
+  )
+
+  const sidebarSections: Record<DocTab, { id: string; label: string }[]> = {
+    overview: [
+      { id: 'overview', label: 'Visión General' },
+      { id: 'arquitectura', label: 'Arquitectura' },
+    ],
+    tutorial: [
+      { id: 'tutorial', label: 'Tutorial' },
+    ],
+    cli: CLI_SECTIONS,
+    codigo: [
+      { id: 'codigo', label: 'Ejemplos de código' },
+    ],
+    desplegar: [
+      { id: 'desplegar', label: 'Despliegue' },
+    ],
+  }
+
+  return (
+    <div className="docs-layout">
+      <div className="docs-content">
+        <div className="docs-tabs">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              className={`docs-tab ${activeTab === tab.id ? 'docs-tab--active' : ''}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <span className="docs-tab__icon">{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'overview' && renderOverview()}
+        {activeTab === 'tutorial' && renderTutorial()}
+        {activeTab === 'cli' && renderCli()}
+        {activeTab === 'codigo' && renderCodigo()}
+        {activeTab === 'desplegar' && renderDesplegar()}
+      </div>
+
       <aside className="docs-sidebar">
-        <div className="docs-sidebar__title">En esta página</div>
+        <div className="docs-sidebar__title">
+          {TABS.find(t => t.id === activeTab)?.label || 'Secciones'}
+        </div>
         <ul className="docs-toc">
-          {SECTIONS.map(s => (
+          {sidebarSections[activeTab]?.map(s => (
             <li key={s.id} className="docs-toc__item">
               <button
                 className={`docs-toc__link ${activeSection === s.id ? 'docs-toc__link--active' : ''}`}
-                onClick={() => scrollTo(s.id)}
+                onClick={() => {
+                  setActiveSection(s.id)
+                  document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth' })
+                }}
               >
                 {s.label}
               </button>
-              {s.sub?.map(sub => (
-                <button
-                  key={sub.id}
-                  className={`docs-toc__link docs-toc__link--sub ${activeSection === sub.id ? 'docs-toc__link--active' : ''}`}
-                  onClick={() => scrollTo(sub.id)}
-                >
-                  {sub.label}
-                </button>
-              ))}
             </li>
           ))}
         </ul>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Routes, Route, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom'
 
 import { SetupWizard } from './components/SetupWizard'
-import { ApiUsagePanel } from './components/ApiUsagePanel'
+
 import { LoginScreen } from './components/LoginScreen'
 import { ProjectSidebar } from './components/ProjectSidebar'
 import { ShareView } from './components/ShareView'
@@ -188,12 +188,7 @@ export function App() {
               >
                 Editor
               </NavLink>
-              <NavLink
-                to="/usage"
-                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-              >
-                Uso
-              </NavLink>
+
               <NavLink
                 to="/simulator"
                 className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
@@ -230,7 +225,6 @@ export function App() {
           <Routes>
             <Route path="/" element={<BuilderPage />} />
             <Route path="/simulator" element={<SimulatorPage />} />
-            <Route path="/usage" element={<ApiUsagePanel />} />
             <Route path="/info" element={<InfoPage />} />
             <Route path="/config" element={<ConfigPage authStatus={authStatus} onLogout={performLogout} />} />
             <Route path="/docs" element={<DocsPage />} />
