@@ -46,3 +46,4 @@ frontend/.vite/
 frontend/coverage/
 backend/.python-version
 backend/deployments/
+deployments/

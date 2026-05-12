@@ -23,7 +23,7 @@ from ..services.project_service import project_service
 logger = logging.getLogger("apimaker.deploy")
 router = APIRouter(prefix="/api/deploy", tags=["deploy"])
 
-DEPLOY_ROOT = Path(__file__).resolve().parent.parent.parent / "deployments"
+DEPLOY_ROOT = Path(__file__).resolve().parent.parent.parent.parent / "deployments"
 TRACKING_FILE = DEPLOY_ROOT / ".deployments.json"
 PORT_RANGE = range(8080, 8100)
 
