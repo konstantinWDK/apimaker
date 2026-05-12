@@ -8,7 +8,7 @@ services:
       - "8000:8000"
     environment:
       - APIMAKER_DATABASE_URL=${APIMAKER_DATABASE_URL:-sqlite:///./app/data/apimaker.db}
-      - APIMAKER_ENVIRONMENT=development
+      - APIMAKER_ENVIRONMENT=${APIMAKER_ENVIRONMENT:-development}
     volumes:
       - ./backend/app/data:/app/app/data
     restart: unless-stopped

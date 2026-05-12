@@ -162,6 +162,20 @@ class Webhook(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class MockRecord(SQLModel, table=True):
+    """Persistent mock data records for the mock server."""
+
+    __tablename__ = "mock_records"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    project_id: str = Field(foreign_key="projects.id", index=True)
+    dataset_id: str = Field(foreign_key="datasets.id", index=True)
+    record_id: str = Field(default_factory=lambda: str(uuid4())[:8])
+    data: str  # JSON-serialized record data
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class ProjectVersion(SQLModel, table=True):
     """Snapshot of a project at a point in time."""
 

@@ -16,6 +16,9 @@ from app.db_models import (
     DatasetField,
     Endpoint,
     ShareSnapshot,
+    MockRecord,
+    Webhook,
+    ProjectVersion,
 )  # noqa: F401
 
 # this is the Alembic Config object
