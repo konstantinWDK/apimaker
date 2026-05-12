@@ -28,6 +28,12 @@ PORT_RANGE = range(8080, 8100)
 class LocalDeployRequest(BaseModel):
     project_id: str
     port: int = 8080
+    db_type: str = "sqlite"
+    db_host: str | None = None
+    db_port: int | None = None
+    db_user: str | None = None
+    db_password: str | None = None
+    db_name: str | None = None
 
 
 class DeployStatus(BaseModel):
@@ -81,7 +87,7 @@ def _find_free_port(preferred: int) -> tuple[int, list[str]]:
     raise HTTPException(status_code=409, detail="No hay puertos disponibles en el rango 8080-8099")
 
 
-def _build_docker_compose(port: int, slug: str) -> str:
+def _build_docker_compose(port: int, slug: str, db_url: str) -> str:
     """Generate a docker-compose.yml using the builder's standalone server."""
     backend_root = str(Path(__file__).resolve().parent.parent.parent)
     proj_root = str(Path(__file__).resolve().parent.parent.parent.parent)
@@ -91,6 +97,8 @@ def _build_docker_compose(port: int, slug: str) -> str:
     ports:
       - "{port}:8000"
     working_dir: /app
+    environment:
+      - APIMAKER_DEPLOY_DB_URL={db_url}
     command: >
       sh -c "pip install -q --no-cache-dir -e /app/backend &&
              python -m app.deploy_entrypoint /app/deployments/{slug}/project.json 8000"
@@ -399,6 +407,14 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
     deploy_dir.mkdir(parents=True, exist_ok=True)
     logs.append(f"📁 Directorio: {deploy_dir}")
 
+    # Build DB URL for the deployed API
+    if req.db_type == "postgresql" and req.db_host:
+        deploy_db_url = f"postgresql+psycopg2://{req.db_user}:{req.db_password}@{req.db_host}:{req.db_port}/{req.db_name or 'api'}"
+        logs.append(f"🗄️ Usando PostgreSQL: {req.db_host}:{req.db_port}/{req.db_name}")
+    else:
+        deploy_db_url = "sqlite:///./data.db"
+        logs.append("🗄️ Usando SQLite embebida")
+
     # Export project as JSON for the standalone server (stable mock server)
     from ..routers.projects import _db_to_pydantic
     export_data = _db_to_pydantic(project, datasets_with_fields, endpoints)
@@ -408,7 +424,8 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
     )
     logs.append("📄 Proyecto exportado a project.json")
 
-    compose = _build_docker_compose(port, slug)
+    # Write env file for the container
+    compose = _build_docker_compose(port, slug, deploy_db_url)
     (deploy_dir / "docker-compose.yml").write_text(compose, encoding="utf-8")
     logs.append(f"📝 docker-compose.yml (puerto {port})")
 

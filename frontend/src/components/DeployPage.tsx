@@ -59,6 +59,12 @@ export function DeployPage() {
 function DeployManager({ project, saveProject, updateProject, deployments, loading, onDeployDone }: any) {
   const [deployType, setDeployType] = useState<'local' | 'remote'>('local')
   const [localPort, setLocalPort] = useState('8080')
+  const [deployDbType, setDeployDbType] = useState<'sqlite' | 'postgresql'>('sqlite')
+  const [deployPgHost, setDeployPgHost] = useState('localhost')
+  const [deployPgPort, setDeployPgPort] = useState('5432')
+  const [deployPgUser, setDeployPgUser] = useState('postgres')
+  const [deployPgPass, setDeployPgPass] = useState('')
+  const [deployPgDb, setDeployPgDb] = useState('api_deploy')
   const [sshHost, setSshHost] = useState('')
   const [sshUser, setSshUser] = useState('root')
   const [sshPort, setSshPort] = useState('22')
@@ -100,8 +106,16 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
 
       if (deployType === 'local') {
         log(`🐳 Desplegando local en puerto ${localPort}...`)
+        const deployBody: any = { project_id: pid, port: parseInt(localPort, 10), db_type: deployDbType }
+        if (deployDbType === 'postgresql') {
+          deployBody.db_host = deployPgHost
+          deployBody.db_port = parseInt(deployPgPort, 10)
+          deployBody.db_user = deployPgUser
+          deployBody.db_password = deployPgPass
+          deployBody.db_name = deployPgDb
+        }
         const res = await apiFetch('/api/deploy/local', {
-          method: 'POST', body: JSON.stringify({ project_id: pid, port: parseInt(localPort, 10) }),
+          method: 'POST', body: JSON.stringify(deployBody),
         })
         const result = await res.json()
         result.logs?.forEach((l: string) => log(l))
@@ -224,10 +238,39 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
           <p className="muted-text" style={{ fontSize: '0.82rem', marginBottom: '0.75rem' }}>
             Despliega en el mismo servidor (requiere Docker). Si el puerto está ocupado, se asigna el siguiente disponible.
           </p>
-            <label className="form-field" style={{ maxWidth: '200px' }}>
-              <span className="label">Puerto preferido</span>
-              <input className="field" type="number" value={localPort} onChange={e => setLocalPort(e.target.value)} placeholder="8080" />
-            </label>
+          <label className="form-field" style={{ maxWidth: '200px' }}>
+            <span className="label">Puerto preferido</span>
+            <input className="field" type="number" value={localPort} onChange={e => setLocalPort(e.target.value)} placeholder="8080" />
+          </label>
+          <div style={{ marginTop: '0.75rem' }}>
+            <span className="label" style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.4rem' }}>
+              Base de datos de la API desplegada
+            </span>
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+              <label style={{ fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <input type="radio" name="ddb" checked={deployDbType === 'sqlite'} onChange={() => setDeployDbType('sqlite')} />
+                SQLite (embebida)
+              </label>
+              <label style={{ fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <input type="radio" name="ddb" checked={deployDbType === 'postgresql'} onChange={() => setDeployDbType('postgresql')} />
+                PostgreSQL (externa)
+              </label>
+            </div>
+            {deployDbType === 'postgresql' && (
+              <div className="form-grid" style={{ gap: '0.4rem' }}>
+                <label className="form-field"><span className="label">Host</span>
+                  <input className="field" value={deployPgHost} onChange={e => setDeployPgHost(e.target.value)} placeholder="localhost" /></label>
+                <label className="form-field"><span className="label">Puerto</span>
+                  <input className="field" value={deployPgPort} onChange={e => setDeployPgPort(e.target.value)} placeholder="5432" /></label>
+                <label className="form-field"><span className="label">Usuario</span>
+                  <input className="field" value={deployPgUser} onChange={e => setDeployPgUser(e.target.value)} placeholder="postgres" /></label>
+                <label className="form-field"><span className="label">Contraseña</span>
+                  <input className="field" type="password" value={deployPgPass} onChange={e => setDeployPgPass(e.target.value)} /></label>
+                <label className="form-field" style={{ gridColumn: 'span 2' }}><span className="label">Base de datos</span>
+                  <input className="field" value={deployPgDb} onChange={e => setDeployPgDb(e.target.value)} placeholder="api_deploy" /></label>
+              </div>
+            )}
+          </div>
           </div>
         ) : (
           <div className="form-grid" style={{ gap: '0.6rem' }}>

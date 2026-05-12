@@ -25,24 +25,12 @@ interface AdminConfig {
 }
 
 export function DatabaseConfigPanel() {
-  const [activeEnv, setActiveEnv] = useState<'dev' | 'prod'>('dev')
-  const [config, setConfig] = useState<{ dev: DbConfig; prod: DbConfig }>({
-    dev: { database_type: 'sqlite', port: 5432 },
-    prod: { database_type: 'postgresql', port: 5432 },
-  })
+  const [config, setConfig] = useState<DbConfig>({ database_type: 'sqlite', port: 5432 })
   const [currentInfo, setCurrentInfo] = useState<AdminConfig['current_database_info'] | null>(null)
-  const [systemEnv, setSystemEnv] = useState<string>('development')
-  
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [saveResult, setSaveResult] = useState<string | null>(null)
   const [testing, setTesting] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [syncing, setSyncing] = useState(false)
-  const [syncResult, setSyncResult] = useState<{
-    success: boolean
-    message: string
-    counts?: any
-  } | null>(null)
   const [useConnectionString, setUseConnectionString] = useState(false)
 
   const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
@@ -58,43 +46,29 @@ export function DatabaseConfigPanel() {
     fetch(`${backendBaseUrl}/admin/config`, { headers: authHeaders })
       .then((r) => r.json())
       .then((data: AdminConfig) => {
-        setConfig({
-          dev: data.dev,
-          prod: data.prod
-        })
+        setConfig(data.dev)
         setCurrentInfo(data.current_database_info)
-        setSystemEnv(data.environment)
-        if (data.environment === 'production') {
-          setActiveEnv('prod')
-        }
       })
-      .catch(() => {
-        /* ignore */
-      })
+      .catch(() => { /* ignore */ })
   }, [])
 
-  const currentConfig = config[activeEnv]
-
   const updateCurrentConfig = (updates: Partial<DbConfig>) => {
-    setConfig(prev => ({
-      ...prev,
-      [activeEnv]: { ...prev[activeEnv], ...updates }
-    }))
+    setConfig(prev => ({ ...prev, ...updates }))
   }
 
   const handleTest = async () => {
     setTesting(true)
     setTestResult(null)
     try {
-      const body: any = { database_type: currentConfig.database_type }
+      const body: any = { database_type: config.database_type }
       if (useConnectionString) {
-        body.postgres_url = currentConfig.postgres_url
+        body.postgres_url = config.postgres_url
       } else {
-        body.host = currentConfig.host
-        body.port = currentConfig.port
-        body.username = currentConfig.username
-        body.password = currentConfig.password
-        body.database = currentConfig.database
+        body.host = config.host
+        body.port = config.port
+        body.username = config.username
+        body.password = config.password
+        body.database = config.database
       }
 
       const res = await fetch(`${backendBaseUrl}/admin/config/test-db`, {
@@ -119,8 +93,8 @@ export function DatabaseConfigPanel() {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
-          environment: activeEnv,
-          config: currentConfig
+          environment: 'development',
+          config: config
         }),
       })
       const data = await res.json()
@@ -130,33 +104,6 @@ export function DatabaseConfigPanel() {
       setSaveResult(err instanceof Error ? err.message : 'Error desconocido')
     } finally {
       setSaving(false)
-    }
-  }
-
-  const handleSync = async () => {
-    const targetLabel = activeEnv === 'dev' ? 'Desarrollo' : 'Producción'
-    if (!confirm(`¿Sincronizar todos los datos de SQLite a PostgreSQL (${targetLabel})? Los registros existentes se omitirán.`)) return
-    setSyncing(true)
-    setSyncResult(null)
-    try {
-      const res = await fetch(`${backendBaseUrl}/admin/sync?target_env=${activeEnv}`, {
-        method: 'POST',
-        headers: authHeaders,
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.detail || 'Error en la sincronización')
-      setSyncResult({
-        success: data.success,
-        message: data.message,
-        counts: data.counts,
-      })
-    } catch (err) {
-      setSyncResult({
-        success: false,
-        message: err instanceof Error ? err.message : 'Error desconocido',
-      })
-    } finally {
-      setSyncing(false)
     }
   }
 
@@ -171,162 +118,87 @@ export function DatabaseConfigPanel() {
               {currentInfo?.type === 'postgresql' ? 'PostgreSQL Activo' : 'SQLite Activo'}
             </span>
           </div>
-          <p className="db-status-detail">
-            Entorno actual detectado: <strong>{systemEnv === 'production' ? 'PRODUCCIÓN' : 'DESARROLLO'}</strong>
-          </p>
         </div>
-      </div>
-
-      {/* Navigation Tabs */}
-      <div className="env-tabs">
-        <button 
-          className={`env-tab ${activeEnv === 'dev' ? 'active' : ''}`}
-          onClick={() => setActiveEnv('dev')}
-        >
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-          Desarrollo
-        </button>
-        <button 
-          className={`env-tab ${activeEnv === 'prod' ? 'active' : ''}`}
-          onClick={() => setActiveEnv('prod')}
-        >
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-          Producción
-        </button>
       </div>
 
       <div className="config-content">
-        {/* Environment Banner */}
-        <div className={`env-banner ${activeEnv}`}>
-          {activeEnv === 'dev' ? (
-            <p>Configura la base de datos para pruebas locales. Puedes usar SQLite para rapidez o PostgreSQL para simular producción.</p>
-          ) : (
-            <p><strong>Configuración Crítica:</strong> En producción solo se permite PostgreSQL. Asegúrate de que las credenciales sean correctas y seguras.</p>
-          )}
+        <p className="config-section__desc" style={{ marginBottom: '1rem' }}>
+          Configura la base de datos del builder. La base de datos de las APIs desplegadas se configura desde la página de Despliegue.
+        </p>
+
+        {/* Database Type */}
+        <div className="form-section">
+          <label className="section-label">Motor de Base de Datos</label>
+          <div className="type-toggle">
+            <button 
+              className={config.database_type === 'sqlite' ? 'active' : ''}
+              onClick={() => updateCurrentConfig({ database_type: 'sqlite' })}
+            >
+              SQLite
+            </button>
+            <button 
+              className={config.database_type === 'postgresql' ? 'active' : ''}
+              onClick={() => updateCurrentConfig({ database_type: 'postgresql' })}
+            >
+              PostgreSQL
+            </button>
+          </div>
         </div>
 
-        {/* Database Type (only for dev) */}
-        {activeEnv === 'dev' && (
-          <div className="form-section">
-            <label className="section-label">Motor de Base de Datos</label>
-            <div className="type-toggle">
-              <button 
-                className={currentConfig.database_type === 'sqlite' ? 'active' : ''}
-                onClick={() => updateCurrentConfig({ database_type: 'sqlite' })}
-              >
-                SQLite
-              </button>
-              <button 
-                className={currentConfig.database_type === 'postgresql' ? 'active' : ''}
-                onClick={() => updateCurrentConfig({ database_type: 'postgresql' })}
-              >
-                PostgreSQL
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* SQLite Info */}
-        {activeEnv === 'dev' && currentConfig.database_type === 'sqlite' && (
+        {config.database_type === 'sqlite' && (
           <div className="sqlite-info">
             <div className="info-icon">📦</div>
             <div className="info-text">
-              <p>Usando base de datos local en <code>backend/app/data/apimaker.db</code></p>
-              <span>No requiere configuración adicional. Ideal para arrancar rápido.</span>
+              <p>Base de datos local</p>
+              <span>No requiere configuración adicional. Ideal para desarrollo.</span>
             </div>
           </div>
         )}
 
         {/* PostgreSQL Form */}
-        {(activeEnv === 'prod' || currentConfig.database_type === 'postgresql') && (
+        {config.database_type === 'postgresql' && (
           <div className="pg-form">
             <div className="connection-mode">
               <label className="checkbox-container">
-                <input 
-                  type="checkbox" 
-                  checked={useConnectionString} 
-                  onChange={e => setUseConnectionString(e.target.checked)}
-                />
+                <input type="checkbox" checked={useConnectionString} onChange={e => setUseConnectionString(e.target.checked)} />
                 <span className="checkmark"></span>
                 Usar Connection String completa
               </label>
             </div>
-
             {useConnectionString ? (
               <div className="field">
                 <label>URL de Conexión</label>
-                <input 
-                  type="text" 
-                  placeholder="postgresql+psycopg2://user:pass@host:5432/db"
-                  value={currentConfig.postgres_url || ''}
-                  onChange={e => updateCurrentConfig({ postgres_url: e.target.value })}
-                />
+                <input type="text" placeholder="postgresql+psycopg2://user:pass@host:5432/db"
+                  value={config.postgres_url || ''} onChange={e => updateCurrentConfig({ postgres_url: e.target.value })} />
               </div>
             ) : (
               <div className="grid-form">
-                <div className="field">
-                  <label>Host</label>
-                  <input 
-                    type="text" 
-                    placeholder="localhost"
-                    value={currentConfig.host || ''}
-                    onChange={e => updateCurrentConfig({ host: e.target.value })}
-                  />
-                </div>
-                <div className="field small">
-                  <label>Puerto</label>
-                  <input 
-                    type="number" 
-                    value={currentConfig.port || 5432}
-                    onChange={e => updateCurrentConfig({ port: parseInt(e.target.value) || 5432 })}
-                  />
-                </div>
-                <div className="field">
-                  <label>Usuario</label>
-                  <input 
-                    type="text" 
-                    placeholder="postgres"
-                    value={currentConfig.username || ''}
-                    onChange={e => updateCurrentConfig({ username: e.target.value })}
-                  />
-                </div>
-                <div className="field">
-                  <label>Contraseña</label>
-                  <input 
-                    type="password" 
-                    placeholder="••••••••"
-                    value={currentConfig.password || ''}
-                    onChange={e => updateCurrentConfig({ password: e.target.value })}
-                  />
-                </div>
-                <div className="field full">
-                  <label>Nombre de la Base de Datos</label>
-                  <input 
-                    type="text" 
-                    placeholder="apimaker"
-                    value={currentConfig.database || ''}
-                    onChange={e => updateCurrentConfig({ database: e.target.value })}
-                  />
-                </div>
+                <div className="field"><label>Host</label>
+                  <input type="text" placeholder="localhost" value={config.host || ''} onChange={e => updateCurrentConfig({ host: e.target.value })} /></div>
+                <div className="field small"><label>Puerto</label>
+                  <input type="number" value={config.port || 5432} onChange={e => updateCurrentConfig({ port: parseInt(e.target.value) || 5432 })} /></div>
+                <div className="field"><label>Usuario</label>
+                  <input type="text" placeholder="postgres" value={config.username || ''} onChange={e => updateCurrentConfig({ username: e.target.value })} /></div>
+                <div className="field"><label>Contraseña</label>
+                  <input type="password" value={config.password || ''} onChange={e => updateCurrentConfig({ password: e.target.value })} /></div>
+                <div className="field full"><label>Base de Datos</label>
+                  <input type="text" placeholder="apimaker" value={config.database || ''} onChange={e => updateCurrentConfig({ database: e.target.value })} /></div>
               </div>
             )}
-
             <div className="actions">
-              <button className="btn-test" onClick={handleTest} disabled={testing}>
-                {testing ? 'Verificando...' : 'Probar Conexión'}
-              </button>
+              <button className="btn-test" onClick={handleTest} disabled={testing}>{testing ? 'Verificando...' : 'Probar Conexión'}</button>
             </div>
           </div>
         )}
 
         <div className="save-section">
           <button className="btn-save" onClick={handleSave} disabled={saving}>
-            {saving ? 'Guardando...' : `Guardar Configuración para ${activeEnv === 'dev' ? 'Desarrollo' : 'Producción'}`}
+            {saving ? 'Guardando...' : 'Guardar Configuración'}
           </button>
           <p className="save-hint">Los cambios requieren reiniciar el backend para surtir efecto.</p>
         </div>
 
-        {/* Results Feedback */}
         {testResult && (
           <div className={`feedback ${testResult.success ? 'success' : 'error'}`}>
             <span className="icon">{testResult.success ? 'OK' : 'ERR'}</span>
@@ -339,31 +211,7 @@ export function DatabaseConfigPanel() {
             <span className="msg">{saveResult}</span>
           </div>
         )}
-
-        {/* Sync Section - Show if current target is PG and not the active one */}
-        {currentConfig.database_type === 'postgresql' && (currentInfo?.type === 'sqlite' || activeEnv !== (systemEnv === 'production' ? 'prod' : 'dev')) && (
-          <div className="sync-section">
-            <div className="sync-header">
-              <h3>Migración de Datos</h3>
-              <p>Transfiere los datos de la base de datos activa ({currentInfo?.type === 'sqlite' ? 'SQLite' : 'PostgreSQL'}) al entorno de {activeEnv === 'dev' ? 'Desarrollo' : 'Producción'}.</p>
-            </div>
-            <div className="sync-visual">
-              <div className="badge sqlite">{currentInfo?.type === 'sqlite' ? 'SQLite Actual' : 'Postgres Actual'}</div>
-              <div className="arrow">→</div>
-              <div className="badge pg">PostgreSQL {activeEnv === 'dev' ? 'Dev' : 'Prod'}</div>
-            </div>
-            <button className="btn-sync" onClick={handleSync} disabled={syncing}>
-              {syncing ? 'Sincronizando...' : `Sincronizar desde ${currentInfo?.type === 'sqlite' ? 'SQLite' : 'Postgres'} a ${activeEnv === 'dev' ? 'Desarrollo' : 'Producción'}`}
-            </button>
-            <p className="sync-hint">Útil para desplegar cambios o migrar de motor sin perder tus proyectos.</p>
-          </div>
-        )}
-            {syncResult && (
-              <div className={`sync-result ${syncResult.success ? 'success' : 'error'}`}>
-                {syncResult.message}
-              </div>
-            )}
-          </div>
+      </div>
 
       <style>{`
         .db-config-panel-v2 {

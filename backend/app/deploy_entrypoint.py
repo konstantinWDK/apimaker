@@ -7,8 +7,9 @@ from pathlib import Path
 # Set DB path BEFORE any app imports
 json_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("/app/deployments/project.json")
 port = int(sys.argv[2]) if len(sys.argv) > 2 else 8000
-db_path = json_path.parent / "data.db"
-os.environ["APIMAKER_DATABASE_URL"] = f"sqlite:///{db_path}"
+# Use provided DB URL or default SQLite
+db_url = os.environ.get("APIMAKER_DEPLOY_DB_URL") or f"sqlite:///{json_path.parent / 'data.db'}"
+os.environ["APIMAKER_DATABASE_URL"] = db_url
 
 # Now safe to import app modules
 from app.standalone_server import _ensure_project_in_db, create_app_for_project
