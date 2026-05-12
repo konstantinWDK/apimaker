@@ -36,6 +36,7 @@ export function DeployPage() {
 
 /* ========== UI DEPLOY PANEL ========== */
 function UiDeployPanel({ project, saveProject }: { project: any; saveProject: () => Promise<string | null> }) {
+  const { updateProject } = useProjectBuilder()
   const [deployType, setDeployType] = useState<'local' | 'remote'>('local')
   const [localPort, setLocalPort] = useState('8080')
   const [sshHost, setSshHost] = useState('')
@@ -91,6 +92,19 @@ function UiDeployPanel({ project, saveProject }: { project: any; saveProject: ()
         result.logs?.forEach((l: string) => log(l))
         if (result.status === 'running') {
           log(`\n✅ API desplegada en ${result.url}/api`)
+          // Save deployment info to project
+          updateProject({
+            deployment: {
+              host: 'localhost',
+              user: 'docker',
+              port: '2375',
+              apiPort: result.url?.split(':').pop() || localPort,
+              authType: 'password',
+              deployedAt: new Date().toISOString(),
+              status: 'running',
+              lastCheckAt: new Date().toISOString(),
+            }
+          })
           setDeployDone(true)
         } else if (result.status === 'no_docker') {
           log('⚠️ Docker no disponible. Sigue las instrucciones manuales.')
@@ -145,9 +159,10 @@ function UiDeployPanel({ project, saveProject }: { project: any; saveProject: ()
           <p className="muted-text" style={{ fontSize: '0.82rem', marginBottom: '0.75rem' }}>
             Despliega la API en el mismo servidor donde corre el builder. Necesitas Docker instalado.
             El código se genera, se extrae en <code className="docs-code--inline">backend/deployments/{project.slug || project.id}/</code> y se levanta con docker compose.
+            Si el puerto está ocupado, se asignará automáticamente el siguiente disponible (8080-8099).
           </p>
           <label className="form-field" style={{ maxWidth: '200px' }}>
-            <span className="label">Puerto</span>
+            <span className="label">Puerto (preferido)</span>
             <input className="field" type="number" value={localPort} onChange={e => setLocalPort(e.target.value)} placeholder="8080" />
           </label>
         </div>
