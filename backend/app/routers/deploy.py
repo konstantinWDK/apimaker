@@ -438,7 +438,7 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
 
     # Build endpoint list from the generated project
     deployed_endpoints = sorted(set(
-        f"{ep.method} /api{ep.path}" for ep in endpoints
+        f"{ep.method} {ep.path}" for ep in endpoints
     ))
 
     # Track deployment

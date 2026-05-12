@@ -177,19 +177,15 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                   </div>
                 </div>
                 {dep.endpoints && dep.endpoints.length > 0 && (
-                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9' }}>
-                    {dep.endpoints.map((ep: string) => {
-                      const [method, ...pathParts] = ep.split(' ')
+                  <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9', fontSize: '0.78rem' }}>
+                    <div style={{ color: '#64748b', marginBottom: '0.3rem' }}>Ejemplos:</div>
+                    {dep.endpoints.filter((ep: string) => ep.startsWith('GET')).slice(0, 2).map((ep: string) => {
+                      const [, ...pathParts] = ep.split(' ')
                       const path = pathParts.join(' ')
-                      const colors: Record<string, string> = { GET: '#0ea5e9', POST: '#10b981', PUT: '#f59e0b', DELETE: '#f43f5e' }
                       return (
-                        <a key={ep} href={dep.url + path} target="_blank" rel="noreferrer"
-                          style={{ fontSize: '0.72rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                          <span style={{
-                            fontWeight: 700, color: colors[method] || '#64748b',
-                          }}>{method}</span>
-                          <span style={{ color: '#475569', fontFamily: 'monospace' }}>{path}</span>
-                        </a>
+                        <div key={ep} style={{ marginBottom: '0.2rem' }}>
+                          <code style={{ fontSize: '0.75rem', color: '#6366f1' }}>{dep.url}{path}</code>
+                        </div>
                       )
                     })}
                   </div>
