@@ -1,0 +1,105 @@
+{
+  "pokemon": [
+    {
+      "pokedex_id": "25",
+      "name": "Pikachu",
+      "type": "electric",
+      "secondary_type": "",
+      "ability": "Static",
+      "region": "Kanto",
+      "level": "32",
+      "hp": "35",
+      "attack": "55",
+      "defense": "40",
+      "speed": "90",
+      "legendary": "false",
+      "caught_at": "2024-05-10T14:23:00Z"
+    },
+    {
+      "pokedex_id": "6",
+      "name": "Charizard",
+      "type": "fire",
+      "secondary_type": "flying",
+      "ability": "Blaze",
+      "region": "Kanto",
+      "level": "58",
+      "hp": "78",
+      "attack": "84",
+      "defense": "78",
+      "speed": "100",
+      "legendary": "false",
+      "caught_at": "2023-11-02T08:11:00Z"
+    },
+    {
+      "pokedex_id": "131",
+      "name": "Lapras",
+      "type": "water",
+      "secondary_type": "ice",
+      "ability": "Water Absorb",
+      "region": "Kanto",
+      "level": "44",
+      "hp": "130",
+      "attack": "85",
+      "defense": "80",
+      "speed": "60",
+      "legendary": "false",
+      "caught_at": "2024-01-18T18:45:00Z"
+    },
+    {
+      "pokedex_id": "150",
+      "name": "Mewtwo",
+      "type": "psychic",
+      "secondary_type": "",
+      "ability": "Pressure",
+      "region": "Kanto",
+      "level": "70",
+      "hp": "106",
+      "attack": "110",
+      "defense": "90",
+      "speed": "130",
+      "legendary": "true",
+      "caught_at": "2022-08-30T21:05:00Z"
+    },
+    {
+      "pokedex_id": "149",
+      "name": "Dragonite",
+      "type": "dragon",
+      "secondary_type": "flying",
+      "ability": "Inner Focus",
+      "region": "Kanto",
+      "level": "55",
+      "hp": "91",
+      "attack": "134",
+      "defense": "95",
+      "speed": "80",
+      "legendary": "false",
+      "caught_at": "2024-03-12T10:17:00Z"
+    }
+  ],
+  "trainers": [
+    {
+      "trainer_id": "1",
+      "name": "Ash Ketchum",
+      "team": "Valor",
+      "badge_count": "8",
+      "region": "Kanto",
+      "pokemon_ids": "25,6,131"
+    },
+    {
+      "trainer_id": "2",
+      "name": "Misty",
+      "team": "Mystic",
+      "badge_count": "7",
+      "region": "Kanto",
+      "pokemon_ids": "131"
+    },
+    {
+      "trainer_id": "3",
+      "name": "Brock",
+      "team": "Instinct",
+      "badge_count": "8",
+      "region": "Kanto",
+      "pokemon_ids": ""
+    }
+  ]
+}

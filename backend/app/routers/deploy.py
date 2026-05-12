@@ -17,7 +17,6 @@ from pydantic import BaseModel
 from sqlmodel import Session
 
 from ..db import get_session
-from ..security import get_current_user_from_header
 from ..services.code_generator import render_bundle
 from ..services.project_service import project_service
 
@@ -102,7 +101,7 @@ services:
 
 
 @router.post("/local/stop")
-def stop_deployment(slug: str, _=Depends(get_current_user_from_header)) -> DeployStatus:
+def stop_deployment(slug: str) -> DeployStatus:
     """Stop a local deployment."""
     deploy_dir = DEPLOY_ROOT / slug
     if not deploy_dir.exists():
@@ -143,7 +142,7 @@ def list_ports() -> dict:
 
 
 @router.post("/local")
-def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session), _=Depends(get_current_user_from_header)) -> DeployStatus:
+def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session)) -> DeployStatus:
     """Deploy a project locally using Docker."""
     logs: list[str] = []
 
