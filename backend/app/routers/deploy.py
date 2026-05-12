@@ -134,6 +134,7 @@ def delete_deployment(req: SlugRequest) -> DeployStatus:
     slug = req.slug
     deploy_dir = DEPLOY_ROOT / slug
     logs: list[str] = []
+    if deploy_dir.exists():
         subprocess.run(
             ["docker", "compose", "down", "--remove-orphans", "-v"],
             cwd=str(deploy_dir), capture_output=True, timeout=60,
@@ -150,6 +151,41 @@ def delete_deployment(req: SlugRequest) -> DeployStatus:
         logs.append("✅ Deployment eliminado del registro")
 
     return DeployStatus(status="deleted", logs=logs, message="Deployment eliminado")
+
+
+def _check_docker_container(slug: str) -> str:
+    """Check if a Docker container is running for a deployment. Returns status string."""
+    try:
+        result = subprocess.run(
+            ["docker", "ps", "--filter", f"name={slug}", "--format", "{{.Status}}"],
+            capture_output=True, text=True, timeout=10,
+        )
+        status = result.stdout.strip()
+        if "Up" in status:
+            return "running"
+        if "Exited" in status or "Created" in status:
+            return "stopped"
+        # Check if container exists (exited)
+        result2 = subprocess.run(
+            ["docker", "ps", "-a", "--filter", f"name={slug}", "--format", "{{.Status}}"],
+            capture_output=True, text=True, timeout=10,
+        )
+        return "stopped" if result2.stdout.strip() else "unknown"
+    except Exception:
+        return "unknown"
+
+
+@router.get("/list")
+def list_deployments() -> list[dict]:
+    """List all deployments with real-time Docker status."""
+    tracking = _load_tracking()
+    result: list[dict] = []
+    for slug, info in tracking.items():
+        entry = dict(info)
+        entry["slug"] = slug
+        entry["docker_status"] = _check_docker_container(slug)
+        result.append(entry)
+    return result
 
 
 @router.get("/local/ports")
