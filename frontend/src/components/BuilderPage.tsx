@@ -12,6 +12,7 @@ import { ProjectForm } from './ProjectForm'
 import { SectionCard } from './SectionCard'
 import { WebhookPanel } from './WebhookPanel'
 import { VersionPanel } from './VersionPanel'
+import { DeploymentStatus } from './DeploymentStatus'
 import { useProjectBuilder } from '../hooks/useProjectBuilder'
 import { useToast } from './Toast'
 import type { GenerationResult, MappingRule } from '../types/schemas'
@@ -39,7 +40,7 @@ export function BuilderPage() {
   const [result, setResult] = useState<GenerationResult | null>(null)
   const [generationWarning, setGenerationWarning] = useState<string | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
-  const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'mappings' | 'delivery' | 'result' | 'webhooks' | 'versions'>('datasets')
+  const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'mappings' | 'delivery' | 'deploy' | 'result' | 'webhooks' | 'versions'>('datasets')
   const [isImportingDB, setIsImportingDB] = useState(false)
   const [editingDatasetId, setEditingDatasetId] = useState<string | null>(null)
   const [mappings, setMappings] = useState<MappingRule[]>([])
@@ -52,6 +53,7 @@ export function BuilderPage() {
       { id: 'endpoints', label: 'Endpoints' },
       { id: 'mappings', label: 'Mappings' },
       { id: 'delivery', label: 'Cómo usarla' },
+      { id: 'deploy', label: '🚀 API desplegada' },
       { id: 'webhooks', label: 'Webhooks' },
       { id: 'versions', label: 'Versiones' },
       { id: 'result', label: 'API generada' },
@@ -348,6 +350,12 @@ export function BuilderPage() {
               />
             </SectionCard>
           </div>
+        )
+      case 'deploy':
+        return (
+          <SectionCard title="API Desplegada" subtitle="Estado y gestión de tu API en producción" accent="emerald" fullWidth>
+            <DeploymentStatus project={project} />
+          </SectionCard>
         )
       case 'webhooks':
         return (

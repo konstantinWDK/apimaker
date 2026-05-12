@@ -77,6 +77,17 @@ export interface MappingRule {
   updatedAt?: string
 }
 
+export interface DeploymentInfo {
+  host: string
+  user: string
+  port: string
+  apiPort: string
+  authType: 'password' | 'key'
+  deployedAt: string
+  lastCheckAt?: string
+  status?: 'running' | 'stopped' | 'unknown'
+}
+
 export interface ProjectDraft {
   id: string
   name: string
@@ -96,6 +107,7 @@ export interface ProjectDraft {
   lastGeneration?: GenerationResult
   remoteId?: string
   workspaceId?: string
+  deployment?: DeploymentInfo
 }
 
 export interface GeneratedEndpoint {
