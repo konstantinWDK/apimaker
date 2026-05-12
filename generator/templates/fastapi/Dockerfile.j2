@@ -16,11 +16,6 @@ COPY --from=builder /install /usr/local
 # Copy application code
 COPY . .
 
-# Create non-root user
-RUN useradd --create-home --shell /bin/bash appuser && \
-    chown -R appuser:appuser /app
-USER appuser
-
 # Environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8000

@@ -32,7 +32,8 @@ CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
-Base = DeclarativeBase()
+class Base(DeclarativeBase):
+    pass
 
 # ─── Security Schemes ───────────────────────────────────────────
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
@@ -60,14 +61,14 @@ class {{ ds.name | capitalize | replace(" ", "") }}Record(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 {% for field in ds.fields %}
   {% if field.references %}
-    {{ field.name }}: Mapped[{{ field.python_type }}]{% if not field.required %} | None{% endif %} = mapped_column(ForeignKey("{{ field.references.dataset_name | lower | replace(" ", "_") }}_records.{{ field.references.field_name }}"){% if not field.required %}, nullable=True{% endif %})
+    {{ field.name }}: Mapped[{{ "Optional[" + field.python_type + "]" if not field.required else field.python_type }}] = mapped_column(ForeignKey("{{ field.references.dataset_name | lower | replace(" ", "_") }}_records.{{ field.references.field_name }}"){% if not field.required %}, nullable=True{% endif %})
     {{ field.name }}_rel: Mapped[Optional["{{ field.references.dataset_name | capitalize | replace(" ", "") }}Record"]] = relationship(back_populates="{{ ds.name | lower | replace(" ", "_") }}_items")
   {% else %}
-    {{ field.name }}: Mapped[{{ field.python_type }}]{% if not field.required %} | None{% endif %} = mapped_column({% if not field.required %}nullable=True{% else %}nullable=False{% endif %})
+    {{ field.name }}: Mapped[{{ "Optional[" + field.python_type + "]" if not field.required else field.python_type }}] = mapped_column({% if not field.required %}nullable=True{% else %}nullable=False{% endif %})
   {% endif %}
 {% endfor %}
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
 
   {% if ds.referenced_by %}
 {% for ref in ds.referenced_by %}
@@ -159,7 +160,19 @@ def startup():
                     if count == 0:
                         print(f"Seeding {{ ds.name }}...")
                         for row in all_data["{{ ds.name }}"]:
-                            valid_data = {k: v for k, v in row.items() if k in {{ ds.name | capitalize | replace(" ", "") }}Record.__table__.columns}
+                            valid_data = {}
+                            for k, v in row.items():
+                                if k not in {{ ds.name | capitalize | replace(" ", "") }}Record.__table__.columns:
+                                    continue
+                                col = {{ ds.name | capitalize | replace(" ", "") }}Record.__table__.columns[k]
+                                if isinstance(v, str) and ("date" in k.lower() or k.lower().endswith("_at")):
+                                    from datetime import datetime as _dt
+                                    try:
+                                        valid_data[k] = _dt.fromisoformat(v.replace("Z", "+00:00"))
+                                    except ValueError:
+                                        valid_data[k] = v
+                                else:
+                                    valid_data[k] = v
                             db.add({{ ds.name | capitalize | replace(" ", "") }}Record(**valid_data))
 {% endfor %}
                 db.commit()
@@ -202,7 +215,7 @@ async def {{ ep.name | lower | replace(" ", "_") }}(
                 {% endfor %}
         total = query.count()
         items = query.offset((page - 1) * limit).limit(limit).all()
-        return {"data": items, "total": total, "page": page, "pages": (total + limit - 1) // limit}
+        return {"data": [item.__dict__ | {"_sa_instance_state": None} for item in items] if items else [], "total": total, "page": page, "pages": (total + limit - 1) // limit}
 
 {# --- GET --- #}
 {% elif ep.operation_type == "get" %}

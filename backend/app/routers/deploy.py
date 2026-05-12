@@ -96,6 +96,8 @@ services:
     environment:
       - DATABASE_URL={db_url}
       - PORT=8000
+    volumes:
+      - .:/app
     restart: unless-stopped
 """
 
@@ -426,8 +428,7 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
         zf.extractall(str(deploy_dir))
     logs.append("✅ Código extraído")
 
-    db_path = deploy_dir / "data.db"
-    db_url = f"sqlite:///{db_path}"
+    db_url = "sqlite:///./data.db"
     compose = _build_docker_compose(port, db_url)
     (deploy_dir / "docker-compose.yml").write_text(compose, encoding="utf-8")
     logs.append(f"📝 docker-compose.yml (puerto {port})")

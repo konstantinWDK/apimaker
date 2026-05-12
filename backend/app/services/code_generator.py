@@ -264,7 +264,18 @@ def render_bundle(
         # Add data.json if requested and we have datasets with sample rows
         if include_data and any(d["sample_rows"] for d in context["datasets"]):
             import json
-            seed_data = {d["name"]: d["sample_rows"] for d in context["datasets"] if d["sample_rows"]}
+            seed_data: dict[str, list[dict]] = {}
+            for d in context["datasets"]:
+                if not d["sample_rows"]:
+                    continue
+                normalized: list[dict] = []
+                for row in d["sample_rows"]:
+                    item = dict(row)
+                    for k, v in item.items():
+                        if isinstance(v, str) and v.lower() in ("true", "false"):
+                            item[k] = v.lower() == "true"
+                    normalized.append(item)
+                seed_data[d["name"]] = normalized
             zf.writestr("data.json", json.dumps(seed_data, indent=2, ensure_ascii=False))
 
         # Add common files
