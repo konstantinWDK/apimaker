@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import type { ProjectDraft } from '../types/schemas'
 import { useProjectBuilder } from '../hooks/useProjectBuilder'
+import { apiFetch } from '../lib/api'
 
 export function DeploymentStatus({ project }: { project: ProjectDraft }) {
   const { updateProject } = useProjectBuilder()
@@ -37,13 +38,41 @@ export function DeploymentStatus({ project }: { project: ProjectDraft }) {
     setChecking(false)
   }, [dep, updateProject, addLog])
 
-  const handleDeploy = () => {
+  const handleRedeploy = async () => {
     if (!dep) return
-    addLog('🚀 Iniciando redeploy...')
-    addLog(`   ssh ${dep.user}@${dep.host} -p ${dep.port}`)
-    addLog(`   cd /opt/apimaker/${project.slug || project.id} && docker compose up -d --build`)
-    addLog('📋 Sigue las instrucciones en la página de Despliegue')
-    updateProject({ deployment: { ...dep, deployedAt: new Date().toISOString() } })
+    addLog('🔄 Redeploy...')
+    try {
+      const res = await apiFetch('/api/deploy/local', {
+        method: 'POST',
+        body: JSON.stringify({ project_id: project.slug || project.id, port: parseInt(dep.apiPort, 10) || 8080 }),
+      })
+      const data = await res.json()
+      data.logs?.forEach((l: string) => addLog(l))
+      if (data.status === 'running') addLog('✅ Redeploy exitoso')
+    } catch (e: any) {
+      addLog(`❌ ${e.message || e}`)
+    }
+  }
+
+  const deleteDeployment = async () => {
+    if (!dep) return
+    if (!window.confirm('¿Eliminar el deployment? Se detendrá el contenedor y se borrarán los archivos.')) return
+    addLog('🗑️ Eliminando deployment...')
+    try {
+      const res = await apiFetch('/api/deploy/local/delete', {
+        method: 'POST',
+        body: JSON.stringify({ slug: project.slug || project.id }),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const data = await res.json()
+      data.logs?.forEach((l: string) => addLog(l))
+      if (data.status === 'deleted') {
+        updateProject({ deployment: undefined })
+        addLog('✅ Deployment eliminado')
+      }
+    } catch (e: any) {
+      addLog(`❌ ${e.message || e}`)
+    }
   }
 
   const clearDeployment = () => {
@@ -103,11 +132,14 @@ export function DeploymentStatus({ project }: { project: ProjectDraft }) {
         <button type="button" className="btn" onClick={checkHealth} disabled={checking}>
           {checking ? 'Verificando...' : '🔍 Verificar estado'}
         </button>
-        <button type="button" className="btn" onClick={handleDeploy}>
+        <button type="button" className="btn" onClick={handleRedeploy}>
           🔄 Redeploy
         </button>
+        <button type="button" className="btn ghost" style={{ color: '#dc2626' }} onClick={deleteDeployment}>
+          🗑️ Eliminar
+        </button>
         <button type="button" className="btn ghost" onClick={clearDeployment} style={{ marginLeft: 'auto' }}>
-          Olvidar despliegue
+          Olvidar registro
         </button>
       </div>
 

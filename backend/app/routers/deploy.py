@@ -101,8 +101,9 @@ services:
 
 
 @router.post("/local/stop")
-def stop_deployment(slug: str) -> DeployStatus:
+def stop_deployment(req: SlugRequest) -> DeployStatus:
     """Stop a local deployment."""
+    slug = req.slug
     deploy_dir = DEPLOY_ROOT / slug
     if not deploy_dir.exists():
         raise HTTPException(status_code=404, detail="Deployment not found")
@@ -121,6 +122,34 @@ def stop_deployment(slug: str) -> DeployStatus:
         _save_tracking(tracking)
 
     return DeployStatus(status="stopped", message="Deployment stopped")
+
+
+class SlugRequest(BaseModel):
+    slug: str
+
+
+@router.post("/local/delete")
+def delete_deployment(req: SlugRequest) -> DeployStatus:
+    """Stop and remove a local deployment entirely."""
+    slug = req.slug
+    deploy_dir = DEPLOY_ROOT / slug
+    logs: list[str] = []
+        subprocess.run(
+            ["docker", "compose", "down", "--remove-orphans", "-v"],
+            cwd=str(deploy_dir), capture_output=True, timeout=60,
+        )
+        shutil.rmtree(deploy_dir)
+        logs.append("🗑️ Directorio eliminado")
+    else:
+        logs.append("📭 No hay directorio de deployment")
+
+    tracking = _load_tracking()
+    if slug in tracking:
+        del tracking[slug]
+        _save_tracking(tracking)
+        logs.append("✅ Deployment eliminado del registro")
+
+    return DeployStatus(status="deleted", logs=logs, message="Deployment eliminado")
 
 
 @router.get("/local/ports")
