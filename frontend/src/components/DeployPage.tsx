@@ -10,7 +10,7 @@ export function DeployPage() {
   const [activeTab, setActiveTab] = useState<DeployTab>('ui')
 
   return (
-    <div className="info-page">
+    <div style={{ maxWidth: '960px', margin: '0 auto', padding: '2rem 0' }}>
       <div className="info-hero">
         <div className="info-hero__content">
           <h1 className="info-hero__title">Despliegue</h1>
@@ -20,7 +20,7 @@ export function DeployPage() {
         </div>
       </div>
 
-      <div className="docs-tabs">
+      <div className="docs-tabs" style={{ marginBottom: '1.5rem' }}>
         <button className={`docs-tab ${activeTab === 'ui' ? 'docs-tab--active' : ''}`} onClick={() => setActiveTab('ui')}>
           <span className="docs-tab__icon">▲</span> Despliegue desde la UI
         </button>
