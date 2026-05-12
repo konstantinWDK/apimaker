@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import io
 import json
 import logging
 import socket
 import shutil
 import subprocess
-import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +15,6 @@ from pydantic import BaseModel
 from sqlmodel import Session
 
 from ..db import get_session
-from ..services.code_generator import render_bundle
 from ..services.project_service import project_service
 
 logger = logging.getLogger("apimaker.deploy")
@@ -84,20 +81,22 @@ def _find_free_port(preferred: int) -> tuple[int, list[str]]:
     raise HTTPException(status_code=409, detail="No hay puertos disponibles en el rango 8080-8099")
 
 
-def _build_docker_compose(port: int, db_url: str) -> str:
-    """Generate a docker-compose.yml for the deployed project."""
-    return f"""version: '3.8'
-
-services:
+def _build_docker_compose(port: int, slug: str) -> str:
+    """Generate a docker-compose.yml using the builder's standalone server."""
+    backend_root = str(Path(__file__).resolve().parent.parent.parent)
+    proj_root = str(Path(__file__).resolve().parent.parent.parent.parent)
+    return f"""services:
   api:
-    build: .
+    image: python:3.11-slim
     ports:
       - "{port}:8000"
-    environment:
-      - DATABASE_URL={db_url}
-      - PORT=8000
+    working_dir: /app
+    command: >
+      sh -c "pip install -q --no-cache-dir -e /app/backend &&
+             python -m app.deploy_entrypoint /app/deployments/{slug}/project.json 8000"
     volumes:
-      - .:/app
+      - {backend_root}:/app/backend
+      - {proj_root}/deployments:/app/deployments
     restart: unless-stopped
 """
 
@@ -221,29 +220,23 @@ def deploy_remote(req: RemoteDeployRequest, session: Session = Depends(get_sessi
         logs.append("📁 Creando directorio remoto...")
         subprocess.run(ssh_base + [f"mkdir -p {remote_dir}"], capture_output=True, text=True, timeout=15)
 
-        # Generate and copy the code bundle
-        logs.append("📦 Generando código...")
-        datasets = data["datasets"]
-        endpoints = data["endpoints"]
-        zip_bytes = render_bundle(
-            project.target_stack or "fastapi", project.name, project.description,
-            project.auth_method, project.api_key, project.jwt_secret, project.rate_limit,
-            datasets, endpoints, True,
-        )
+        # Export project as JSON
+        logs.append("📦 Exportando proyecto...")
+        from ..routers.projects import _db_to_pydantic
+        export_data = _db_to_pydantic(project, data["datasets"], data["endpoints"])
+        json_path = Path(tempfile.gettempdir()) / f"{slug}-project.json"
+        json_path.write_text(export_data.model_dump_json(indent=2))
 
-        bundle_path = Path(tempfile.gettempdir()) / f"{slug}-bundle.zip"
-        bundle_path.write_bytes(zip_bytes)
+        logs.append("📄 Subiendo project.json al servidor...")
+        subprocess.run(scp_base + [str(json_path), f"{remote_url}:{remote_dir}/project.json"], capture_output=True, text=True, timeout=30)
+        json_path.unlink(missing_ok=True)
 
-        logs.append("📄 Subiendo código al servidor...")
-        subprocess.run(scp_base + [str(bundle_path), f"{remote_url}:{remote_dir}/bundle.zip"], capture_output=True, text=True, timeout=30)
-        bundle_path.unlink(missing_ok=True)
-
-        # Extract and deploy via SSH
+        # Deploy via SSH using the CLI on the remote server
         logs.append("🐳 Desplegando en el servidor remoto...")
         deploy_cmd = (
             f"cd {remote_dir} && "
-            f"unzip -o bundle.zip && rm bundle.zip && "
-            f"docker compose up -d --build"
+            f"pip install apimaker-backend -q --no-cache-dir && "
+            f"apimaker deploy project.json --port {req.api_port}"
         )
         result = subprocess.run(ssh_base + [deploy_cmd], capture_output=True, text=True, timeout=300)
         if result.stdout.strip():
@@ -252,7 +245,7 @@ def deploy_remote(req: RemoteDeployRequest, session: Session = Depends(get_sessi
             logs.append(f"❌ {result.stderr.strip()[:300]}")
             return DeployStatus(status="error", logs=logs)
 
-        url = f"http://{req.host}:{req.api_port}"
+        url = f"http://{req.host}:{req.api_port}/api"
         logs.append(f"✅ API desplegada en {url}")
 
         # Track deployment
@@ -406,30 +399,16 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
     deploy_dir.mkdir(parents=True, exist_ok=True)
     logs.append(f"📁 Directorio: {deploy_dir}")
 
-    # Generate bundle
-    logs.append("📦 Generando código...")
-    try:
-        zip_bytes = render_bundle(
-            project.target_stack or "fastapi",
-            project.name,
-            project.description,
-            project.auth_method,
-            project.api_key,
-            project.jwt_secret,
-            project.rate_limit,
-            datasets_with_fields,
-            endpoints,
-            True,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Code generation failed: {e}")
+    # Export project as JSON for the standalone server (stable mock server)
+    from ..routers.projects import _db_to_pydantic
+    export_data = _db_to_pydantic(project, datasets_with_fields, endpoints)
+    (deploy_dir / "project.json").write_text(
+        export_data.model_dump_json(indent=2),
+        encoding="utf-8",
+    )
+    logs.append("📄 Proyecto exportado a project.json")
 
-    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-        zf.extractall(str(deploy_dir))
-    logs.append("✅ Código extraído")
-
-    db_url = "sqlite:///./data.db"
-    compose = _build_docker_compose(port, db_url)
+    compose = _build_docker_compose(port, slug)
     (deploy_dir / "docker-compose.yml").write_text(compose, encoding="utf-8")
     logs.append(f"📝 docker-compose.yml (puerto {port})")
 
@@ -459,7 +438,7 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
 
     # Build endpoint list from the generated project
     deployed_endpoints = sorted(set(
-        f"{ep.method} {ep.path}" for ep in endpoints
+        f"{ep.method} /api{ep.path}" for ep in endpoints
     ))
 
     # Track deployment
@@ -477,7 +456,7 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
     }
     _save_tracking(tracking)
 
-    url = f"http://localhost:{port}"
+    url = f"http://localhost:{port}/api"
     logs.append(f"✅ API en {url}")
     logs.append(f"📌 Deployments activos:")
     for s, d in _load_tracking().items():
