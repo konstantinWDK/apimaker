@@ -17,7 +17,14 @@ from sqlmodel import Session, select
 
 from ..db import get_session
 from ..db_models import Dataset, DatasetField, Endpoint, MockRecord, Project
-from ..routers.webhooks import dispatch_webhooks
+# Lazy import to avoid circular deps with routers
+_dispatch_webhooks = None
+def _get_webhook_dispatcher():
+    global _dispatch_webhooks
+    if _dispatch_webhooks is None:
+        from ..routers.webhooks import dispatch_webhooks as dw
+        _dispatch_webhooks = dw
+    return _dispatch_webhooks
 from .project_service import project_service
 
 logger = logging.getLogger("apimaker.mock_server")
@@ -239,17 +246,16 @@ def _get_related_data(session: Session, project_id: str, dataset_id: str, reques
     return related
 
 
-@router.get("/{path:path}")
-async def mock_get(
+async def _mock_get_impl(
     project_id: str,
     path: str,
     request: Request,
-    session: Session = Depends(get_session),
-    page: int = Query(1, ge=1),
-    limit: int = Query(100, ge=1, le=1000),
-    include: str = Query(None, description="Comma-separated relations to include"),
+    session: Session,
+    page: int = 1,
+    limit: int = 100,
+    include: str | None = None,
 ) -> Any:
-    """Mock GET — list or get by ID."""
+    """Mock GET implementation with plain Python defaults."""
     try:
         resolved_id = _resolve_project_id(session, project_id)
         project_cache = _mock_cache.get(resolved_id)
@@ -384,6 +390,20 @@ async def mock_get(
         raise HTTPException(status_code=500, detail=f"Mock Server Error: {str(e)}")
 
 
+@router.get("/{path:path}")
+async def mock_get(
+    project_id: str,
+    path: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    page: int = Query(1, ge=1),
+    limit: int = Query(100, ge=1, le=1000),
+    include: str = Query(None, description="Comma-separated relations to include"),
+) -> Any:
+    """Mock GET — route handler that delegates to _mock_get_impl."""
+    return await _mock_get_impl(project_id, path, request, session, page, limit, include)
+
+
 @router.post("/{path:path}")
 async def mock_post(
     project_id: str,
@@ -450,7 +470,7 @@ async def mock_post(
     if ds_id:
         _save_record(session, resolved_id, ds_id, record_id, new_item)
 
-    await dispatch_webhooks(session, str(resolved_id), "create", new_item)
+    await _get_webhook_dispatcher()(session, str(resolved_id), "create", new_item)
     return new_item
 
 
@@ -486,7 +506,7 @@ async def mock_put(
                 updated = {"_id": item_id, **body}
                 store[i] = updated
                 _save_record(session, resolved_id, ds_id, item_id, updated)
-                await dispatch_webhooks(session, str(resolved_id), "update", updated)
+                await _get_webhook_dispatcher()(session, str(resolved_id), "update", updated)
                 return updated
 
     raise HTTPException(status_code=404, detail="Not found")
@@ -514,7 +534,7 @@ async def mock_delete(
             if item.get("_id") == item_id or str(item.get("id")) == str(item_id):
                 removed = store.pop(i)
                 _delete_record(session, resolved_id, ds_id, item_id)
-                await dispatch_webhooks(session, str(resolved_id), "delete", removed)
+                await _get_webhook_dispatcher()(session, str(resolved_id), "delete", removed)
                 return
 
     raise HTTPException(status_code=404, detail="Not found")
