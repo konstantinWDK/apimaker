@@ -11,6 +11,7 @@ import { InfoPage } from './components/InfoPage'
 import { DocsPage } from './components/DocsPage'
 import { ConfigPage } from './components/ConfigPage'
 import { SecurityPage } from './components/SecurityPage'
+import { DeployPage } from './components/DeployPage'
 import { BuilderPage } from './components/BuilderPage'
 import { SimulatorPage } from './components/SimulatorPage'
 import { useProjectBuilder } from './hooks/useProjectBuilder'
@@ -208,6 +209,12 @@ export function App() {
                 Seguridad
               </NavLink>
               <NavLink
+                to="/deploy"
+                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+              >
+                Despliegue
+              </NavLink>
+              <NavLink
                 to="/config"
                 className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
               >
@@ -233,6 +240,7 @@ export function App() {
             <Route path="/simulator" element={<SimulatorPage />} />
             <Route path="/info" element={<InfoPage />} />
             <Route path="/security" element={<SecurityPage />} />
+            <Route path="/deploy" element={<DeployPage />} />
             <Route path="/config" element={<ConfigPage authStatus={authStatus} onLogout={performLogout} />} />
             <Route path="/docs" element={<DocsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
