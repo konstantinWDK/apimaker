@@ -174,10 +174,8 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                       {dep.url} · {dep.stack} · {statusLabel(dep.docker_status)}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
-                    <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                      onClick={() => window.open(dep.url, '_blank')}>Abrir</button>
-                    {dep.docker_status === 'running' ? (
+                    <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
+                      {dep.docker_status === 'running' ? (
                       <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#dc2626' }}
                         onClick={() => handleAction(dep.slug, 'stop')}>Detener</button>
                     ) : (
@@ -226,7 +224,7 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
 
         {deployType === 'local' ? (
           <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', fontSize: '0.82rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', fontSize: '0.82rem', flexWrap: 'wrap' }}>
             <span style={{
               width: 10, height: 10, borderRadius: '50%', display: 'inline-block', flexShrink: 0,
               background: dockerAvail === null ? '#94a3b8' : dockerAvail?.available ? '#22c55e' : '#ef4444',
@@ -234,6 +232,19 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
             {dockerAvail === null ? 'Verificando Docker...' : dockerAvail?.available
               ? `Docker disponible (v${dockerAvail.version}, ${dockerAvail.containers_running} contenedores activos)`
               : `Docker no disponible - ${dockerAvail?.error || 'desconocido'}`}
+            {dockerAvail?.available && (
+              <button type="button" className="btn ghost" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+                onClick={async () => {
+                  log('🔄 Reconstruyendo imagen Docker local...')
+                  try {
+                    const res = await apiFetch('/api/deploy/local/rebuild-image', { method: 'POST' })
+                    const data = await res.json()
+                    data.logs?.forEach((l: string) => log(l))
+                  } catch (e: any) { log(`❌ ${e.message}`) }
+                }}>
+                Reconstruir imagen
+              </button>
+            )}
           </div>
           <p className="muted-text" style={{ fontSize: '0.82rem', marginBottom: '0.75rem' }}>
             Despliega en el mismo servidor (requiere Docker). Si el puerto está ocupado, se asigna el siguiente disponible.

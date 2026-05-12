@@ -21,8 +21,10 @@ logger = logging.getLogger("apimaker.deploy")
 router = APIRouter(prefix="/api/deploy", tags=["deploy"])
 
 DEPLOY_ROOT = Path(__file__).resolve().parent.parent.parent.parent / "deployments"
+BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
 TRACKING_FILE = DEPLOY_ROOT / ".deployments.json"
 PORT_RANGE = range(8080, 8100)
+DEPLOY_IMAGE = "apimaker-deploy:latest"
 
 
 class LocalDeployRequest(BaseModel):
@@ -87,23 +89,50 @@ def _find_free_port(preferred: int) -> tuple[int, list[str]]:
     raise HTTPException(status_code=409, detail="No hay puertos disponibles en el rango 8080-8099")
 
 
+def _ensure_deploy_image(logs: list[str]) -> bool:
+    """Build the deploy Docker image locally if it doesn't exist."""
+    try:
+        result = subprocess.run(
+            ["docker", "image", "inspect", DEPLOY_IMAGE],
+            capture_output=True, timeout=10,
+        )
+        if result.returncode == 0:
+            return True
+    except Exception:
+        pass
+
+    logs.append(f"🐳 Construyendo imagen local {DEPLOY_IMAGE}...")
+    try:
+        result = subprocess.run(
+            ["docker", "build", "-t", DEPLOY_IMAGE, "-f", "Dockerfile", "."],
+            cwd=str(BACKEND_DIR),
+            capture_output=True, text=True, timeout=300,
+        )
+        if result.returncode != 0:
+            logs.append(f"❌ Error construyendo imagen: {result.stderr.strip()[:300]}")
+            return False
+        logs.append("✅ Imagen construida")
+        return True
+    except subprocess.TimeoutExpired:
+        logs.append("⏱️ Timeout construyendo imagen (>5min)")
+        return False
+    except Exception as e:
+        logs.append(f"❌ Error: {str(e)}")
+        return False
+
+
 def _build_docker_compose(port: int, slug: str, db_url: str) -> str:
-    """Generate a docker-compose.yml using the builder's standalone server."""
-    backend_root = str(Path(__file__).resolve().parent.parent.parent)
+    """Generate a docker-compose.yml using the local deploy image."""
     proj_root = str(Path(__file__).resolve().parent.parent.parent.parent)
     return f"""services:
   api:
-    image: python:3.11-slim
+    image: {DEPLOY_IMAGE}
     ports:
       - "{port}:8000"
-    working_dir: /app
     environment:
       - APIMAKER_DEPLOY_DB_URL={db_url}
-    command: >
-      sh -c "pip install -q --no-cache-dir -e /app/backend &&
-             python -m app.deploy_entrypoint /app/deployments/{slug}/project.json 8000"
+    command: python -m app.deploy_entrypoint /app/deployments/{slug}/project.json 8000
     volumes:
-      - {backend_root}:/app/backend
       - {proj_root}/deployments:/app/deployments
     restart: unless-stopped
 """
@@ -158,27 +187,27 @@ def start_deployment(req: SlugRequest) -> DeployStatus:
 
 @router.post("/local/restart")
 def restart_deployment(req: SlugRequest) -> DeployStatus:
-    """Rebuild and restart a deployment (docker compose up -d --build)."""
+    """Restart a deployment."""
     slug = req.slug
     deploy_dir = DEPLOY_ROOT / slug
     if not deploy_dir.exists():
         raise HTTPException(status_code=404, detail="Deployment not found")
     try:
         result = subprocess.run(
-            ["docker", "compose", "up", "-d", "--build"],
-            cwd=str(deploy_dir), capture_output=True, text=True, timeout=300,
+            ["docker", "compose", "up", "-d"],
+            cwd=str(deploy_dir), capture_output=True, text=True, timeout=120,
         )
         if result.returncode != 0:
             return DeployStatus(status="error", message=result.stderr.strip()[:300], logs=[result.stderr.strip()])
     except subprocess.TimeoutExpired:
-        return DeployStatus(status="timeout", message="Timeout rebuilding")
+        return DeployStatus(status="timeout", message="Timeout restarting")
     except Exception as e:
         return DeployStatus(status="error", message=str(e))
     tracking = _load_tracking()
     if slug in tracking:
         tracking[slug]["status"] = "running"
         _save_tracking(tracking)
-    return DeployStatus(status="running", message="Deployment rebuilt and restarted")
+    return DeployStatus(status="running", message="Deployment restarted")
 
 
 class SlugRequest(BaseModel):
@@ -288,19 +317,8 @@ def delete_deployment(req: SlugRequest) -> DeployStatus:
             ["docker", "compose", "down", "--remove-orphans", "-v"],
             cwd=str(deploy_dir), capture_output=True, timeout=60,
         )
-        # Remove the Docker image
-        image_name = f"{slug}-api"
-        logs.append(f"🗑️ Eliminando imagen Docker '{image_name}'...")
-        subprocess.run(
-            ["docker", "rmi", "-f", image_name],
-            capture_output=True, timeout=30,
-        )
-        subprocess.run(
-            ["docker", "image", "prune", "-f"],
-            capture_output=True, timeout=30,
-        )
         shutil.rmtree(deploy_dir)
-        logs.append("📁 Directorio eliminado")
+        logs.append("📁 Directorio de deploy eliminado")
     else:
         logs.append("📭 No hay directorio de deployment")
 
@@ -389,6 +407,17 @@ def list_ports() -> dict:
     }
 
 
+@router.post("/local/rebuild-image")
+def rebuild_deploy_image() -> DeployStatus:
+    """Rebuild the local deploy Docker image."""
+    logs: list[str] = []
+    logs.append("🗑️ Eliminando imagen anterior...")
+    subprocess.run(["docker", "rmi", "-f", DEPLOY_IMAGE], capture_output=True, timeout=30)
+    if _ensure_deploy_image(logs):
+        return DeployStatus(status="ok", logs=logs, message="Imagen reconstruida")
+    return DeployStatus(status="error", logs=logs, message="Error al reconstruir la imagen")
+
+
 @router.post("/local")
 def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session)) -> DeployStatus:
     """Deploy a project locally using Docker."""
@@ -423,10 +452,10 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
         deploy_db_url = f"postgresql+psycopg2://{req.db_user}:{req.db_password}@{req.db_host}:{req.db_port}/{req.db_name or 'api'}"
         logs.append(f"🗄️ Usando PostgreSQL: {req.db_host}:{req.db_port}/{req.db_name}")
     else:
-        deploy_db_url = "sqlite:///./data.db"
-        logs.append("🗄️ Usando SQLite embebida")
+        deploy_db_url = f"sqlite:////app/deployments/{slug}/data.db"
+        logs.append("🗄️ Usando SQLite embebida (persistente en disco)")
 
-    # Export project as JSON for the standalone server (stable mock server)
+    # Export project as JSON for the standalone server
     from ..routers.projects import _db_to_pydantic
     export_data = _db_to_pydantic(project, datasets_with_fields, endpoints)
     (deploy_dir / "project.json").write_text(
@@ -435,7 +464,7 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
     )
     logs.append("📄 Proyecto exportado a project.json")
 
-    # Write env file for the container
+    # Write docker-compose.yml
     compose = _build_docker_compose(port, slug, deploy_db_url)
     (deploy_dir / "docker-compose.yml").write_text(compose, encoding="utf-8")
     logs.append(f"📝 docker-compose.yml (puerto {port})")
@@ -445,15 +474,20 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
         subprocess.run(["docker", "--version"], capture_output=True, check=True, timeout=10)
     except (subprocess.CalledProcessError, FileNotFoundError):
         logs.append("⚠️ Docker no disponible. Instrucciones:")
-        logs.append(f"   cd {deploy_dir} && docker compose up -d --build")
+        logs.append(f"   cd {deploy_dir} && docker compose up -d")
         return DeployStatus(status="no_docker", logs=logs)
+
+    # Build or verify local deploy image
+    if not _ensure_deploy_image(logs):
+        logs.append("❌ No se pudo preparar la imagen Docker. Revisa los logs.")
+        return DeployStatus(status="error", logs=logs, message="Error preparando imagen Docker")
 
     logs.append("🐳 Levantando contenedor...")
     try:
         result = subprocess.run(
-            ["docker", "compose", "up", "-d", "--build"],
+            ["docker", "compose", "up", "-d"],
             cwd=str(deploy_dir),
-            capture_output=True, text=True, timeout=300,
+            capture_output=True, text=True, timeout=120,
         )
         if result.stdout.strip():
             logs.append(result.stdout.strip()[:500])
@@ -461,7 +495,7 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
             logs.append(f"❌ {result.stderr.strip()[:300]}")
             return DeployStatus(status="error", logs=logs)
     except subprocess.TimeoutExpired:
-        logs.append("⏱️ Timeout (>5min)")
+        logs.append("⏱️ Timeout (>2min)")
         return DeployStatus(status="timeout", logs=logs)
 
     # Build endpoint list from the generated project
@@ -474,7 +508,7 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
     tracking[slug] = {
         "name": project.name,
         "port": port,
-        "url": f"http://localhost:{port}",
+        "url": f"http://localhost:{port}/api",
         "stack": project.target_stack,
         "status": "running",
         "endpoints": deployed_endpoints,

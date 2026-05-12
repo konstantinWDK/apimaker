@@ -8,11 +8,14 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy pyproject.toml and install dependencies
+# Copy package config and source
 COPY pyproject.toml .
+COPY app/ app/
+
+# Install the package and dependencies
 RUN pip install --no-cache-dir .
 
-# Copy application code
+# Copy remaining files (scripts, alembic, tests, etc.)
 COPY . .
 
 # Expose port
