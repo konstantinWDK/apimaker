@@ -161,7 +161,7 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                 </div>
                 <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
                   <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                    onClick={() => window.open(dep.url + '/api', '_blank')}>Abrir</button>
+                    onClick={() => window.open(dep.url, '_blank')}>Abrir</button>
                   {dep.docker_status === 'running' ? (
                     <>
                       <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#dc2626' }}
