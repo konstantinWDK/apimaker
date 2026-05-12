@@ -69,6 +69,11 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
   const [deployLog, setDeployLog] = useState<string[]>([])
   const [deploying, setDeploying] = useState(false)
   const [deployDone, setDeployDone] = useState(false)
+  const [dockerAvail, setDockerAvail] = useState<{ available: boolean; version?: string; containers_running?: number; error?: string } | null>(null)
+
+  useEffect(() => {
+    apiFetch('/api/deploy/docker-status').then(r => r.json()).then(setDockerAvail).catch(() => setDockerAvail({ available: false }))
+  }, [])
 
   const log = useCallback((msg: string) => setDeployLog((prev: string[]) => [...prev, msg]), [])
 
@@ -181,9 +186,18 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
 
         {deployType === 'local' ? (
           <div>
-            <p className="muted-text" style={{ fontSize: '0.82rem', marginBottom: '0.75rem' }}>
-              Despliega en el mismo servidor (requiere Docker). Si el puerto está ocupado, se asigna el siguiente disponible.
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', fontSize: '0.82rem' }}>
+            <span style={{
+              width: 10, height: 10, borderRadius: '50%', display: 'inline-block', flexShrink: 0,
+              background: dockerAvail === null ? '#94a3b8' : dockerAvail?.available ? '#22c55e' : '#ef4444',
+            }} />
+            {dockerAvail === null ? 'Verificando Docker...' : dockerAvail?.available
+              ? `Docker disponible (v${dockerAvail.version}, ${dockerAvail.containers_running} contenedores activos)`
+              : `Docker no disponible - ${dockerAvail?.error || 'desconocido'}`}
+          </div>
+          <p className="muted-text" style={{ fontSize: '0.82rem', marginBottom: '0.75rem' }}>
+            Despliega en el mismo servidor (requiere Docker). Si el puerto está ocupado, se asigna el siguiente disponible.
+          </p>
             <label className="form-field" style={{ maxWidth: '200px' }}>
               <span className="label">Puerto preferido</span>
               <input className="field" type="number" value={localPort} onChange={e => setLocalPort(e.target.value)} placeholder="8080" />

@@ -128,6 +128,103 @@ class SlugRequest(BaseModel):
     slug: str
 
 
+class RemoteDeployRequest(BaseModel):
+    project_id: str
+    host: str
+    user: str
+    port: int = 22
+    api_port: int = 8080
+    ssh_key: str = ""
+    password: str = ""
+
+
+@router.post("/remote")
+def deploy_remote(req: RemoteDeployRequest, session: Session = Depends(get_session)) -> DeployStatus:
+    """Deploy a project to a remote VPS via SSH + Docker."""
+    import tempfile
+
+    logs: list[str] = []
+
+    data = project_service.get_project_with_data(session, req.project_id)
+    project = data["project"]
+    slug = project.slug or str(project.id)
+    remote_dir = f"/opt/apimaker/{slug}"
+    remote_url = f"{req.user}@{req.host}"
+
+    logs.append(f"🔌 Conectando a {remote_url}...")
+
+    # Build SSH command prefix
+    ssh_base = ["ssh", remote_url, "-p", str(req.port), "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10"]
+    scp_base = ["scp", "-P", str(req.port), "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10"]
+
+    key_file = None
+    if req.ssh_key:
+        key_file = tempfile.NamedTemporaryFile(mode="w", suffix=".key", delete=False)
+        key_file.write(req.ssh_key)
+        key_file.close()
+        ssh_base.extend(["-i", key_file.name])
+        scp_base.extend(["-i", key_file.name])
+
+    try:
+        # Create remote directory
+        logs.append("📁 Creando directorio remoto...")
+        subprocess.run(ssh_base + [f"mkdir -p {remote_dir}"], capture_output=True, text=True, timeout=15)
+
+        # Generate and copy the code bundle
+        logs.append("📦 Generando código...")
+        datasets = data["datasets"]
+        endpoints = data["endpoints"]
+        zip_bytes = render_bundle(
+            project.target_stack or "fastapi", project.name, project.description,
+            project.auth_method, project.api_key, project.jwt_secret, project.rate_limit,
+            datasets, endpoints, True,
+        )
+
+        bundle_path = Path(tempfile.gettempdir()) / f"{slug}-bundle.zip"
+        bundle_path.write_bytes(zip_bytes)
+
+        logs.append("📄 Subiendo código al servidor...")
+        subprocess.run(scp_base + [str(bundle_path), f"{remote_url}:{remote_dir}/bundle.zip"], capture_output=True, text=True, timeout=30)
+        bundle_path.unlink(missing_ok=True)
+
+        # Extract and deploy via SSH
+        logs.append("🐳 Desplegando en el servidor remoto...")
+        deploy_cmd = (
+            f"cd {remote_dir} && "
+            f"unzip -o bundle.zip && rm bundle.zip && "
+            f"docker compose up -d --build"
+        )
+        result = subprocess.run(ssh_base + [deploy_cmd], capture_output=True, text=True, timeout=300)
+        if result.stdout.strip():
+            logs.append(result.stdout.strip()[:500])
+        if result.returncode != 0:
+            logs.append(f"❌ {result.stderr.strip()[:300]}")
+            return DeployStatus(status="error", logs=logs)
+
+        url = f"http://{req.host}:{req.api_port}"
+        logs.append(f"✅ API desplegada en {url}/api")
+
+        # Track deployment
+        tracking = _load_tracking()
+        tracking[f"{slug}-remote"] = {
+            "name": project.name, "host": req.host, "port": req.api_port,
+            "url": url, "stack": project.target_stack, "status": "running",
+        }
+        _save_tracking(tracking)
+
+        return DeployStatus(status="running", url=url, logs=logs, message="Deploy remoto exitoso")
+
+    except subprocess.TimeoutExpired:
+        logs.append("⏱️ Timeout en conexión SSH")
+        return DeployStatus(status="timeout", logs=logs)
+    except Exception as e:
+        logs.append(f"❌ Error: {str(e)}")
+        return DeployStatus(status="error", logs=logs)
+    finally:
+        if key_file:
+            Path(key_file.name).unlink(missing_ok=True)
+
+
 @router.post("/local/delete")
 def delete_deployment(req: SlugRequest) -> DeployStatus:
     """Stop and remove a local deployment entirely."""
@@ -186,6 +283,29 @@ def list_deployments() -> list[dict]:
         entry["docker_status"] = _check_docker_container(slug)
         result.append(entry)
     return result
+
+
+@router.get("/docker-status")
+def docker_status() -> dict:
+    """Check if Docker is available on this machine."""
+    try:
+        result = subprocess.run(
+            ["docker", "info", "--format", "{{.ServerVersion}}"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode == 0:
+            version = result.stdout.strip()
+            # Count running containers
+            ps_result = subprocess.run(
+                ["docker", "ps", "-q"], capture_output=True, text=True, timeout=5,
+            )
+            running = len([c for c in ps_result.stdout.strip().split("\n") if c])
+            return {"available": True, "version": version, "containers_running": running}
+        return {"available": False, "error": result.stderr.strip()}
+    except FileNotFoundError:
+        return {"available": False, "error": "Docker no instalado"}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
 
 
 @router.get("/local/ports")
