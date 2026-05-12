@@ -10,7 +10,6 @@ import { SchemaDiagram } from './SchemaDiagram'
 import { PayloadPreview } from './PayloadPreview'
 import { ProjectForm } from './ProjectForm'
 import { SectionCard } from './SectionCard'
-import { SecurityConfigPanel } from './SecurityConfigPanel'
 import { WebhookPanel } from './WebhookPanel'
 import { VersionPanel } from './VersionPanel'
 import { useProjectBuilder } from '../hooks/useProjectBuilder'
@@ -40,7 +39,7 @@ export function BuilderPage() {
   const [result, setResult] = useState<GenerationResult | null>(null)
   const [generationWarning, setGenerationWarning] = useState<string | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
-  const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'mappings' | 'security' | 'delivery' | 'result' | 'webhooks' | 'versions'>('datasets')
+  const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'mappings' | 'delivery' | 'result' | 'webhooks' | 'versions'>('datasets')
   const [isImportingDB, setIsImportingDB] = useState(false)
   const [editingDatasetId, setEditingDatasetId] = useState<string | null>(null)
   const [mappings, setMappings] = useState<MappingRule[]>([])
@@ -52,7 +51,6 @@ export function BuilderPage() {
       { id: 'datasets', label: 'Datasets' },
       { id: 'endpoints', label: 'Endpoints' },
       { id: 'mappings', label: 'Mappings' },
-      { id: 'security', label: 'Seguridad' },
       { id: 'delivery', label: 'Cómo usarla' },
       { id: 'webhooks', label: 'Webhooks' },
       { id: 'versions', label: 'Versiones' },
@@ -335,12 +333,6 @@ export function BuilderPage() {
                 onRemoveMapping={handleRemoveMapping}
               />
             )}
-          </SectionCard>
-        )
-      case 'security':
-        return (
-          <SectionCard title="Configuración de Seguridad" subtitle="Protege tus endpoints y limita el tráfico" accent="amber" fullWidth>
-            <SecurityConfigPanel project={project} onChange={updateProject} />
           </SectionCard>
         )
       case 'delivery':
