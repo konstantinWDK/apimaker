@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any, List, Dict
 
@@ -20,7 +21,23 @@ ROOT_DIR = Path(__file__).resolve().parent
 FRONTEND_DEMO = ROOT_DIR.parent / "frontend" / "public" / "demo-project.json"
 BACKEND_DEMO = ROOT_DIR / "app" / "data" / "projects.json"
 
-def migrate() -> None:
+
+def _camel_to_snake(name: str) -> str:
+    """Convert camelCase to snake_case."""
+    s1 = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", name)
+    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
+
+
+def _convert_keys(obj: Any) -> Any:
+    """Recursively convert all dict keys from camelCase to snake_case."""
+    if isinstance(obj, dict):
+        return {_camel_to_snake(k): _convert_keys(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_convert_keys(item) for item in obj]
+    return obj
+
+
+def migrate(force: bool = False) -> None:
     """Read projects.json (or fallback to demo) and insert into database."""
     
     # Ensure data directory exists
@@ -58,6 +75,9 @@ def migrate() -> None:
     if isinstance(raw, dict):
         raw = [raw]
 
+    # Convert all keys from camelCase to snake_case
+    raw = [_convert_keys(item) for item in raw]
+
     print(f"📋 Found {len(raw)} project(s) to migrate.")
 
     with Session(engine) as session:
@@ -82,13 +102,34 @@ def migrate() -> None:
                 print(f"❌ Validation error for {item.get('name')}: {e}")
                 continue
 
-            print(f"  → Migrating project: {project_data.name} (Slug: {project_data.slug})")
-
             # Check if already exists
             existing = session.exec(select(Project).where(Project.slug == project_data.slug)).first()
             if existing:
-                print(f"    ⏭️  Already exists, skipping.")
-                continue
+                if force:
+                    print(f"    ♻️  Re-migrating (force): {project_data.name}")
+                    # Delete existing endpoints, datasets, fields
+                    session.exec(
+                        DatasetField.__table__.delete().where(
+                            DatasetField.dataset_id.in_(
+                                select(Dataset.id).where(Dataset.project_id == existing.id)
+                            )
+                        )
+                    )
+                    session.exec(
+                        Dataset.__table__.delete().where(Dataset.project_id == existing.id)
+                    )
+                    session.exec(
+                        Endpoint.__table__.delete().where(Endpoint.project_id == existing.id)
+                    )
+                    session.exec(
+                        Project.__table__.delete().where(Project.id == existing.id)
+                    )
+                    session.commit()
+                else:
+                    print(f"    ⏭️  Already exists, skipping.")
+                    continue
+
+            print(f"  → Migrating project: {project_data.name} (Slug: {project_data.slug})")
 
             # Insert project
             db_project = Project(
@@ -158,4 +199,5 @@ def migrate() -> None:
 
 
 if __name__ == "__main__":
-    migrate()
+    force = "--force" in sys.argv
+    migrate(force=force)
