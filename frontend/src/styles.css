@@ -4457,7 +4457,7 @@ input[type='password'] {
 
 /* ─── Info Page ─────────────────────────────────────────────── */
 .info-page {
-  max-width: 900px; margin: 0 auto; padding: 2rem 0;
+  padding: 2rem 0;
 }
 .info-hero {
   display: flex; gap: 2rem; align-items: center;
