@@ -5,19 +5,23 @@ import { apiFetch } from '../lib/api'
 export function DeployPage() {
   const { project, saveProject, updateProject } = useProjectBuilder()
   const [activeTab, setActiveTab] = useState<'desplegar' | 'cli'>('desplegar')
-  const [deployments, setDeployments] = useState<any[]>([])
+  const [allDeployments, setAllDeployments] = useState<any[]>([])
   const [loadingDeployments, setLoadingDeployments] = useState(true)
 
+  const projectSlugs = [project.slug, project.remoteId].filter(Boolean) as string[]
+  const deployments = allDeployments.filter((d: any) => projectSlugs.includes(d.slug))
+
   const loadDeployments = useCallback(async () => {
+    setLoadingDeployments(true)
     try {
       const res = await apiFetch('/api/deploy/list')
       const data = await res.json()
-      setDeployments(data)
+      setAllDeployments(data)
     } catch { /* ignore */ }
     setLoadingDeployments(false)
   }, [])
 
-  useEffect(() => { loadDeployments() }, [loadDeployments])
+  useEffect(() => { loadDeployments() }, [loadDeployments, project.slug, project.remoteId])
 
   return (
     <div className="info-page">

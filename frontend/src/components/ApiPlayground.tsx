@@ -9,6 +9,7 @@ interface Props {
   mockLoading?: boolean
   mockError?: string | null
   selectedDatasetId?: string
+  deploymentBaseUrl?: string | null
 }
 
 interface ApiResponse {
@@ -45,11 +46,11 @@ function buildDefaultBody(project: ProjectDraft, method: string, datasetId?: str
   return JSON.stringify(obj, null, 2)
 }
 
-export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, selectedDatasetId }: Props) {
+export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, selectedDatasetId, deploymentBaseUrl }: Props) {
   const backendConfig = readBackendConfig()
   const backendBaseUrl = backendConfig.baseUrl?.replace(/\/$/, '') || 'http://localhost:8000'
   const effectiveId = project.slug || project.remoteId || project.id
-  const mockBase = `${backendBaseUrl}/api/mock/${effectiveId}`
+  const mockBase = deploymentBaseUrl || `${backendBaseUrl}/api/mock/${effectiveId}`
 
   const endpoints = useMemo(() =>
     selectedDatasetId
@@ -73,15 +74,18 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
 
   const urlInputRef = useRef<HTMLInputElement>(null)
 
-  // Init with first endpoint
   useEffect(() => {
-    if (endpoints.length > 0 && !url) {
+    if (endpoints.length > 0) {
       const ep = endpoints[0]
+      const newUrl = mockBase + (ep.path.startsWith('/') ? ep.path : `/${ep.path}`)
+      const newBody = buildDefaultBody(project, ep.method, selectedDatasetId)
       setMethod(ep.method)
-      setUrl(mockBase + (ep.path.startsWith('/') ? ep.path : `/${ep.path}`))
-      setBody(buildDefaultBody(project, ep.method, selectedDatasetId))
+      setUrl(newUrl)
+      setBody(newBody)
+      setResponse(null)
+      executeRequest(newUrl, ep.method, newBody)
     }
-  }, [endpoints])
+  }, [mockBase, selectedDatasetId])
 
   const fullUrl = useMemo(() => {
     const enabledParams = queryParams.filter(p => p.enabled && p.key.trim())
@@ -90,13 +94,12 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
     return url + sep + enabledParams.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&')
   }, [url, queryParams])
 
-  const handleSend = async () => {
-    if (!url.trim()) return
+  const executeRequest = async (targetUrl: string, targetMethod: string, targetBody: string) => {
     setLoading(true)
     setBodyError(null)
 
-    if (body.trim() && method !== 'GET' && method !== 'DELETE') {
-      try { JSON.parse(body) } catch {
+    if (targetBody.trim() && targetMethod !== 'GET' && targetMethod !== 'DELETE') {
+      try { JSON.parse(targetBody) } catch {
         setBodyError('JSON invalido')
         setLoading(false)
         return
@@ -114,10 +117,10 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
         requestHeaders['Authorization'] = 'Bearer sim-token'
       }
 
-      const opts: RequestInit = { method, headers: requestHeaders }
-      if (method !== 'GET' && method !== 'DELETE' && body) opts.body = body
+      const opts: RequestInit = { method: targetMethod, headers: requestHeaders }
+      if (targetMethod !== 'GET' && targetMethod !== 'DELETE' && targetBody) opts.body = targetBody
 
-      const res = await fetch(fullUrl, opts)
+      const res = await fetch(targetUrl, opts)
       const text = await res.text()
       let parsed: unknown = text
       try { parsed = JSON.parse(text) } catch { /* keep as text */ }
@@ -125,14 +128,19 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
       const elapsed = Math.round(performance.now() - start)
       const size = new Blob([text]).size
 
-      const entry: ApiResponse = { url: fullUrl, status: res.status, body: parsed, method, time: elapsed, size }
+      const entry: ApiResponse = { url: targetUrl, status: res.status, body: parsed, method: targetMethod, time: elapsed, size }
       setResponse(entry)
       setHistory(prev => [entry, ...prev].slice(0, 20))
     } catch {
-      setResponse({ url: fullUrl, status: 0, body: { error: 'Error de conexion' }, method, time: 0, size: 0 })
+      setResponse({ url: targetUrl, status: 0, body: { error: 'Error de conexion' }, method: targetMethod, time: 0, size: 0 })
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSend = async () => {
+    if (!url.trim()) return
+    await executeRequest(fullUrl, method, body)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -140,10 +148,13 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
   }
 
   const selectEndpoint = (ep: typeof endpoints[0]) => {
+    const newUrl = mockBase + (ep.path.startsWith('/') ? ep.path : `/${ep.path}`)
+    const newBody = buildDefaultBody(project, ep.method, selectedDatasetId)
     setMethod(ep.method)
-    setUrl(mockBase + (ep.path.startsWith('/') ? ep.path : `/${ep.path}`))
-    setBody(buildDefaultBody(project, ep.method, selectedDatasetId))
+    setUrl(newUrl)
+    setBody(newBody)
     setResponse(null)
+    executeRequest(newUrl, ep.method, newBody)
   }
 
   const addQueryParam = () => setQueryParams([...queryParams, { key: '', value: '', enabled: true }])
@@ -160,14 +171,18 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
 
   return (
     <div className="pg">
-      {!mockRunning && (
+      {deploymentBaseUrl ? (
+        <div className="pg__banner pg__banner--deploy">
+          <span>Probando contra <strong>{deploymentBaseUrl}</strong></span>
+        </div>
+      ) : !mockRunning ? (
         <div className="pg__banner">
           <span>El mock server esta detenido. Inicialo para probar endpoints.</span>
           <button className="btn primary btn-small" onClick={onStartMock} disabled={mockLoading}>
             {mockLoading ? 'Iniciando...' : 'Iniciar Mock Server'}
           </button>
         </div>
-      )}
+      ) : null}
 
       {/* Main layout */}
       <div className="pg__layout">
@@ -361,6 +376,9 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
           padding: 0.65rem 1rem; margin-bottom: 0.75rem;
           background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px;
           font-size: 0.82rem; color: #92400e;
+        }
+        .pg__banner--deploy {
+          background: #e0f2fe; border-color: #7dd3fc; color: #0369a1;
         }
         .pg__layout { display: flex; gap: 1rem; min-height: 500px; }
         .pg__sidebar { width: 220px; flex-shrink: 0; display: flex; flex-direction: column; gap: 1rem; }
