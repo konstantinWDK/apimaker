@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useProjectBuilder } from '../hooks/useProjectBuilder'
 import { readBackendConfig } from '../lib/backendConfig'
 import { apiFetch } from '../lib/api'
@@ -36,7 +36,8 @@ export function DeployPage() {
 
 /* ========== UI DEPLOY PANEL ========== */
 function UiDeployPanel({ project, saveProject }: { project: any; saveProject: () => Promise<string | null> }) {
-  const baseUrl = readBackendConfig().baseUrl?.replace(/\/$/, '') || 'http://localhost:8000'
+  const [deployType, setDeployType] = useState<'local' | 'remote'>('local')
+  const [localPort, setLocalPort] = useState('8080')
   const [sshHost, setSshHost] = useState('')
   const [sshUser, setSshUser] = useState('root')
   const [sshPort, setSshPort] = useState('22')
@@ -61,55 +62,60 @@ function UiDeployPanel({ project, saveProject }: { project: any; saveProject: ()
   ]
   const allChecksOk = checks.every(c => c.ok)
 
-  const log = (msg: string) => setDeployLog(prev => [...prev, msg])
+  const log = useCallback((msg: string) => setDeployLog(prev => [...prev, msg]), [])
 
   const handleDeploy = async () => {
     setDeploying(true)
     setDeployDone(false)
     setDeployLog([])
 
+    const checksOk = deployType === 'local'
+      ? project.endpoints.length > 0 && project.datasets.length > 0
+      : allChecksOk
+
     log('🔍 Verificando requisitos...')
-    if (!allChecksOk) { log('❌ Requisitos no cumplidos'); setDeploying(false); return }
+    if (!checksOk) { log('❌ Requisitos no cumplidos'); setDeploying(false); return }
 
     try {
-      log('💾 Guardando proyecto en backend...')
       const pid = await saveProject()
       if (!pid) { log('❌ Error al guardar proyecto'); setDeploying(false); return }
       log(`✅ Proyecto guardado (ID: ${pid})`)
 
-      log('📦 Exportando proyecto...')
-      const exportRes = await apiFetch(`/projects/${pid}/export`)
-      const projectData = await exportRes.json()
-      log(`✅ Proyecto "${projectData.name}" exportado`)
+      if (deployType === 'local') {
+        log(`🐳 Desplegando localmente en puerto ${localPort}...`)
+        const res = await apiFetch('/api/deploy/local', {
+          method: 'POST',
+          body: JSON.stringify({ project_id: pid, port: parseInt(localPort, 10) }),
+        })
+        const result = await res.json()
+        result.logs?.forEach((l: string) => log(l))
+        if (result.status === 'running') {
+          log(`\n✅ API desplegada en ${result.url}/api`)
+          setDeployDone(true)
+        } else if (result.status === 'no_docker') {
+          log('⚠️ Docker no disponible. Sigue las instrucciones manuales.')
+        }
+      } else {
+        log('📦 Exportando proyecto...')
+        const exportRes = await apiFetch(`/projects/${pid}/export`)
+        const projectData = await exportRes.json()
+        log(`✅ "${projectData.name}" exportado`)
 
-      log(`📋 Preparando despliegue en ${sshUser}@${sshHost}:${sshPort}...`)
-      log(`🚀 Conectando vía SSH...`)
+        const sshCmd = sshAuthType === 'key' && sshKey.trim()
+          ? `ssh -i ~/.ssh/deploy_key -p ${sshPort} ${sshUser}@${sshHost}`
+          : `ssh ${sshUser}@${sshHost} -p ${sshPort}`
+        const scpCmd = sshAuthType === 'key' && sshKey.trim()
+          ? `scp -P ${sshPort} -i ~/.ssh/deploy_key proyecto.json ${sshUser}@${sshHost}:/tmp/`
+          : `scp -P ${sshPort} proyecto.json ${sshUser}@${sshHost}:/tmp/`
 
-      const deployRes = await fetch(`${baseUrl}/admin/run-tests`, { method: 'POST' })
-      if (deployRes.ok) log('✅ Backend reachable')
-
-      log(``)
-      const sshCmd = sshAuthType === 'key' && sshKey.trim()
-        ? `ssh -i ~/.ssh/deploy_key -p ${sshPort} ${sshUser}@${sshHost}`
-        : `ssh ${sshUser}@${sshHost} -p ${sshPort}`
-      const scpCmd = sshAuthType === 'key' && sshKey.trim()
-        ? `scp -P ${sshPort} -i ~/.ssh/deploy_key proyecto.json ${sshUser}@${sshHost}:/tmp/`
-        : `scp -P ${sshPort} proyecto.json ${sshUser}@${sshHost}:/tmp/`
-
-      log(`📌 Instrucciones para desplegar manualmente:`)
-      log(`   1. Guarda la exportación del proyecto:`)
-      log(`      apimaker init ${project.slug || project.id} -o proyecto.json`)
-      log(`   2. Copia el archivo al servidor:`)
-      log(`      ${scpCmd}`)
-      log(`   3. Conéctate por SSH:`)
-      log(`      ${sshCmd}`)
-      log(`   4. Dentro del servidor, despliega:`)
-      log(`      apimaker deploy /tmp/proyecto.json --port ${apiPort}`)
-      log(``)
-      log(`✨ O usa el comando directo desde tu terminal:`)
-      log(`   apimaker deploy proyecto.json --ssh ${sshUser}@${sshHost} --port ${apiPort}`)
-
-      setDeployDone(true)
+        log(`📌 Despliegue manual en ${sshUser}@${sshHost}:`)
+        log(`   1. apimaker init ${project.slug || project.id} -o proyecto.json`)
+        log(`   2. ${scpCmd}`)
+        log(`   3. ${sshCmd}`)
+        log(`   4. apimaker deploy /tmp/proyecto.json --port ${apiPort}`)
+        log(`\n✨ O directo: apimaker deploy proyecto.json --ssh ${sshUser}@${sshHost} --port ${apiPort}`)
+        setDeployDone(true)
+      }
     } catch (e: any) {
       log(`❌ Error: ${e.message || e}`)
     }
@@ -118,20 +124,36 @@ function UiDeployPanel({ project, saveProject }: { project: any; saveProject: ()
 
   return (
     <div className="info-grid" style={{ gridTemplateColumns: '1fr 1fr', margin: 0 }}>
-      {/* Checks */}
+      {/* Deploy Type Selector */}
       <div className="info-card" style={{ gridColumn: '1 / -1' }}>
-          <h3 className="info-card__title" style={{ marginBottom: '0.75rem' }}>Pre-requisitos</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem 1rem' }}>
-            {checks.map(c => (
-              <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: c.ok ? '#166534' : '#92400e' }}>
-                <span style={{ fontWeight: 700, fontSize: '1rem' }}>{c.ok ? '✓' : '○'}</span>
-                <span>{c.label}</span>
-              </div>
-            ))}
-          </div>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem', cursor: 'pointer' }}>
+            <input type="radio" name="deployType" checked={deployType === 'local'} onChange={() => setDeployType('local')} />
+            🖥️ Local (Docker)
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem', cursor: 'pointer' }}>
+            <input type="radio" name="deployType" checked={deployType === 'remote'} onChange={() => setDeployType('remote')} />
+            ☁️ Remoto (SSH)
+          </label>
         </div>
+      </div>
 
-        {/* SSH Config */}
+      {/* Local Deploy Config */}
+      {deployType === 'local' ? (
+        <div className="info-card" style={{ gridColumn: '1 / -1' }}>
+          <h3 className="info-card__title" style={{ marginBottom: '0.5rem' }}>Despliegue Local</h3>
+          <p className="muted-text" style={{ fontSize: '0.82rem', marginBottom: '0.75rem' }}>
+            Despliega la API en el mismo servidor donde corre el builder. Necesitas Docker instalado.
+            El código se genera, se extrae en <code className="docs-code--inline">backend/deployments/{project.slug || project.id}/</code> y se levanta con docker compose.
+          </p>
+          <label className="form-field" style={{ maxWidth: '200px' }}>
+            <span className="label">Puerto</span>
+            <input className="field" type="number" value={localPort} onChange={e => setLocalPort(e.target.value)} placeholder="8080" />
+          </label>
+        </div>
+      ) : (
+        <>
+        {/* Remote SSH Config */}
         <div className="info-card">
           <h3 className="info-card__title" style={{ marginBottom: '0.75rem' }}>Conexión SSH</h3>
           <div className="form-grid" style={{ gap: '0.6rem' }}>
@@ -174,10 +196,9 @@ function UiDeployPanel({ project, saveProject }: { project: any; saveProject: ()
                 <div>
                   <textarea className="field" style={{ minHeight: '80px', fontFamily: 'monospace', fontSize: '0.78rem' }}
                     value={sshKey} onChange={e => setSshKey(e.target.value)}
-                    placeholder="Pega tu clave privada SSH (~/.ssh/id_rsa)&#10;Ej:&#10;-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----" />
+                    placeholder="Pega tu clave privada SSH (~/.ssh/id_rsa)&#10;-----BEGIN OPENSSH PRIVATE KEY----->&#10;...&#10;-----END OPENSSH PRIVATE KEY-----" />
                   <p className="muted-text" style={{ fontSize: '0.72rem', marginTop: '0.25rem' }}>
                     La clave privada se usa solo durante el despliegue. No se almacena.
-                    También puedes usar <code className="docs-code--inline">ssh-agent</code> y dejar esto vacío si ya tienes la clave cargada.
                   </p>
                 </div>
               )}
@@ -191,7 +212,6 @@ function UiDeployPanel({ project, saveProject }: { project: any; saveProject: ()
           <div style={{ fontSize: '0.85rem', lineHeight: 1.6 }}>
             <div><strong>Nombre:</strong> {project.name}</div>
             <div><strong>Stack:</strong> {project.targetStack}</div>
-            <div><strong>Auth:</strong> {project.authMethod === 'none' ? 'Pública' : project.authMethod}</div>
             <div><strong>Endpoints:</strong> {project.endpoints.length}</div>
             <div><strong>Datasets:</strong> {project.datasets.length}</div>
             <div style={{ marginTop: '0.5rem' }}>
@@ -199,12 +219,14 @@ function UiDeployPanel({ project, saveProject }: { project: any; saveProject: ()
             </div>
           </div>
         </div>
+        </>
+      )}
 
         {/* Deploy Result */}
         <div className="info-card" style={{ gridColumn: '1 / -1' }}>
           <button type="button" className="btn" style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem', fontWeight: 600 }}
-            onClick={handleDeploy} disabled={deploying || !allChecksOk}>
-            {deploying ? 'Desplegando...' : deployDone ? '✅ Desplegado' : '🚀 Desplegar API'}
+            onClick={handleDeploy} disabled={deploying || (deployType === 'remote' && !allChecksOk)}>
+            {deploying ? 'Desplegando...' : deployDone ? '✅ Desplegado' : deployType === 'local' ? '🐳 Desplegar Local' : '🚀 Desplegar Remoto'}
           </button>
           {deployLog.length > 0 && (
             <pre className="docs-code" style={{ marginTop: '0.75rem', fontSize: '0.75rem', whiteSpace: 'pre-wrap' }}>
