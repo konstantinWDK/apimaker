@@ -40,17 +40,24 @@ function UiDeployPanel({ project, saveProject }: { project: any; saveProject: ()
   const [sshHost, setSshHost] = useState('')
   const [sshUser, setSshUser] = useState('root')
   const [sshPort, setSshPort] = useState('22')
+  const [sshAuthType, setSshAuthType] = useState<'password' | 'key'>('password')
+  const [sshPassword, setSshPassword] = useState('')
+  const [sshKey, setSshKey] = useState('')
   const [apiPort, setApiPort] = useState('8080')
   const [deployLog, setDeployLog] = useState<string[]>([])
   const [deploying, setDeploying] = useState(false)
   const [deployDone, setDeployDone] = useState(false)
+
+  const sshAuthOk = sshHost.trim().length > 0 && sshUser.trim().length > 0 && (
+    sshAuthType === 'password' ? sshPassword.trim().length > 0 : sshKey.trim().length > 0
+  )
 
   const checks = [
     { id: 'project', label: 'Proyecto guardado en backend', ok: !!project.remoteId },
     { id: 'endpoints', label: 'Al menos 1 endpoint definido', ok: project.endpoints.length > 0 },
     { id: 'datasets', label: 'Al menos 1 dataset con datos', ok: project.datasets.length > 0 && project.datasets.some((d: any) => d.sampleRows?.length > 0) },
     { id: 'auth', label: project.authMethod === 'none' ? 'API pública (sin autenticación)' : `Autenticación: ${project.authMethod}`, ok: true },
-    { id: 'ssh', label: 'Datos de conexión SSH completos', ok: sshHost.trim().length > 0 && sshUser.trim().length > 0 },
+    { id: 'ssh', label: 'Conexión SSH configurada', ok: sshAuthOk },
   ]
   const allChecksOk = checks.every(c => c.ok)
 
@@ -82,15 +89,24 @@ function UiDeployPanel({ project, saveProject }: { project: any; saveProject: ()
       if (deployRes.ok) log('✅ Backend reachable')
 
       log(``)
-      log(`📌 Para desplegar manualmente en tu servidor:`)
-      log(`   1. Copia el archivo a tu servidor:`)
-      log(`      scp -P ${sshPort} <proyecto-exportado.json> ${sshUser}@${sshHost}:/tmp/`)
-      log(`   2. Conéctate por SSH:`)
-      log(`      ssh ${sshUser}@${sshHost} -p ${sshPort}`)
-      log(`   3. Ejecuta el CLI de apimaker:`)
+      const sshCmd = sshAuthType === 'key' && sshKey.trim()
+        ? `ssh -i ~/.ssh/deploy_key -p ${sshPort} ${sshUser}@${sshHost}`
+        : `ssh ${sshUser}@${sshHost} -p ${sshPort}`
+      const scpCmd = sshAuthType === 'key' && sshKey.trim()
+        ? `scp -P ${sshPort} -i ~/.ssh/deploy_key proyecto.json ${sshUser}@${sshHost}:/tmp/`
+        : `scp -P ${sshPort} proyecto.json ${sshUser}@${sshHost}:/tmp/`
+
+      log(`📌 Instrucciones para desplegar manualmente:`)
+      log(`   1. Guarda la exportación del proyecto:`)
+      log(`      apimaker init ${project.slug || project.id} -o proyecto.json`)
+      log(`   2. Copia el archivo al servidor:`)
+      log(`      ${scpCmd}`)
+      log(`   3. Conéctate por SSH:`)
+      log(`      ${sshCmd}`)
+      log(`   4. Dentro del servidor, despliega:`)
       log(`      apimaker deploy /tmp/proyecto.json --port ${apiPort}`)
       log(``)
-      log(`✨ También puedes usar 'apimaker deploy --ssh' desde tu terminal:`)
+      log(`✨ O usa el comando directo desde tu terminal:`)
       log(`   apimaker deploy proyecto.json --ssh ${sshUser}@${sshHost} --port ${apiPort}`)
 
       setDeployDone(true)
@@ -137,6 +153,35 @@ function UiDeployPanel({ project, saveProject }: { project: any; saveProject: ()
                 <span className="label">Puerto API</span>
                 <input className="field" value={apiPort} onChange={e => setApiPort(e.target.value)} placeholder="8080" />
               </label>
+            </div>
+
+            <div className="form-field" style={{ gridColumn: '1 / -1' }}>
+              <span className="label">Autenticación SSH</span>
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem', cursor: 'pointer' }}>
+                  <input type="radio" name="sshAuth" checked={sshAuthType === 'password'} onChange={() => setSshAuthType('password')} />
+                  Contraseña
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem', cursor: 'pointer' }}>
+                  <input type="radio" name="sshAuth" checked={sshAuthType === 'key'} onChange={() => setSshAuthType('key')} />
+                  Clave SSH (privada)
+                </label>
+              </div>
+
+              {sshAuthType === 'password' ? (
+                <input className="field" type="password" value={sshPassword}
+                  onChange={e => setSshPassword(e.target.value)} placeholder="Contraseña del servidor" />
+              ) : (
+                <div>
+                  <textarea className="field" style={{ minHeight: '80px', fontFamily: 'monospace', fontSize: '0.78rem' }}
+                    value={sshKey} onChange={e => setSshKey(e.target.value)}
+                    placeholder="Pega tu clave privada SSH (~/.ssh/id_rsa)&#10;Ej:&#10;-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----" />
+                  <p className="muted-text" style={{ fontSize: '0.72rem', marginTop: '0.25rem' }}>
+                    La clave privada se usa solo durante el despliegue. No se almacena.
+                    También puedes usar <code className="docs-code--inline">ssh-agent</code> y dejar esto vacío si ya tienes la clave cargada.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
