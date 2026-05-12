@@ -10,7 +10,7 @@ export function DeployPage() {
   const [activeTab, setActiveTab] = useState<DeployTab>('ui')
 
   return (
-    <div style={{ maxWidth: '960px', margin: '0 auto', padding: '2rem 0' }}>
+    <div className="info-page" style={{ maxWidth: '960px' }}>
       <div className="info-hero">
         <div className="info-hero__content">
           <h1 className="info-hero__title">Despliegue</h1>
@@ -117,10 +117,9 @@ function UiDeployPanel({ project, saveProject }: { project: any; saveProject: ()
   }
 
   return (
-    <div>
-      <div className="info-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-        {/* Checks */}
-        <div className="info-card" style={{ gridColumn: '1 / -1' }}>
+    <div className="info-grid" style={{ gridTemplateColumns: '1fr 1fr', margin: 0 }}>
+      {/* Checks */}
+      <div className="info-card" style={{ gridColumn: '1 / -1' }}>
           <h3 className="info-card__title" style={{ marginBottom: '0.75rem' }}>Pre-requisitos</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem 1rem' }}>
             {checks.map(c => (
@@ -213,7 +212,6 @@ function UiDeployPanel({ project, saveProject }: { project: any; saveProject: ()
             </pre>
           )}
         </div>
-      </div>
     </div>
   )
 }
@@ -251,8 +249,8 @@ function CliDeployPanel({ project }: { project: any }) {
   ]
 
   return (
-    <div>
-      <div className="info-card" style={{ marginBottom: '1rem' }}>
+    <div className="info-grid" style={{ gridTemplateColumns: '1fr', margin: 0, gap: '0.75rem' }}>
+      <div className="info-card">
         <h3 className="info-card__title" style={{ marginBottom: '0.5rem' }}>Comandos disponibles</h3>
         <p className="muted-text" style={{ fontSize: '0.85rem', margin: 0 }}>
           El CLI <code className="docs-code--inline">apimaker</code> se instala con el backend. 
@@ -261,7 +259,7 @@ function CliDeployPanel({ project }: { project: any }) {
       </div>
 
       {CLI_STEPS.map((step, i) => (
-        <div key={i} className="info-step" style={{ marginBottom: '0.75rem' }}>
+        <div key={i} className="info-step" style={{ margin: 0 }}>
           <span className="info-step__num" style={{ background: '#6366f1' }}>{i + 1}</span>
           <div style={{ flex: 1 }}>
             <strong>{step.title}</strong>
@@ -271,7 +269,7 @@ function CliDeployPanel({ project }: { project: any }) {
         </div>
       ))}
 
-      <div className="docs-checklist" style={{ marginTop: '1.5rem' }}>
+      <div className="docs-checklist" style={{ margin: 0 }}>
         <h3>Requisitos para deploy remoto (SSH)</h3>
         <ul>
           <li><span className="docs-checkmark">✓</span> Servidor con <strong>Docker</strong> y <strong>docker compose</strong> instalados</li>
