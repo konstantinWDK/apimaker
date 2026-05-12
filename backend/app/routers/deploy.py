@@ -288,8 +288,19 @@ def delete_deployment(req: SlugRequest) -> DeployStatus:
             ["docker", "compose", "down", "--remove-orphans", "-v"],
             cwd=str(deploy_dir), capture_output=True, timeout=60,
         )
+        # Remove the Docker image
+        image_name = f"{slug}-api"
+        logs.append(f"🗑️ Eliminando imagen Docker '{image_name}'...")
+        subprocess.run(
+            ["docker", "rmi", "-f", image_name],
+            capture_output=True, timeout=30,
+        )
+        subprocess.run(
+            ["docker", "image", "prune", "-f"],
+            capture_output=True, timeout=30,
+        )
         shutil.rmtree(deploy_dir)
-        logs.append("🗑️ Directorio eliminado")
+        logs.append("📁 Directorio eliminado")
     else:
         logs.append("📭 No hay directorio de deployment")
 

@@ -84,7 +84,7 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
   const log = useCallback((msg: string) => setDeployLog((prev: string[]) => [...prev, msg]), [])
 
   const handleAction = async (slug: string, action: 'stop' | 'delete' | 'restart' | 'start') => {
-    if (action === 'delete' && !window.confirm('¿Eliminar deployment? Se borrarán contenedor y archivos.')) return
+    if (action === 'delete' && !window.confirm('¿Eliminar deployment?\n\nSe detendrá el contenedor, se borrará la imagen Docker, los archivos y el registro.\nLos datos de la BD se perderán.')) return
     try {
       const endpoint = action === 'restart' ? 'restart' : action
       const res = await apiFetch(`/api/deploy/local/${endpoint}`, {
