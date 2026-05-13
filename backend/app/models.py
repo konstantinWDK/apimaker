@@ -152,3 +152,69 @@ class ErrorResponse(BaseModel):
     detail: str
     error_code: str | None = None
     errors: list[dict] | None = None
+
+
+# ── Database Connection Schemas ──
+
+class DbConnectionCreate(BaseModel):
+    name: str
+    db_type: str = "postgresql"
+    host: str | None = None
+    port: int | None = None
+    username: str | None = None
+    password: str | None = None
+    database: str | None = None
+    ssl_mode: str | None = None
+
+
+class DbConnectionUpdate(BaseModel):
+    name: str | None = None
+    db_type: str | None = None
+    host: str | None = None
+    port: int | None = None
+    username: str | None = None
+    password: str | None = None
+    database: str | None = None
+    ssl_mode: str | None = None
+
+
+class DbConnectionResponse(BaseModel):
+    id: str
+    name: str
+    db_type: str
+    host: str | None = None
+    port: int | None = None
+    username: str | None = None
+    database: str | None = None
+    ssl_mode: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class TableInfo(BaseModel):
+    name: str
+    kind: str | None = None
+
+
+class ColumnInfo(BaseModel):
+    name: str
+    type: str
+    nullable: bool = True
+    is_primary_key: bool = False
+    default: str | None = None
+    foreign_key: str | None = None
+
+
+class TableSchema(BaseModel):
+    table: str
+    columns: list[ColumnInfo]
+
+
+class QueryRequest(BaseModel):
+    sql: str
+
+
+class TestConnectionResult(BaseModel):
+    success: bool
+    message: str
+    server_version: str | None = None

@@ -176,6 +176,25 @@ class MockRecord(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class DbConnection(SQLModel, table=True):
+    """External database connection configuration."""
+
+    __tablename__ = "db_connections"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    project_id: str = Field(foreign_key="projects.id", index=True)
+    name: str
+    db_type: str = "postgresql"  # postgresql | mysql | sqlite | mssql
+    host: str | None = None
+    port: int | None = None
+    username: str | None = None
+    password_encrypted: str | None = None  # encrypted via cryptography.fernet
+    database: str | None = None
+    ssl_mode: str | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class ProjectVersion(SQLModel, table=True):
     """Snapshot of a project at a point in time."""
 

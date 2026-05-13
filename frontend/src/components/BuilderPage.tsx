@@ -1,21 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { BackendSyncCard } from './BackendSyncCard'
 import { DatabaseImportPanel } from './DatabaseImportPanel'
 import { DataMappingPanel } from './DataMappingPanel'
 import { EndpointDesigner } from './EndpointDesigner'
 import { GenerationResultPanel } from './GenerationResultPanel'
 import { DatasetEditor } from './DatasetEditor'
 import { SchemaDiagram } from './SchemaDiagram'
-import { PayloadPreview } from './PayloadPreview'
 import { ProjectForm } from './ProjectForm'
 import { SectionCard } from './SectionCard'
 import { WebhookPanel } from './WebhookPanel'
 import { VersionPanel } from './VersionPanel'
+import { ConnectionManager } from './ConnectionManager'
 
 import { useProjectBuilder } from '../hooks/useProjectBuilder'
 import { useToast } from './Toast'
-import type { GenerationResult, MappingRule } from '../types/schemas'
+import type { FieldType, GenerationResult, MappingRule } from '../types/schemas'
 import { slugify } from '../lib/slug'
 import { readBackendConfig } from '../lib/backendConfig'
 import { fetchMappings, createMapping, deleteMapping } from '../lib/api'
@@ -40,7 +39,7 @@ export function BuilderPage() {
   const [result, setResult] = useState<GenerationResult | null>(null)
   const [generationWarning, setGenerationWarning] = useState<string | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
-  const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'mappings' | 'delivery' | 'result' | 'webhooks' | 'versions'>('datasets')
+  const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'mappings' | 'connections' | 'result' | 'webhooks' | 'versions'>('datasets')
   const [isImportingDB, setIsImportingDB] = useState(false)
   const [editingDatasetId, setEditingDatasetId] = useState<string | null>(null)
   const [mappings, setMappings] = useState<MappingRule[]>([])
@@ -52,7 +51,7 @@ export function BuilderPage() {
       { id: 'datasets', label: 'Datasets' },
       { id: 'endpoints', label: 'Endpoints' },
       { id: 'mappings', label: 'Mappings' },
-      { id: 'delivery', label: 'Cómo usarla' },
+      { id: 'connections', label: 'Fuentes de Datos' },
       { id: 'webhooks', label: 'Webhooks' },
       { id: 'versions', label: 'Versiones' },
       { id: 'result', label: 'API generada' },
@@ -168,6 +167,38 @@ export function BuilderPage() {
       toast(`Error al crear mapping: ${err instanceof Error ? err.message : 'desconocido'}`, 'error')
     }
   }, [project.slug, project.remoteId, project.datasets, toast])
+
+  const handleImportTable = useCallback((tableName: string, columns: any[]) => {
+    const dsId = crypto.randomUUID()
+    const inferType = (dbType: string): FieldType => {
+      const t = dbType.toLowerCase()
+      if (t.includes('int')) return 'integer'
+      if (t.includes('float') || t.includes('double') || t.includes('numeric') || t.includes('decimal') || t.includes('real')) return 'float'
+      if (t.includes('bool')) return 'boolean'
+      return 'string'
+    }
+    const fields = columns.map((col: any) => ({
+      id: crypto.randomUUID(),
+      name: col.name,
+      type: inferType(col.type),
+      required: !col.nullable,
+      isPrimaryKey: col.is_primary_key,
+    }))
+    upsertDataset({
+      id: dsId,
+      name: tableName,
+      sourceType: 'database',
+      fields,
+      sampleRows: [],
+    })
+    const basePath = '/' + tableName.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+    upsertEndpoint({ id: crypto.randomUUID(), name: 'Listar ' + tableName, method: 'GET', path: basePath, summary: 'Listar registros de ' + tableName, operationType: 'list', targetDatasetId: dsId })
+    upsertEndpoint({ id: crypto.randomUUID(), name: 'Obtener ' + tableName, method: 'GET', path: basePath + '/{id}', summary: 'Obtener un registro de ' + tableName, operationType: 'get', targetDatasetId: dsId })
+    upsertEndpoint({ id: crypto.randomUUID(), name: 'Crear ' + tableName, method: 'POST', path: basePath, summary: 'Crear registro en ' + tableName, operationType: 'create', targetDatasetId: dsId })
+    upsertEndpoint({ id: crypto.randomUUID(), name: 'Actualizar ' + tableName, method: 'PUT', path: basePath + '/{id}', summary: 'Actualizar registro de ' + tableName, operationType: 'update', targetDatasetId: dsId })
+    upsertEndpoint({ id: crypto.randomUUID(), name: 'Eliminar ' + tableName, method: 'DELETE', path: basePath + '/{id}', summary: 'Eliminar registro de ' + tableName, operationType: 'delete', targetDatasetId: dsId })
+    setEditingDatasetId(dsId)
+  }, [upsertDataset, upsertEndpoint])
 
   const handleRemoveMapping = useCallback(async (mappingId: string) => {
     const pid = project.slug || project.remoteId
@@ -336,19 +367,14 @@ export function BuilderPage() {
             )}
           </SectionCard>
         )
-      case 'delivery':
+      case 'connections':
         return (
-          <div className="tab-grid">
-            <SectionCard title="Payload estimado" subtitle="Vista previa del JSON que expondrá tu API">
-              <PayloadPreview project={project} />
-            </SectionCard>
-            <SectionCard title="Sincronización con backend" subtitle="Publica este proyecto en tu instalación">
-              <BackendSyncCard
-                project={project}
-                onSynced={(remoteId) => updateProject({ remoteId })}
-              />
-            </SectionCard>
-          </div>
+          <SectionCard title="Fuentes de Datos" subtitle="Conecta bases de datos externas e importa sus esquemas" accent="sky" fullWidth>
+            <ConnectionManager
+              projectId={project.slug || project.remoteId || project.id}
+              onImportTable={handleImportTable}
+            />
+          </SectionCard>
         )
       case 'webhooks':
         return (

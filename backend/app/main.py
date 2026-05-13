@@ -13,6 +13,7 @@ from .routers import auth, mock as mock_ctrl_router, projects, share as share_ro
 from .routers import webhooks as webhooks_router
 from .routers import versions as versions_router
 from .routers import deploy as deploy_router
+from .routers import connections as connections_router
 from .services.mock_server import router as mock_api_router
 
 
@@ -67,6 +68,7 @@ app.include_router(setup_router.router)
 app.include_router(webhooks_router.router)
 app.include_router(versions_router.router)
 app.include_router(deploy_router.router)
+app.include_router(connections_router.router)
 
 
 @app.on_event("startup")

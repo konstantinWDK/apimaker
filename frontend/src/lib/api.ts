@@ -420,3 +420,70 @@ export const getShareSnapshot = async (
   }
   return response.json()
 }
+
+// ── Database Connections ──
+
+export interface DbConnectionInfo {
+  id: string
+  name: string
+  db_type: string
+  host: string | null
+  port: number | null
+  username: string | null
+  database: string | null
+  ssl_mode: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface TableInfo {
+  name: string
+  kind?: string
+}
+
+export interface ColumnInfo {
+  name: string
+  type: string
+  nullable: boolean
+  is_primary_key: boolean
+  default: string | null
+  foreign_key: string | null
+}
+
+export const listConnections = async (projectId: string): Promise<DbConnectionInfo[]> => {
+  const res = await apiFetch(`/api/connections/project/${projectId}`)
+  return res.json()
+}
+
+export const createConnection = async (projectId: string, data: any): Promise<DbConnectionInfo> => {
+  const res = await apiFetch(`/api/connections/project/${projectId}`, {
+    method: 'POST', body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+export const updateConnection = async (id: string, data: any): Promise<DbConnectionInfo> => {
+  const res = await apiFetch(`/api/connections/${id}`, {
+    method: 'PUT', body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+export const deleteConnection = async (id: string): Promise<void> => {
+  await apiFetch(`/api/connections/${id}`, { method: 'DELETE' })
+}
+
+export const testConnection = async (id: string): Promise<{ success: boolean; message: string; server_version?: string }> => {
+  const res = await apiFetch(`/api/connections/${id}/test`, { method: 'POST' })
+  return res.json()
+}
+
+export const listTables = async (id: string): Promise<TableInfo[]> => {
+  const res = await apiFetch(`/api/connections/${id}/tables`)
+  return res.json()
+}
+
+export const getTableSchema = async (id: string, table: string): Promise<{ table: string; columns: ColumnInfo[] }> => {
+  const res = await apiFetch(`/api/connections/${id}/tables/${encodeURIComponent(table)}/schema`)
+  return res.json()
+}
