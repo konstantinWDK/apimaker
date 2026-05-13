@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 echo =======================================
-echo    🚀 API Maker - Configuracion
+echo    API Maker - Configuracion
 echo =======================================
 
 :: 1. Dependencias
@@ -30,14 +30,19 @@ if "!ADMIN_PASS!"=="" set ADMIN_PASS=admin
 :: 3. Base de Datos
 echo.
 echo ^<^<^< CONFIGURACION DE BASE DE DATOS ^>^>^>
-echo 1) SQLite (Local)
-echo 2) PostgreSQL (Remota/Local - recomendado para produccion)
+echo 1) SQLite (local, rapida)
+echo 2) PostgreSQL existente (conectarse a uno que ya tengas)
+echo 3) PostgreSQL nuevo en Docker (crear contenedor automaticamente)
 set /p DB_OPTION="Elige una opcion [1]: "
 if "!DB_OPTION!"=="" set DB_OPTION=1
 
 set DB_TYPE=sqlite
+set NEED_DOCKER_DB=false
+
+if "!DB_OPTION!"=="2" set NEED_DOCKER_DB=false
+if "!DB_OPTION!"=="3" set NEED_DOCKER_DB=true
+
 if "!DB_OPTION!"=="2" (
-    set DB_TYPE=postgresql
     set /p PG_HOST="Host de Postgres [localhost]: "
     if "!PG_HOST!"=="" set PG_HOST=localhost
     set /p PG_PORT="Puerto [5432]: "
@@ -47,10 +52,22 @@ if "!DB_OPTION!"=="2" (
     set /p PG_PASS="Contrasena: "
     set /p PG_DB="Nombre BD [apimaker]: "
     if "!PG_DB!"=="" set PG_DB=apimaker
-    
+)
+
+if "!DB_OPTION!"=="3" (
+    set PG_HOST=localhost
+    set PG_PORT=5432
+    set PG_USER=apimaker
+    set PG_PASS=apimaker_secret_%RANDOM%
+    set PG_DB=apimaker
+    echo Se generara un contenedor PostgreSQL con credenciales seguras.
+)
+
+if "!DB_OPTION!"=="2" (
+    set DB_TYPE=postgresql
     set DB_URL=postgresql+psycopg2://!PG_USER!:!PG_PASS!@!PG_HOST!:!PG_PORT!/!PG_DB!
     set APIMAKER_DATABASE_URL=!DB_URL!
-    
+
     mkdir backend\app\data 2>nul
     (
       echo {
@@ -62,24 +79,58 @@ if "!DB_OPTION!"=="2" (
       echo     "username": "!PG_USER!",
       echo     "password": "!PG_PASS!",
       echo     "database": "!PG_DB!"
-      echo   },
-      echo   "prod": {
-      echo     "database_type": "postgresql",
-      echo     "postgres_url": "!DB_URL!"
       echo   }
       echo }
     ) > backend\app\data\admin_config.json
+    echo Configuracion de PostgreSQL guardada.
+)
+
+if "!DB_OPTION!"=="3" (
+    set DB_TYPE=postgresql
+    set DB_URL=postgresql+psycopg2://!PG_USER!:!PG_PASS!@!PG_HOST!:!PG_PORT!/!PG_DB!
+    set APIMAKER_DATABASE_URL=!DB_URL!
+
+    mkdir backend\app\data 2>nul
+    (
+      echo {
+      echo   "dev": {
+      echo     "database_type": "postgresql",
+      echo     "postgres_url": "!DB_URL!",
+      echo     "host": "!PG_HOST!",
+      echo     "port": !PG_PORT!,
+      echo     "username": "!PG_USER!",
+      echo     "password": "!PG_PASS!",
+      echo     "database": "!PG_DB!"
+      echo   }
+      echo }
+    ) > backend\app\data\admin_config.json
+
+    :: Guardar .env
+    (
+      echo APIMAKER_ENVIRONMENT=development
+      echo APIMAKER_DATABASE_URL=!DB_URL!
+      echo POSTGRES_USER=!PG_USER!
+      echo POSTGRES_PASSWORD=!PG_PASS!
+      echo POSTGRES_DB=!PG_DB!
+    ) > .env
+    echo Archivo .env generado con credenciales de PostgreSQL.
+    echo.
+    echo ^>^>^> PostgreSQL en contenedor configurado.
+    echo     Usuario: !PG_USER!
+    echo     Contrasena: !PG_PASS!
+    echo     Base de datos: !PG_DB!
 )
 
 :: 4. Seed
 echo.
-echo Inicializando base de datos...
+echo Inicializando base de datos y usuario...
 cd backend
 .venv\Scripts\python.exe app\scripts\seed_admin.py --username !ADMIN_USER! --password !ADMIN_PASS!
 cd ..
 
 :: 5. Demo
-set /p IMPORT_POKEDEX="^<^<^< Importar proyecto Pokedex? (y/n) [y]: "
+echo.
+set /p IMPORT_POKEDEX="Importar proyecto Pokedex? (y/n) [y]: "
 if "!IMPORT_POKEDEX!"=="" set IMPORT_POKEDEX=y
 if "!IMPORT_POKEDEX!"=="y" (
     echo Importando Pokedex...
@@ -92,46 +143,26 @@ if "!IMPORT_POKEDEX!"=="y" (
 :: 6. Docker
 echo.
 echo ^<^<^< DESPLIEGUE CON DOCKER ^>^>^>
-set /p USE_DOCKER="^<^<^< Levantar con Docker? (y/n) [n]: "
+set /p USE_DOCKER="Levantar la app ahora con Docker? (y/n) [n]: "
 if "!USE_DOCKER!"=="" set USE_DOCKER=n
 
 if "!USE_DOCKER!"=="y" (
     set COMPOSE_FILES=-f docker-compose.yml
-    
-    if "!DB_TYPE!"=="postgresql" (
-        echo.
-        echo ^<^<^< BASE DE DATOS ^>^>^>
-        echo 1) Usar PostgreSQL existente
-        echo 2) Crear PostgreSQL en contenedor Docker
-        set /p PG_OPTION="Elige [1]: "
-        if "!PG_OPTION!"=="" set PG_OPTION=1
-        
-        if "!PG_OPTION!"=="2" (
-            set COMPOSE_FILES=!COMPOSE_FILES! -f docker-compose.prod.yml
-            set DB_USER=apimaker
-            set DB_PASS=apimaker_secret_%RANDOM%
-            set DB_NAME=apimaker
-            
-            (
-              echo APIMAKER_ENVIRONMENT=production
-              echo APIMAKER_DATABASE_URL=postgresql://!DB_USER!:!DB_PASS!@postgres:5432/!DB_NAME!
-              echo POSTGRES_USER=!DB_USER!
-              echo POSTGRES_PASSWORD=!DB_PASS!
-              echo POSTGRES_DB=!DB_NAME!
-            ) > .env
-            
-            echo.
-            echo ^>^>^> PostgreSQL en contenedor configurado.
-            echo     Usuario: !DB_USER!
-            echo     Contrasena: !DB_PASS!
-            echo     Base de datos: !DB_NAME!
-        )
+
+    if "!NEED_DOCKER_DB!"=="true" (
+        set COMPOSE_FILES=!COMPOSE_FILES! -f docker-compose.prod.yml
+        echo Usando PostgreSQL en contenedor.
+    ) else if "!DB_TYPE!"=="postgresql" (
+        set APIMAKER_DATABASE_URL=!DB_URL!
+        echo Usando PostgreSQL existente: !PG_HOST!:!PG_PORT!/!PG_DB!
+    ) else (
+        echo Usando SQLite.
     )
-    
+
     echo.
     echo Construyendo y levantando contenedores...
     docker compose %COMPOSE_FILES% up -d --build || docker-compose %COMPOSE_FILES% up -d --build
-    
+
     echo.
     echo =======================================
     echo    INSTALACION COMPLETADA CON EXITO
@@ -140,6 +171,15 @@ if "!USE_DOCKER!"=="y" (
     echo Frontend: http://localhost:5173
     echo Backend:  http://localhost:8000
     echo Usuario:  !ADMIN_USER!
+    if "!NEED_DOCKER_DB!"=="true" (
+        echo.
+        echo Credenciales PostgreSQL (contenedor):
+        echo   Host:      localhost
+        echo   Puerto:    5432
+        echo   Usuario:   !PG_USER!
+        echo   Password:  !PG_PASS!
+        echo   Base:      !PG_DB!
+    )
     goto :end
 )
 
