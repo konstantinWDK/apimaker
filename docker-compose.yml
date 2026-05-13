@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build: 
@@ -9,8 +7,11 @@ services:
     environment:
       - APIMAKER_DATABASE_URL=${APIMAKER_DATABASE_URL:-sqlite:///./app/data/apimaker.db}
       - APIMAKER_ENVIRONMENT=${APIMAKER_ENVIRONMENT:-development}
+      - APIMAKER_DEPLOY_HOST_PATH=${APIMAKER_DEPLOY_HOST_PATH:-.}
     volumes:
       - ./backend/app/data:/app/app/data
+      - ./deployments:/app/deployments
+      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 
   frontend:

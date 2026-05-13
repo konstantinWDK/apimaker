@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import socket
 import shutil
 import subprocess
@@ -20,8 +21,25 @@ from ..services.project_service import project_service
 logger = logging.getLogger("apimaker.deploy")
 router = APIRouter(prefix="/api/deploy", tags=["deploy"])
 
-DEPLOY_ROOT = Path(__file__).resolve().parent.parent.parent.parent / "deployments"
-BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
+# When running inside Docker, APIMAKER_DEPLOY_HOST_PATH maps the container's
+# /app to the host path so generated docker-compose volumes work correctly.
+_HOST_PATH = os.environ.get("APIMAKER_DEPLOY_HOST_PATH", "").strip()
+if _HOST_PATH:
+    _HOST_PATH = _HOST_PATH.rstrip("/")
+
+def _host_path(container_path: str) -> str:
+    """Convert a container path to a host path using APIMAKER_DEPLOY_HOST_PATH."""
+    if _HOST_PATH and container_path.startswith("/app"):
+        return container_path.replace("/app", _HOST_PATH, 1)
+    return container_path
+
+# Resolve project root — works both natively and inside Docker
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+if _HOST_PATH:
+    _PROJECT_ROOT = Path(_HOST_PATH)
+
+DEPLOY_ROOT = _PROJECT_ROOT / "deployments"
+BACKEND_DIR = _PROJECT_ROOT / "backend"
 TRACKING_FILE = DEPLOY_ROOT / ".deployments.json"
 PORT_RANGE = range(8080, 8100)
 DEPLOY_IMAGE = "apimaker-deploy:latest"
@@ -123,7 +141,7 @@ def _ensure_deploy_image(logs: list[str]) -> bool:
 
 def _build_docker_compose(port: int, slug: str, db_url: str) -> str:
     """Generate a docker-compose.yml using the local deploy image."""
-    proj_root = str(Path(__file__).resolve().parent.parent.parent.parent)
+    volumes_path = _host_path(str(_PROJECT_ROOT / "deployments"))
     return f"""services:
   api:
     image: {DEPLOY_IMAGE}
@@ -133,7 +151,7 @@ def _build_docker_compose(port: int, slug: str, db_url: str) -> str:
       - APIMAKER_DEPLOY_DB_URL={db_url}
     command: python -m app.deploy_entrypoint /app/deployments/{slug}/project.json 8000
     volumes:
-      - {proj_root}/deployments:/app/deployments
+      - {volumes_path}:/app/deployments
     restart: unless-stopped
 """
 
