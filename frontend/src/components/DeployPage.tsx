@@ -64,6 +64,7 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
   const [deployType, setDeployType] = useState<'local' | 'remote'>('local')
   const [localPort, setLocalPort] = useState('8080')
   const [deployDbType, setDeployDbType] = useState<'sqlite' | 'postgresql'>('sqlite')
+  const [deployPgMode, setDeployPgMode] = useState<'existing' | 'new_container'>('existing')
   const [deployPgHost, setDeployPgHost] = useState('localhost')
   const [deployPgPort, setDeployPgPort] = useState('5432')
   const [deployPgUser, setDeployPgUser] = useState('postgres')
@@ -112,11 +113,14 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
         log(`🐳 Desplegando local en puerto ${localPort}...`)
         const deployBody: any = { project_id: pid, port: parseInt(localPort, 10), db_type: deployDbType }
         if (deployDbType === 'postgresql') {
-          deployBody.db_host = deployPgHost
-          deployBody.db_port = parseInt(deployPgPort, 10)
-          deployBody.db_user = deployPgUser
-          deployBody.db_password = deployPgPass
-          deployBody.db_name = deployPgDb
+          deployBody.deploy_postgres_mode = deployPgMode
+          if (deployPgMode === 'existing') {
+            deployBody.db_host = deployPgHost
+            deployBody.db_port = parseInt(deployPgPort, 10)
+            deployBody.db_user = deployPgUser
+            deployBody.db_password = deployPgPass
+            deployBody.db_name = deployPgDb
+          }
         }
         const res = await apiFetch('/api/deploy/local', {
           method: 'POST', body: JSON.stringify(deployBody),
@@ -272,17 +276,36 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
               </label>
             </div>
             {deployDbType === 'postgresql' && (
-              <div className="form-grid" style={{ gap: '0.4rem' }}>
-                <label className="form-field"><span className="label">Host</span>
-                  <input className="field" value={deployPgHost} onChange={e => setDeployPgHost(e.target.value)} placeholder="localhost" /></label>
-                <label className="form-field"><span className="label">Puerto</span>
-                  <input className="field" value={deployPgPort} onChange={e => setDeployPgPort(e.target.value)} placeholder="5432" /></label>
-                <label className="form-field"><span className="label">Usuario</span>
-                  <input className="field" value={deployPgUser} onChange={e => setDeployPgUser(e.target.value)} placeholder="postgres" /></label>
-                <label className="form-field"><span className="label">Contraseña</span>
-                  <input className="field" type="password" value={deployPgPass} onChange={e => setDeployPgPass(e.target.value)} /></label>
-                <label className="form-field" style={{ gridColumn: 'span 2' }}><span className="label">Base de datos</span>
-                  <input className="field" value={deployPgDb} onChange={e => setDeployPgDb(e.target.value)} placeholder="api_deploy" /></label>
+              <div>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <label style={{ fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <input type="radio" name="pgmode" checked={deployPgMode === 'existing'} onChange={() => setDeployPgMode('existing')} />
+                    Conectar a PostgreSQL existente
+                  </label>
+                  <label style={{ fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <input type="radio" name="pgmode" checked={deployPgMode === 'new_container'} onChange={() => setDeployPgMode('new_container')} />
+                    Nuevo contenedor PostgreSQL
+                  </label>
+                </div>
+                {deployPgMode === 'existing' ? (
+                  <div className="form-grid" style={{ gap: '0.4rem' }}>
+                    <label className="form-field"><span className="label">Host</span>
+                      <input className="field" value={deployPgHost} onChange={e => setDeployPgHost(e.target.value)} placeholder="localhost" /></label>
+                    <label className="form-field"><span className="label">Puerto</span>
+                      <input className="field" value={deployPgPort} onChange={e => setDeployPgPort(e.target.value)} placeholder="5432" /></label>
+                    <label className="form-field"><span className="label">Usuario</span>
+                      <input className="field" value={deployPgUser} onChange={e => setDeployPgUser(e.target.value)} placeholder="postgres" /></label>
+                    <label className="form-field"><span className="label">Contraseña</span>
+                      <input className="field" type="password" value={deployPgPass} onChange={e => setDeployPgPass(e.target.value)} /></label>
+                    <label className="form-field" style={{ gridColumn: 'span 2' }}><span className="label">Base de datos</span>
+                      <input className="field" value={deployPgDb} onChange={e => setDeployPgDb(e.target.value)} placeholder="api_deploy" /></label>
+                  </div>
+                ) : (
+                  <div style={{ padding: '0.5rem 0.75rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '0.82rem', color: '#166534' }}>
+                    Se creará un contenedor PostgreSQL 16 con credenciales seguras auto-generadas.
+                    Los datos persistirán en un volumen Docker (<code>pgdata</code>).
+                  </div>
+                )}
               </div>
             )}
           </div>

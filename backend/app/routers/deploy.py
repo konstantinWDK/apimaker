@@ -54,6 +54,7 @@ class LocalDeployRequest(BaseModel):
     db_user: str | None = None
     db_password: str | None = None
     db_name: str | None = None
+    deploy_postgres_mode: str | None = None  # "existing" or "new_container"
 
 
 class DeployStatus(BaseModel):
@@ -139,9 +140,48 @@ def _ensure_deploy_image(logs: list[str]) -> bool:
         return False
 
 
-def _build_docker_compose(port: int, slug: str, db_url: str) -> str:
+def _build_docker_compose(port: int, slug: str, db_url: str, include_postgres_container: bool = False) -> str:
     """Generate a docker-compose.yml using the local deploy image."""
     volumes_path = _host_path(str(_PROJECT_ROOT / "deployments"))
+
+    if include_postgres_container:
+        pg_user = "apimaker"
+        pg_pass = "deploy_secret_$(date +%s)"
+        pg_db = "api_deploy"
+        return f"""services:
+  api:
+    image: {DEPLOY_IMAGE}
+    ports:
+      - "{port}:8000"
+    environment:
+      - APIMAKER_DEPLOY_DB_URL=postgresql+psycopg2://{pg_user}:{pg_pass}@db:5432/{pg_db}
+    command: python -m app.deploy_entrypoint /app/deployments/{slug}/project.json 8000
+    volumes:
+      - {volumes_path}:/app/deployments
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER={pg_user}
+      - POSTGRES_PASSWORD={pg_pass}
+      - POSTGRES_DB={pg_db}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {pg_user} -d {pg_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+"""
+
     return f"""services:
   api:
     image: {DEPLOY_IMAGE}
@@ -466,9 +506,19 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
     logs.append(f"📁 Directorio: {deploy_dir}")
 
     # Build DB URL for the deployed API
-    if req.db_type == "postgresql" and req.db_host:
-        deploy_db_url = f"postgresql+psycopg2://{req.db_user}:{req.db_password}@{req.db_host}:{req.db_port}/{req.db_name or 'api'}"
-        logs.append(f"🗄️ Usando PostgreSQL: {req.db_host}:{req.db_port}/{req.db_name}")
+    include_postgres_container = False
+    if req.db_type == "postgresql":
+        if req.deploy_postgres_mode == "new_container":
+            include_postgres_container = True
+            logs.append("🗄️ Nuevo contenedor PostgreSQL incluido en el despliegue")
+            # db_url is auto-generated inside _build_docker_compose
+            deploy_db_url = ""
+        elif req.db_host:
+            deploy_db_url = f"postgresql+psycopg2://{req.db_user}:{req.db_password}@{req.db_host}:{req.db_port}/{req.db_name or 'api'}"
+            logs.append(f"🗄️ Usando PostgreSQL existente: {req.db_host}:{req.db_port}/{req.db_name}")
+        else:
+            deploy_db_url = f"sqlite:////app/deployments/{slug}/data.db"
+            logs.append("🗄️ Usando SQLite embebida (persistente en disco)")
     else:
         deploy_db_url = f"sqlite:////app/deployments/{slug}/data.db"
         logs.append("🗄️ Usando SQLite embebida (persistente en disco)")
@@ -483,7 +533,7 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
     logs.append("📄 Proyecto exportado a project.json")
 
     # Write docker-compose.yml
-    compose = _build_docker_compose(port, slug, deploy_db_url)
+    compose = _build_docker_compose(port, slug, deploy_db_url, include_postgres_container)
     (deploy_dir / "docker-compose.yml").write_text(compose, encoding="utf-8")
     logs.append(f"📝 docker-compose.yml (puerto {port})")
 
