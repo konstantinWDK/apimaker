@@ -213,11 +213,15 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                 {dep.db_credentials && (
                   <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
                     <div style={{ color: '#047857', marginBottom: '0.3rem', fontWeight: 600 }}>🗄️ PostgreSQL</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.1rem 0.6rem', color: '#374151' }}>
-                      <span>Usuario:</span><span style={{ fontFamily: 'monospace' }}>{dep.db_credentials.user}</span>
-                      <span>Contraseña:</span><span style={{ fontFamily: 'monospace' }}>{dep.db_credentials.password}</span>
-                      <span>Base de datos:</span><span style={{ fontFamily: 'monospace' }}>{dep.db_credentials.database}</span>
-                      <span>Host:</span><span style={{ fontFamily: 'monospace' }}>{dep.db_credentials.host}:{dep.db_credentials.port}</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.1rem 0.6rem', color: '#374151', alignItems: 'center' }}>
+                      <span>Usuario:</span>
+                      <span style={{ fontFamily: 'monospace' }}>{dep.db_credentials.user}</span>
+                      <span>Contraseña:</span>
+                      <PasswordDisplay value={dep.db_credentials.password} />
+                      <span>Base de datos:</span>
+                      <span style={{ fontFamily: 'monospace' }}>{dep.db_credentials.database}</span>
+                      <span>Host:</span>
+                      <span style={{ fontFamily: 'monospace' }}>{dep.db_credentials.host}:{dep.db_credentials.port}</span>
                     </div>
                   </div>
                 )}
@@ -387,6 +391,26 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
         )}
       </div>
     </div>
+  )
+}
+
+/* ========== PASSWORD DISPLAY ========== */
+function PasswordDisplay({ value }: { value: string }) {
+  const [visible, setVisible] = useState(false)
+  const [copied, setCopied] = useState(false)
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontFamily: 'monospace' }}>
+      {visible ? value : '•'.repeat(value.length > 20 ? 20 : value.length)}
+      <button type="button" onClick={() => setVisible(!visible)}
+        style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '0.15rem', fontSize: '0.85rem', lineHeight: 1, color: '#64748b' }}
+        title={visible ? 'Ocultar' : 'Mostrar'}>
+        {visible ? '🙈' : '👁️'}
+      </button>
+      <button type="button" onClick={async () => { await navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
+        style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '0.15rem', fontSize: '0.75rem', lineHeight: 1, color: copied ? '#16a34a' : '#64748b' }}>
+        {copied ? '✓' : '📋'}
+      </button>
+    </span>
   )
 }
 
