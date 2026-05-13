@@ -60,6 +60,13 @@ export function DeployPage() {
 }
 
 /* ========== DEPLOY MANAGER ========== */
+function generatePassword() {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  let pwd = ''
+  for (let i = 0; i < 16; i++) pwd += chars.charAt(Math.floor(Math.random() * chars.length))
+  return pwd
+}
+
 function DeployManager({ project, saveProject, updateProject, deployments, loading, onDeployDone }: any) {
   const [deployType, setDeployType] = useState<'local' | 'remote'>('local')
   const [localPort, setLocalPort] = useState('8080')
@@ -70,6 +77,9 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
   const [deployPgUser, setDeployPgUser] = useState('postgres')
   const [deployPgPass, setDeployPgPass] = useState('')
   const [deployPgDb, setDeployPgDb] = useState('api_deploy')
+  const [containerPgUser] = useState('apimaker')
+  const [containerPgPass] = useState(generatePassword)
+  const [containerPgDb] = useState('api_deploy')
   const [sshHost, setSshHost] = useState('')
   const [sshUser, setSshUser] = useState('root')
   const [sshPort, setSshPort] = useState('22')
@@ -120,6 +130,10 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
             deployBody.db_user = deployPgUser
             deployBody.db_password = deployPgPass
             deployBody.db_name = deployPgDb
+          } else {
+            deployBody.db_user = containerPgUser
+            deployBody.db_password = containerPgPass
+            deployBody.db_name = containerPgDb
           }
         }
         const res = await apiFetch('/api/deploy/local', {
@@ -301,9 +315,18 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                       <input className="field" value={deployPgDb} onChange={e => setDeployPgDb(e.target.value)} placeholder="api_deploy" /></label>
                   </div>
                 ) : (
-                  <div style={{ padding: '0.5rem 0.75rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '0.82rem', color: '#166534' }}>
-                    Se creará un contenedor PostgreSQL 16 con credenciales seguras auto-generadas.
-                    Los datos persistirán en un volumen Docker (<code>pgdata</code>).
+                  <div style={{ padding: '0.75rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '0.82rem', color: '#166534' }}>
+                    <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>📦 Nuevo contenedor PostgreSQL 16</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.2rem 0.75rem', fontSize: '0.78rem' }}>
+                      <span style={{ color: '#4b5563' }}>Usuario:</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerPgUser}</span>
+                      <span style={{ color: '#4b5563' }}>Contraseña:</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerPgPass}</span>
+                      <span style={{ color: '#4b5563' }}>Base de datos:</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerPgDb}</span>
+                      <span style={{ color: '#4b5563' }}>Volumen:</span>
+                      <span style={{ fontFamily: 'monospace' }}>pgdata</span>
+                    </div>
                   </div>
                 )}
               </div>

@@ -140,14 +140,19 @@ def _ensure_deploy_image(logs: list[str]) -> bool:
         return False
 
 
-def _build_docker_compose(port: int, slug: str, db_url: str, include_postgres_container: bool = False) -> str:
+def _build_docker_compose(
+    port: int, slug: str, db_url: str,
+    include_postgres_container: bool = False,
+    pg_user: str = "apimaker",
+    pg_pass: str = "",
+    pg_db: str = "api_deploy",
+) -> str:
     """Generate a docker-compose.yml using the local deploy image."""
     volumes_path = _host_path(str(_PROJECT_ROOT / "deployments"))
 
     if include_postgres_container:
-        pg_user = "apimaker"
-        pg_pass = "deploy_secret_$(date +%s)"
-        pg_db = "api_deploy"
+        if not pg_pass:
+            pg_pass = f"deploy_secret_{int(Path(__file__).stat().st_mtime)}"
         return f"""services:
   api:
     image: {DEPLOY_IMAGE}
@@ -510,8 +515,10 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
     if req.db_type == "postgresql":
         if req.deploy_postgres_mode == "new_container":
             include_postgres_container = True
-            logs.append("🗄️ Nuevo contenedor PostgreSQL incluido en el despliegue")
-            # db_url is auto-generated inside _build_docker_compose
+            container_pg_user = req.db_user or "apimaker"
+            container_pg_pass = req.db_password or ""
+            container_pg_db = req.db_name or "api_deploy"
+            logs.append(f"🗄️ Nuevo contenedor PostgreSQL: usuario={container_pg_user}, bd={container_pg_db}")
             deploy_db_url = ""
         elif req.db_host:
             deploy_db_url = f"postgresql+psycopg2://{req.db_user}:{req.db_password}@{req.db_host}:{req.db_port}/{req.db_name or 'api'}"
@@ -533,7 +540,10 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
     logs.append("📄 Proyecto exportado a project.json")
 
     # Write docker-compose.yml
-    compose = _build_docker_compose(port, slug, deploy_db_url, include_postgres_container)
+    if include_postgres_container:
+        compose = _build_docker_compose(port, slug, deploy_db_url, True, container_pg_user, container_pg_pass, container_pg_db)
+    else:
+        compose = _build_docker_compose(port, slug, deploy_db_url, False)
     (deploy_dir / "docker-compose.yml").write_text(compose, encoding="utf-8")
     logs.append(f"📝 docker-compose.yml (puerto {port})")
 
