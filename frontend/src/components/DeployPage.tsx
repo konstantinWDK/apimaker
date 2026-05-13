@@ -210,6 +210,17 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                       onClick={() => handleAction(dep.slug, 'delete')}>Eliminar</button>
                   </div>
                 </div>
+                {dep.db_credentials && (
+                  <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
+                    <div style={{ color: '#047857', marginBottom: '0.3rem', fontWeight: 600 }}>🗄️ PostgreSQL</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.1rem 0.6rem', color: '#374151' }}>
+                      <span>Usuario:</span><span style={{ fontFamily: 'monospace' }}>{dep.db_credentials.user}</span>
+                      <span>Contraseña:</span><span style={{ fontFamily: 'monospace' }}>{dep.db_credentials.password}</span>
+                      <span>Base de datos:</span><span style={{ fontFamily: 'monospace' }}>{dep.db_credentials.database}</span>
+                      <span>Host:</span><span style={{ fontFamily: 'monospace' }}>{dep.db_credentials.host}:{dep.db_credentials.port}</span>
+                    </div>
+                  </div>
+                )}
                 {dep.endpoints && dep.endpoints.length > 0 && (
                   <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9', fontSize: '0.78rem' }}>
                     <div style={{ color: '#64748b', marginBottom: '0.3rem' }}>Ejemplos:</div>

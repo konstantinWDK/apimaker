@@ -590,10 +590,19 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
         "stack": project.target_stack,
         "status": "running",
         "endpoints": deployed_endpoints,
+        "db_type": "postgresql" if include_postgres_container else req.db_type,
         "deployed_at": str(subprocess.run(
             ["date"], capture_output=True, text=True
         ).stdout.strip()),
     }
+    if include_postgres_container:
+        tracking[slug]["db_credentials"] = {
+            "user": container_pg_user,
+            "password": container_pg_pass,
+            "database": container_pg_db,
+            "host": "localhost",
+            "port": 5432,
+        }
     _save_tracking(tracking)
 
     url = f"http://localhost:{port}/api"
