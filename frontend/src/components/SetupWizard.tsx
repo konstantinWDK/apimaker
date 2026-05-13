@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Database, Shield, Layout, Server, CheckCircle, ArrowRight, Loader2, Box } from 'lucide-react';
 import './SetupWizard.css';
+import { readBackendConfig } from '../lib/backendConfig';
 
 interface SetupWizardProps {
   onComplete: () => void;
@@ -38,7 +39,8 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('http://localhost:8000/setup/run', {
+      const baseUrl = readBackendConfig().baseUrl?.replace(/\/$/, '') || 'http://localhost:8000'
+      const response = await fetch(`${baseUrl}/setup/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)

@@ -49,6 +49,7 @@ if "!DB_OPTION!"=="2" (
     if "!PG_DB!"=="" set PG_DB=apimaker
     
     set DB_URL=postgresql+psycopg2://!PG_USER!:!PG_PASS!@!PG_HOST!:!PG_PORT!/!PG_DB!
+    set APIMAKER_DATABASE_URL=!DB_URL!
     
     mkdir backend\app\data 2>nul
     (
