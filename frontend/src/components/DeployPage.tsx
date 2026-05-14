@@ -399,7 +399,14 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                     <label className="form-field"><span className="label">Host</span>
                       <input className="field" value={deployPgHost} onChange={e => setDeployPgHost(e.target.value)} placeholder="localhost" /></label>
                     <label className="form-field"><span className="label">Puerto</span>
-                      <input className="field" value={deployPgPort} onChange={e => setDeployPgPort(e.target.value)} placeholder="5432" /></label>
+                      <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                        <input className="field" value={deployPgPort} onChange={e => setDeployPgPort(e.target.value)} placeholder="5432"
+                          style={{ width: '90px' }} />
+                        <button type="button" className="btn ghost" style={{ fontSize: '0.65rem', padding: '0.15rem 0.4rem' }}
+                          onClick={() => checkPort(deployPgPort, 'pg-existing')}>
+                          {portStatus['pg-existing'] === 'checking' ? '...' : portStatus['pg-existing'] === 'free' ? '✓ Libre' : portStatus['pg-existing'] === 'busy' ? '✗ Ocupado' : 'Comprobar'}
+                        </button>
+                      </div></label>
                     <label className="form-field"><span className="label">Usuario</span>
                       <input className="field" value={deployPgUser} onChange={e => setDeployPgUser(e.target.value)} placeholder="postgres" /></label>
                     <label className="form-field"><span className="label">Contraseña</span>
@@ -449,7 +456,14 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                     <label className="form-field"><span className="label">Host</span>
                       <input className="field" value={deployMySqlHost} onChange={e => setDeployMySqlHost(e.target.value)} placeholder="localhost" /></label>
                     <label className="form-field"><span className="label">Puerto</span>
-                      <input className="field" value={deployMySqlPort} onChange={e => setDeployMySqlPort(e.target.value)} placeholder="3306" /></label>
+                      <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                        <input className="field" value={deployMySqlPort} onChange={e => setDeployMySqlPort(e.target.value)} placeholder="3306"
+                          style={{ width: '90px' }} />
+                        <button type="button" className="btn ghost" style={{ fontSize: '0.65rem', padding: '0.15rem 0.4rem' }}
+                          onClick={() => checkPort(deployMySqlPort, 'mysql-existing')}>
+                          {portStatus['mysql-existing'] === 'checking' ? '...' : portStatus['mysql-existing'] === 'free' ? '✓ Libre' : portStatus['mysql-existing'] === 'busy' ? '✗ Ocupado' : 'Comprobar'}
+                        </button>
+                      </div></label>
                     <label className="form-field"><span className="label">Usuario</span>
                       <input className="field" value={deployMySqlUser} onChange={e => setDeployMySqlUser(e.target.value)} placeholder="root" /></label>
                     <label className="form-field"><span className="label">Contraseña</span>
