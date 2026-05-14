@@ -350,6 +350,7 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                 </button>
               </div>
             </label>
+          </div>
           <div style={{ marginTop: '0.75rem' }}>
             <span className="label" style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.4rem' }}>
               Base de datos de la API desplegada
@@ -495,7 +496,6 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                 )}
               </div>
             )}
-          </div>
           </div>
           </div>
         ) : (
