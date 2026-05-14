@@ -81,6 +81,7 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
   const [containerPgUser] = useState('apimaker')
   const [containerPgPass] = useState(generatePassword)
   const [containerPgDb] = useState('api_deploy')
+  const [containerPgPort, setContainerPgPort] = useState('5432')
 
   const [deployMySqlMode, setDeployMySqlMode] = useState<'existing' | 'new_container'>('existing')
   const [deployMySqlHost, setDeployMySqlHost] = useState('localhost')
@@ -91,6 +92,7 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
   const [containerMySqlUser] = useState('apimaker')
   const [containerMySqlPass] = useState(generatePassword)
   const [containerMySqlDb] = useState('api_deploy')
+  const [containerMySqlPort, setContainerMySqlPort] = useState('3306')
   const [sshHost, setSshHost] = useState('')
   const [sshUser, setSshUser] = useState('root')
   const [sshPort, setSshPort] = useState('22')
@@ -146,6 +148,7 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
             deployBody.db_password = deployPgPass
             deployBody.db_name = deployPgDb
           } else {
+            deployBody.db_port = parseInt(containerPgPort, 10)
             deployBody.db_user = containerPgUser
             deployBody.db_password = containerPgPass
             deployBody.db_name = containerPgDb
@@ -159,6 +162,7 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
             deployBody.db_password = deployMySqlPass
             deployBody.db_name = deployMySqlDb
           } else {
+            deployBody.db_port = parseInt(containerMySqlPort, 10)
             deployBody.db_user = containerMySqlUser
             deployBody.db_password = containerMySqlPass
             deployBody.db_name = containerMySqlDb
@@ -387,14 +391,15 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                   <div style={{ padding: '0.75rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '0.82rem', color: '#166534' }}>
                     <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}> Nuevo contenedor PostgreSQL 16</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.2rem 0.75rem', fontSize: '0.78rem' }}>
+                      <span style={{ color: '#4b5563' }}>Puerto:</span>
+                      <input className="field" type="number" value={containerPgPort} onChange={e => setContainerPgPort(e.target.value)} placeholder="5432"
+                        style={{ width: '90px', fontSize: '0.78rem', padding: '0.2rem 0.4rem' }} />
                       <span style={{ color: '#4b5563' }}>Usuario:</span>
                       <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerPgUser}</span>
                       <span style={{ color: '#4b5563' }}>Contraseña:</span>
                       <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerPgPass}</span>
                       <span style={{ color: '#4b5563' }}>Base de datos:</span>
                       <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerPgDb}</span>
-                      <span style={{ color: '#4b5563' }}>Volumen:</span>
-                      <span style={{ fontFamily: 'monospace' }}>pgdata</span>
                     </div>
                   </div>
                 )}
@@ -430,14 +435,15 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                   <div style={{ padding: '0.75rem', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', fontSize: '0.82rem', color: '#0369a1' }}>
                     <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}> Nuevo contenedor MySQL 8.0</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.2rem 0.75rem', fontSize: '0.78rem' }}>
+                      <span style={{ color: '#4b5563' }}>Puerto:</span>
+                      <input className="field" type="number" value={containerMySqlPort} onChange={e => setContainerMySqlPort(e.target.value)} placeholder="3306"
+                        style={{ width: '90px', fontSize: '0.78rem', padding: '0.2rem 0.4rem' }} />
                       <span style={{ color: '#4b5563' }}>Usuario:</span>
                       <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerMySqlUser}</span>
                       <span style={{ color: '#4b5563' }}>Contraseña:</span>
                       <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerMySqlPass}</span>
                       <span style={{ color: '#4b5563' }}>Base de datos:</span>
                       <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerMySqlDb}</span>
-                      <span style={{ color: '#4b5563' }}>Volumen:</span>
-                      <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>mysqldata</span>
                     </div>
                   </div>
                 )}

@@ -185,10 +185,12 @@ def _build_docker_compose(
     pg_user: str = "apimaker",
     pg_pass: str = "",
     pg_db: str = "api_deploy",
+    pg_port: int = 5432,
     include_mysql_container: bool = False,
     mysql_user: str = "apimaker",
     mysql_pass: str = "",
     mysql_db: str = "api_deploy",
+    mysql_port: int = 3306,
     **kwargs: Any,
 ) -> str:
     """Generate a docker-compose.yml using the local deploy image."""
@@ -200,7 +202,6 @@ def _build_docker_compose(
     if include_postgres_container:
         if not pg_pass:
             pg_pass = f"deploy_secret_{int(Path(__file__).stat().st_mtime)}"
-        db_port = port + 1
         return f"""services:
   api:
     image: {DEPLOY_IMAGE}
@@ -219,7 +220,7 @@ def _build_docker_compose(
   db:
     image: postgres:16-alpine
     ports:
-      - "127.0.0.1:{db_port}:5432"
+      - "127.0.0.1:{pg_port}:5432"
     environment:
       - POSTGRES_USER={pg_user}
       - POSTGRES_PASSWORD={pg_pass}
@@ -240,8 +241,7 @@ volumes:
     if include_mysql_container:
         if not mysql_pass:
             mysql_pass = f"deploy_secret_{int(Path(__file__).stat().st_mtime)}"
-        db_port = port + 1
-    return f"""services:
+        return f"""services:
   api:
     image: {DEPLOY_IMAGE}
     ports:
@@ -259,7 +259,7 @@ volumes:
   db:
     image: mysql:8.0
     ports:
-      - "127.0.0.1:{db_port}:3306"
+      - "127.0.0.1:{mysql_port}:3306"
     environment:
       - MYSQL_ROOT_PASSWORD={mysql_pass}
       - MYSQL_DATABASE={mysql_db}
@@ -651,16 +651,20 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
 
     # Write docker-compose.yml
     if include_postgres_container:
+        pg_host_port = req.db_port or 5432
         compose = _build_docker_compose(
             port=port, slug=slug, db_url="",
             include_postgres_container=True,
-            pg_user=container_pg_user, pg_pass=container_pg_pass, pg_db=container_pg_db
+            pg_user=container_pg_user, pg_pass=container_pg_pass, pg_db=container_pg_db,
+            pg_port=pg_host_port,
         )
     elif include_mysql_container:
+        mysql_host_port = req.db_port or 3306
         compose = _build_docker_compose(
             port=port, slug=slug, db_url="",
             include_mysql_container=True,
-            mysql_user=container_mysql_user, mysql_pass=container_mysql_pass, mysql_db=container_mysql_db
+            mysql_user=container_mysql_user, mysql_pass=container_mysql_pass, mysql_db=container_mysql_db,
+            mysql_port=mysql_host_port,
         )
     else:
         compose = _build_docker_compose(
@@ -723,7 +727,7 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
             "password": container_pg_pass,
             "database": container_pg_db,
             "host": "localhost",
-            "port": port + 1,
+            "port": req.db_port or 5432,
         }
     elif include_mysql_container:
         tracking[slug]["db_credentials"] = {
@@ -731,7 +735,7 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
             "password": container_mysql_pass,
             "database": container_mysql_db,
             "host": "localhost",
-            "port": port + 1,
+            "port": req.db_port or 3306,
         }
     _save_tracking(tracking)
 
