@@ -5032,3 +5032,41 @@ input[type='password'] {
   color: #ef4444;
   background: #fef2f2;
 }
+
+/* Global Deploy Toast */
+.global-deploy-toast {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293b;
+  color: #f8fafc;
+  padding: 0.75rem 1.25rem;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.2);
+  z-index: 9999;
+  animation: slideUpFade 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translate(-50%, 1rem); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.global-deploy-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #f8fafc;
+  border-radius: 50%;
+  animation: globalSpin 1s linear infinite;
+}
+
+@keyframes globalSpin {
+  to { transform: rotate(360deg); }
+}

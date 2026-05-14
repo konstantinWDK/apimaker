@@ -7,6 +7,7 @@ from typing import Optional
 from uuid import uuid4
 
 from sqlmodel import SQLModel, Field
+from sqlalchemy import Column, Text
 
 
 class User(SQLModel, table=True):
@@ -171,7 +172,7 @@ class MockRecord(SQLModel, table=True):
     project_id: str = Field(foreign_key="projects.id", index=True)
     dataset_id: str = Field(foreign_key="datasets.id", index=True)
     record_id: str = Field(default_factory=lambda: str(uuid4())[:8])
-    data: str  # JSON-serialized record data
+    data: str = Field(sa_column=Column(Text))  # JSON-serialized record data
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

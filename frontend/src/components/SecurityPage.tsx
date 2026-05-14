@@ -174,7 +174,7 @@ export function SecurityPage() {
           {testResult && (
             <div style={{ marginTop: '0.75rem' }}>
               <span style={{ fontSize: '0.82rem', fontWeight: 600, color: testResult.status === 200 ? '#166534' : '#991b1b' }}>
-                {testResult.status === 200 ? '✅ Acceso permitido' : testResult.status === 401 ? '🔒 Acceso denegado (401)' : `⚠️ Error (${testResult.status})`}
+                {testResult.status === 200 ? ' Acceso permitido' : testResult.status === 401 ? ' Acceso denegado (401)' : ` Error (${testResult.status})`}
               </span>
               <pre style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.3rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                 {testResult.body}

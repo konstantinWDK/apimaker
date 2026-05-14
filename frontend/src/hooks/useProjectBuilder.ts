@@ -32,6 +32,9 @@ interface BuilderState {
   saveProject: () => Promise<string | null>
   isGenerating: boolean
   setIsGenerating: (val: boolean) => void
+  globalDeployState: 'idle' | 'deploying' | 'success' | 'error'
+  globalDeployStatus: string
+  setGlobalDeployState: (state: 'idle' | 'deploying' | 'success' | 'error', status?: string) => void
 }
 
 const STORAGE_KEY = 'apimaker-project'
@@ -411,6 +414,9 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
   mockError: null,
   isGenerating: false,
   setIsGenerating: (val) => set({ isGenerating: val }),
+  globalDeployState: 'idle',
+  globalDeployStatus: '',
+  setGlobalDeployState: (state, status = '') => set({ globalDeployState: state, globalDeployStatus: status }),
 
   setSelectedDatasetId: (id) =>
     set((state) => {

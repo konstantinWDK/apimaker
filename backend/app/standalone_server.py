@@ -183,17 +183,17 @@ def serve_project_from_json(
     app = create_app_for_project(pid, title=project_data.get("name", "API"))
 
     print(f"\n{'='*50}")
-    print(f"  🚀 {project_data.get('name', 'API')} corriendo en:")
-    print(f"  📍 http://{host}:{port}/api")
+    print(f"   {project_data.get('name', 'API')} corriendo en:")
+    print(f"   http://{host}:{port}/api")
 
     endpoints = project_data.get("endpoints", [])
-    print(f"  📋 Endpoints:")
+    print(f"   Endpoints:")
     for ep in endpoints:
         method = ep.get("method", "GET")
         path = ep.get("path", "/")
         print(f"     {method:6s} /api{path}")
 
-    print(f"\n  💾 DB: {db_url}")
+    print(f"\n   DB: {db_url}")
     print(f"{'='*50}\n")
     uvicorn.run(app, host=host, port=port)
 
@@ -215,15 +215,15 @@ def serve_project_from_db(
             select(Project).where(Project.slug == project_slug)
         ).first()
         if not project:
-            print(f"❌ Project '{project_slug}' not found.")
+            print(f" Project '{project_slug}' not found.")
             sys.exit(1)
 
         app = create_app_for_project(project.id, title=project.name)
 
         print(f"\n{'='*50}")
-        print(f"  🚀 '{project.name}' como API independiente")
-        print(f"  📍 http://{host}:{port}/api")
-        print(f"  🔌 Puerto separado del builder (puerto 8000)")
+        print(f"   '{project.name}' como API independiente")
+        print(f"   http://{host}:{port}/api")
+        print(f"   Puerto separado del builder (puerto 8000)")
         print(f"{'='*50}\n")
 
         uvicorn.run(app, host=host, port=port)

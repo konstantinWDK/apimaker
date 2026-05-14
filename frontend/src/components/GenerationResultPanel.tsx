@@ -138,7 +138,7 @@ export function GenerationResultPanel({ result, projectId }: Props) {
           <div className="deploy-card download-card">
             <div className="card-header">
               <div className="stack-badge">
-                {result.stack === 'fastapi' ? '🐍 Python' : '🟢 Node.js'}
+                {result.stack === 'fastapi' ? ' Python' : ' Node.js'}
               </div>
               <h3>Código Fuente Completo</h3>
             </div>
@@ -149,7 +149,7 @@ export function GenerationResultPanel({ result, projectId }: Props) {
               onClick={handleDownload}
               disabled={downloading}
             >
-              {downloading ? 'Generando ZIP...' : '📥 Descargar Bundle (.zip)'}
+              {downloading ? 'Generando ZIP...' : ' Descargar Bundle (.zip)'}
             </button>
           </div>
 
@@ -158,12 +158,12 @@ export function GenerationResultPanel({ result, projectId }: Props) {
             <div className="url-display">
               <code>{baseUrl}/...</code>
               <button className="copy-icon-btn" onClick={() => handleCopy(baseUrl)}>
-                {copied ? '✅' : '📋'}
+                {copied ? '' : ''}
               </button>
             </div>
             <div className="card-footer-actions">
               <a className="btn ghost btn-small" href={result.docsUrl} target="_blank" rel="noreferrer">
-                📚 Ver Documentación (Redoc)
+                 Ver Documentación (Redoc)
               </a>
             </div>
           </div>
@@ -211,10 +211,10 @@ export function GenerationResultPanel({ result, projectId }: Props) {
             </p>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button type="button" className="btn ghost btn-small" onClick={handleExport} disabled={exporting}>
-                {exporting ? 'Exportando...' : '⬇ Exportar JSON'}
+                {exporting ? 'Exportando...' : ' Exportar JSON'}
               </button>
               <button type="button" className="btn ghost btn-small" onClick={() => fileInputRef.current?.click()}>
-                ⬆ Importar JSON
+                 Importar JSON
               </button>
               <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
             </div>
@@ -223,7 +223,7 @@ export function GenerationResultPanel({ result, projectId }: Props) {
 
         {/* Right: Steps */}
         <div className="deploy-steps-panel">
-          <h4 className="steps-title">🚀 Guía de Despliegue</h4>
+          <h4 className="steps-title"> Guía de Despliegue</h4>
           <div className="step-item">
             <div className="step-circle">1</div>
             <div className="step-content">
@@ -237,7 +237,7 @@ export function GenerationResultPanel({ result, projectId }: Props) {
               <strong>Instalar y Lanzar</strong>
               <div className="code-block">
                 <code>./setup.sh</code>
-                <button onClick={() => handleCopy('./setup.sh')}>📋</button>
+                <button onClick={() => handleCopy('./setup.sh')}></button>
               </div>
               <p className="muted-text-tiny" style={{ marginTop: '4px' }}>Si falla, usa: <code>bash setup.sh</code></p>
             </div>
@@ -248,7 +248,7 @@ export function GenerationResultPanel({ result, projectId }: Props) {
               <strong>Docker Compose</strong>
               <div className="code-block">
                 <code>docker compose up -d</code>
-                <button onClick={() => handleCopy('docker compose up -d')}>📋</button>
+                <button onClick={() => handleCopy('docker compose up -d')}></button>
               </div>
             </div>
           </div>

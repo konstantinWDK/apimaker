@@ -334,7 +334,7 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
                   placeholder="••••••••"
                 />
                 <button type="button" className="dbi__show-pass" onClick={() => setShowPassword(v => !v)}>
-                  {showPassword ? '🙈' : '👁'}
+                  {showPassword ? '' : ''}
                 </button>
               </div>
             </div>

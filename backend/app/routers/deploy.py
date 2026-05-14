@@ -33,16 +33,53 @@ def _host_path(container_path: str) -> str:
         return container_path.replace("/app", _HOST_PATH, 1)
     return container_path
 
-# Resolve project root — works both natively and inside Docker
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-if _HOST_PATH:
-    _PROJECT_ROOT = Path(_HOST_PATH)
+# Resolve paths
+BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
+_IS_DOCKER = Path("/.dockerenv").exists() or os.environ.get("APIMAKER_DEPLOY_HOST_PATH") is not None
 
-DEPLOY_ROOT = _PROJECT_ROOT / "deployments"
-BACKEND_DIR = _PROJECT_ROOT / "backend"
+if _IS_DOCKER:
+    DEPLOY_ROOT = BACKEND_DIR / "deployments"
+else:
+    DEPLOY_ROOT = BACKEND_DIR.parent / "deployments"
+
 TRACKING_FILE = DEPLOY_ROOT / ".deployments.json"
 PORT_RANGE = range(8080, 8100)
 DEPLOY_IMAGE = "apimaker-deploy:latest"
+
+
+def _get_host_deploy_root() -> str:
+    """Find the absolute host path for the deployments folder."""
+    # 1. Check if we have an explicit host path from environment
+    env_path = os.environ.get("APIMAKER_DEPLOY_HOST_PATH", "").strip()
+    if env_path and env_path != ".":
+        return env_path.replace("\\", "/").rstrip("/") + "/deployments"
+
+    # 2. If in Docker, try to inspect ourselves to find the real host mount
+    if Path("/.dockerenv").exists():
+        try:
+            # We try to find the mount for '/app/deployments' or '/app'
+            # Note: hostname in docker is usually the container ID
+            cid = socket.gethostname()
+            res = subprocess.run(
+                ["docker", "inspect", cid, "--format", "{{json .Mounts}}"],
+                capture_output=True, text=True, timeout=5
+            )
+            if res.returncode == 0:
+                mounts = json.loads(res.stdout)
+                # Look for /app/deployments first
+                for m in mounts:
+                    if m.get("Destination") == "/app/deployments":
+                        return m["Source"].replace("\\", "/")
+                # Look for /app as fallback
+                for m in mounts:
+                    if m.get("Destination") == "/app":
+                        return m["Source"].replace("\\", "/").rstrip("/") + "/deployments"
+        except Exception:
+            pass
+
+    # 3. Fallback to '..' which works if docker compose is called from deployments/slug/
+    # but only if the daemon's context is correctly aligned (often fails in Win/Mac)
+    return ".."
 
 
 class LocalDeployRequest(BaseModel):
@@ -55,6 +92,7 @@ class LocalDeployRequest(BaseModel):
     db_password: str | None = None
     db_name: str | None = None
     deploy_postgres_mode: str | None = None  # "existing" or "new_container"
+    deploy_mysql_mode: str | None = None  # "existing" or "new_container"
 
 
 class DeployStatus(BaseModel):
@@ -97,12 +135,12 @@ def _find_free_port(preferred: int) -> tuple[int, list[str]]:
     if _port_is_free(preferred):
         return preferred, logs
 
-    logs.append(f"⚠️ Puerto {preferred} está ocupado. Buscando disponible...")
+    logs.append(f" Puerto {preferred} está ocupado. Buscando disponible...")
     for port in PORT_RANGE:
         if port == preferred:
             continue
         if _port_is_free(port):
-            logs.append(f"✅ Puerto disponible encontrado: {port}")
+            logs.append(f" Puerto disponible encontrado: {port}")
             return port, logs
 
     raise HTTPException(status_code=409, detail="No hay puertos disponibles en el rango 8080-8099")
@@ -120,7 +158,7 @@ def _ensure_deploy_image(logs: list[str]) -> bool:
     except Exception:
         pass
 
-    logs.append(f"🐳 Construyendo imagen local {DEPLOY_IMAGE}...")
+    logs.append(f" Construyendo imagen local {DEPLOY_IMAGE}...")
     try:
         result = subprocess.run(
             ["docker", "build", "-t", DEPLOY_IMAGE, "-f", "Dockerfile", "."],
@@ -128,15 +166,15 @@ def _ensure_deploy_image(logs: list[str]) -> bool:
             capture_output=True, text=True, timeout=300,
         )
         if result.returncode != 0:
-            logs.append(f"❌ Error construyendo imagen: {result.stderr.strip()[:300]}")
+            logs.append(f" Error construyendo imagen: {result.stderr.strip()[:300]}")
             return False
-        logs.append("✅ Imagen construida")
+        logs.append(" Imagen construida")
         return True
     except subprocess.TimeoutExpired:
-        logs.append("⏱️ Timeout construyendo imagen (>5min)")
+        logs.append(" Timeout construyendo imagen (>5min)")
         return False
     except Exception as e:
-        logs.append(f"❌ Error: {str(e)}")
+        logs.append(f" Error: {str(e)}")
         return False
 
 
@@ -146,9 +184,17 @@ def _build_docker_compose(
     pg_user: str = "apimaker",
     pg_pass: str = "",
     pg_db: str = "api_deploy",
+    include_mysql_container: bool = False,
+    mysql_user: str = "apimaker",
+    mysql_pass: str = "",
+    mysql_db: str = "api_deploy",
+    **kwargs: Any,
 ) -> str:
     """Generate a docker-compose.yml using the local deploy image."""
-    volumes_path = _host_path(str(_PROJECT_ROOT / "deployments"))
+    if _IS_DOCKER:
+        volumes_path = _get_host_deploy_root()
+    else:
+        volumes_path = str(DEPLOY_ROOT)
 
     if include_postgres_container:
         if not pg_pass:
@@ -185,6 +231,44 @@ def _build_docker_compose(
 
 volumes:
   pgdata:
+"""
+
+    if include_mysql_container:
+        if not mysql_pass:
+            mysql_pass = f"deploy_secret_{int(Path(__file__).stat().st_mtime)}"
+        return f"""services:
+  api:
+    image: {DEPLOY_IMAGE}
+    ports:
+      - "{port}:8000"
+    environment:
+      - APIMAKER_DEPLOY_DB_URL=mysql+pymysql://{mysql_user}:{mysql_pass}@db:3306/{mysql_db}
+    command: python -m app.deploy_entrypoint /app/deployments/{slug}/project.json 8000
+    volumes:
+      - {volumes_path}:/app/deployments
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD={mysql_pass}
+      - MYSQL_DATABASE={mysql_db}
+      - MYSQL_USER={mysql_user}
+      - MYSQL_PASSWORD={mysql_pass}
+    volumes:
+      - mysqldata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  mysqldata:
 """
 
     return f"""services:
@@ -301,7 +385,7 @@ def deploy_remote(req: RemoteDeployRequest, session: Session = Depends(get_sessi
     remote_dir = f"/opt/apimaker/{slug}"
     remote_url = f"{req.user}@{req.host}"
 
-    logs.append(f"🔌 Conectando a {remote_url}...")
+    logs.append(f" Conectando a {remote_url}...")
 
     # Build SSH command prefix
     ssh_base = ["ssh", remote_url, "-p", str(req.port), "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10"]
@@ -317,22 +401,22 @@ def deploy_remote(req: RemoteDeployRequest, session: Session = Depends(get_sessi
 
     try:
         # Create remote directory
-        logs.append("📁 Creando directorio remoto...")
+        logs.append(" Creando directorio remoto...")
         subprocess.run(ssh_base + [f"mkdir -p {remote_dir}"], capture_output=True, text=True, timeout=15)
 
         # Export project as JSON
-        logs.append("📦 Exportando proyecto...")
+        logs.append(" Exportando proyecto...")
         from ..routers.projects import _db_to_pydantic
         export_data = _db_to_pydantic(project, data["datasets"], data["endpoints"])
         json_path = Path(tempfile.gettempdir()) / f"{slug}-project.json"
         json_path.write_text(export_data.model_dump_json(indent=2))
 
-        logs.append("📄 Subiendo project.json al servidor...")
+        logs.append(" Subiendo project.json al servidor...")
         subprocess.run(scp_base + [str(json_path), f"{remote_url}:{remote_dir}/project.json"], capture_output=True, text=True, timeout=30)
         json_path.unlink(missing_ok=True)
 
         # Deploy via SSH using the CLI on the remote server
-        logs.append("🐳 Desplegando en el servidor remoto...")
+        logs.append(" Desplegando en el servidor remoto...")
         deploy_cmd = (
             f"cd {remote_dir} && "
             f"pip install apimaker-backend -q --no-cache-dir && "
@@ -342,11 +426,11 @@ def deploy_remote(req: RemoteDeployRequest, session: Session = Depends(get_sessi
         if result.stdout.strip():
             logs.append(result.stdout.strip()[:500])
         if result.returncode != 0:
-            logs.append(f"❌ {result.stderr.strip()[:300]}")
+            logs.append(f" {result.stderr.strip()[:300]}")
             return DeployStatus(status="error", logs=logs)
 
         url = f"http://{req.host}:{req.api_port}/api"
-        logs.append(f"✅ API desplegada en {url}")
+        logs.append(f" API desplegada en {url}")
 
         # Track deployment
         tracking = _load_tracking()
@@ -359,10 +443,10 @@ def deploy_remote(req: RemoteDeployRequest, session: Session = Depends(get_sessi
         return DeployStatus(status="running", url=url, logs=logs, message="Deploy remoto exitoso")
 
     except subprocess.TimeoutExpired:
-        logs.append("⏱️ Timeout en conexión SSH")
+        logs.append(" Timeout en conexión SSH")
         return DeployStatus(status="timeout", logs=logs)
     except Exception as e:
-        logs.append(f"❌ Error: {str(e)}")
+        logs.append(f" Error: {str(e)}")
         return DeployStatus(status="error", logs=logs)
     finally:
         if key_file:
@@ -381,15 +465,15 @@ def delete_deployment(req: SlugRequest) -> DeployStatus:
             cwd=str(deploy_dir), capture_output=True, timeout=60,
         )
         shutil.rmtree(deploy_dir)
-        logs.append("📁 Directorio de deploy eliminado")
+        logs.append(" Directorio de deploy eliminado")
     else:
-        logs.append("📭 No hay directorio de deployment")
+        logs.append(" No hay directorio de deployment")
 
     tracking = _load_tracking()
     if slug in tracking:
         del tracking[slug]
         _save_tracking(tracking)
-        logs.append("✅ Deployment eliminado del registro")
+        logs.append(" Deployment eliminado del registro")
 
     return DeployStatus(status="deleted", logs=logs, message="Deployment eliminado")
 
@@ -474,7 +558,7 @@ def list_ports() -> dict:
 def rebuild_deploy_image() -> DeployStatus:
     """Rebuild the local deploy Docker image."""
     logs: list[str] = []
-    logs.append("🗑️ Eliminando imagen anterior...")
+    logs.append(" Eliminando imagen anterior...")
     subprocess.run(["docker", "rmi", "-f", DEPLOY_IMAGE], capture_output=True, timeout=30)
     if _ensure_deploy_image(logs):
         return DeployStatus(status="ok", logs=logs, message="Imagen reconstruida")
@@ -501,34 +585,53 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
 
     # Stop existing container for this project if redeploying
     if deploy_dir.exists():
-        logs.append("🔄 Deteniendo contenedor anterior...")
+        logs.append(" Deteniendo contenedor anterior...")
         subprocess.run(
-            ["docker", "compose", "down", "--remove-orphans"],
+            ["docker", "compose", "down", "--remove-orphans", "-v"],
             cwd=str(deploy_dir), capture_output=True, timeout=30,
         )
         shutil.rmtree(deploy_dir)
     deploy_dir.mkdir(parents=True, exist_ok=True)
-    logs.append(f"📁 Directorio: {deploy_dir}")
+    logs.append(f" Directorio: {deploy_dir}")
 
     # Build DB URL for the deployed API
     include_postgres_container = False
+    include_mysql_container = False
+    
+    container_pg_user = container_pg_pass = container_pg_db = ""
+    container_mysql_user = container_mysql_pass = container_mysql_db = ""
+
     if req.db_type == "postgresql":
         if req.deploy_postgres_mode == "new_container":
             include_postgres_container = True
             container_pg_user = req.db_user or "apimaker"
             container_pg_pass = req.db_password or ""
             container_pg_db = req.db_name or "api_deploy"
-            logs.append(f"🗄️ Nuevo contenedor PostgreSQL: usuario={container_pg_user}, bd={container_pg_db}")
+            logs.append(f" Nuevo contenedor PostgreSQL: usuario={container_pg_user}, bd={container_pg_db}")
             deploy_db_url = ""
         elif req.db_host:
             deploy_db_url = f"postgresql+psycopg2://{req.db_user}:{req.db_password}@{req.db_host}:{req.db_port}/{req.db_name or 'api'}"
-            logs.append(f"🗄️ Usando PostgreSQL existente: {req.db_host}:{req.db_port}/{req.db_name}")
+            logs.append(f" Usando PostgreSQL existente: {req.db_host}:{req.db_port}/{req.db_name}")
         else:
             deploy_db_url = f"sqlite:////app/deployments/{slug}/data.db"
-            logs.append("🗄️ Usando SQLite embebida (persistente en disco)")
+            logs.append(" Usando SQLite embebida (persistente en disco)")
+    elif req.db_type == "mysql":
+        if req.deploy_mysql_mode == "new_container":
+            include_mysql_container = True
+            container_mysql_user = req.db_user or "apimaker"
+            container_mysql_pass = req.db_password or ""
+            container_mysql_db = req.db_name or "api_deploy"
+            logs.append(f" Nuevo contenedor MySQL: usuario={container_mysql_user}, bd={container_mysql_db}")
+            deploy_db_url = ""
+        elif req.db_host:
+            deploy_db_url = f"mysql+pymysql://{req.db_user}:{req.db_password}@{req.db_host}:{req.db_port}/{req.db_name or 'api'}"
+            logs.append(f" Usando MySQL existente: {req.db_host}:{req.db_port}/{req.db_name}")
+        else:
+            deploy_db_url = f"sqlite:////app/deployments/{slug}/data.db"
+            logs.append(" Usando SQLite embebida (persistente en disco)")
     else:
         deploy_db_url = f"sqlite:////app/deployments/{slug}/data.db"
-        logs.append("🗄️ Usando SQLite embebida (persistente en disco)")
+        logs.append(" Usando SQLite embebida (persistente en disco)")
 
     # Export project as JSON for the standalone server
     from ..routers.projects import _db_to_pydantic
@@ -537,30 +640,42 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
         export_data.model_dump_json(indent=2),
         encoding="utf-8",
     )
-    logs.append("📄 Proyecto exportado a project.json")
+    logs.append(" Proyecto exportado a project.json")
 
     # Write docker-compose.yml
     if include_postgres_container:
-        compose = _build_docker_compose(port, slug, deploy_db_url, True, container_pg_user, container_pg_pass, container_pg_db)
+        compose = _build_docker_compose(
+            port=port, slug=slug, db_url="",
+            include_postgres_container=True,
+            pg_user=container_pg_user, pg_pass=container_pg_pass, pg_db=container_pg_db
+        )
+    elif include_mysql_container:
+        compose = _build_docker_compose(
+            port=port, slug=slug, db_url="",
+            include_mysql_container=True,
+            mysql_user=container_mysql_user, mysql_pass=container_mysql_pass, mysql_db=container_mysql_db
+        )
     else:
-        compose = _build_docker_compose(port, slug, deploy_db_url, False)
+        compose = _build_docker_compose(
+            port=port, slug=slug, db_url=deploy_db_url
+        )
     (deploy_dir / "docker-compose.yml").write_text(compose, encoding="utf-8")
-    logs.append(f"📝 docker-compose.yml (puerto {port})")
+    logs.append(f" docker-compose.yml (puerto {port})")
 
     # Check Docker
     try:
         subprocess.run(["docker", "--version"], capture_output=True, check=True, timeout=10)
     except (subprocess.CalledProcessError, FileNotFoundError):
-        logs.append("⚠️ Docker no disponible. Instrucciones:")
+        logs.append(" Docker no disponible. Instrucciones:")
         logs.append(f"   cd {deploy_dir} && docker compose up -d")
         return DeployStatus(status="no_docker", logs=logs)
 
     # Build or verify local deploy image
     if not _ensure_deploy_image(logs):
-        logs.append("❌ No se pudo preparar la imagen Docker. Revisa los logs.")
+        logs.append(" No se pudo preparar la imagen Docker. Revisa los logs.")
         return DeployStatus(status="error", logs=logs, message="Error preparando imagen Docker")
 
-    logs.append("🐳 Levantando contenedor...")
+    logs.append(" Levantando contenedor...")
     try:
         result = subprocess.run(
             ["docker", "compose", "up", "-d"],
@@ -570,10 +685,10 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
         if result.stdout.strip():
             logs.append(result.stdout.strip()[:500])
         if result.returncode != 0:
-            logs.append(f"❌ {result.stderr.strip()[:300]}")
+            logs.append(f" {result.stderr.strip()[:300]}")
             return DeployStatus(status="error", logs=logs)
     except subprocess.TimeoutExpired:
-        logs.append("⏱️ Timeout (>2min)")
+        logs.append(" Timeout (>2min)")
         return DeployStatus(status="timeout", logs=logs)
 
     # Build endpoint list from the generated project
@@ -590,7 +705,7 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
         "stack": project.target_stack,
         "status": "running",
         "endpoints": deployed_endpoints,
-        "db_type": "postgresql" if include_postgres_container else req.db_type,
+        "db_type": "postgresql" if include_postgres_container else ("mysql" if include_mysql_container else req.db_type),
         "deployed_at": str(subprocess.run(
             ["date"], capture_output=True, text=True
         ).stdout.strip()),
@@ -603,11 +718,19 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
             "host": "localhost",
             "port": 5432,
         }
+    elif include_mysql_container:
+        tracking[slug]["db_credentials"] = {
+            "user": container_mysql_user,
+            "password": container_mysql_pass,
+            "database": container_mysql_db,
+            "host": "localhost",
+            "port": 3306,
+        }
     _save_tracking(tracking)
 
     url = f"http://localhost:{port}/api"
-    logs.append(f"✅ API en {url}")
-    logs.append(f"📌 Deployments activos:")
+    logs.append(f" API en {url}")
+    logs.append(f" Deployments activos:")
     for s, d in _load_tracking().items():
         logs.append(f"   {d['name']}: {d['url']}")
 

@@ -312,38 +312,38 @@ def render_bundle(
         
         # README
         if project_description:
-            readme_content = f"# 🚀 {project_name}\n\n"
+            readme_content = f"#  {project_name}\n\n"
         else:
             readme_content = f"# {project_name}\n\n"
         readme_content += f"{project_description or 'API generada con API Maker.'}\n\n"
         readme_content += "Este proyecto contiene una API profesional completa, lista para ser desplegada en producción.\n\n"
         
-        readme_content += "## ⚡ Arranque Rápido\n\n"
+        readme_content += "##  Arranque Rápido\n\n"
         readme_content += "La forma más sencilla de configurar y levantar la API es usando el instalador interactivo:\n\n"
         readme_content += "```bash\n"
         readme_content += "chmod +x setup.sh && ./setup.sh\n"
         readme_content += "```\n\n"
         readme_content += "Este script configurará el entorno, las variables de entorno (`.env`) y te permitirá elegir entre ejecución local o con Docker.\n\n"
 
-        readme_content += "## 🐳 Despliegue con Docker\n\n"
+        readme_content += "##  Despliegue con Docker\n\n"
         readme_content += "Si prefieres usar Docker directamente:\n\n"
         readme_content += "```bash\n"
         readme_content += "docker-compose up -d --build\n"
         readme_content += "```\n"
         readme_content += "La API estará disponible en `http://localhost:8000`.\n\n"
 
-        readme_content += "## 📚 Documentación Interactiva\n\n"
+        readme_content += "##  Documentación Interactiva\n\n"
         readme_content += "Una vez levantada la API, puedes acceder a la documentación completa de todos tus recursos en:\n"
         readme_content += "- **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)\n"
         readme_content += "- **ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)\n\n"
 
-        readme_content += "## 🛠️ Estructura del Proyecto\n\n"
+        readme_content += "##  Estructura del Proyecto\n\n"
         readme_content += f"- Stack: **{context['target_stack'].upper()}**\n"
         readme_content += "- Base de Datos: SQLite (desarrollo) / PostgreSQL (producción vía Docker)\n"
         readme_content += f"- Autenticación: {context['auth_method']}\n"
         readme_content += "- Datasets incluidos: " + ", ".join([ds['name'] for ds in context['datasets']]) + "\n\n"
 
-        readme_content += "## 🛠️ Instalación Manual\n\n"
+        readme_content += "##  Instalación Manual\n\n"
         if stack == "fastapi":
             readme_content += (
                 "```bash\n"
@@ -364,10 +364,10 @@ def render_bundle(
             )
 
         if context["include_data"] and any(d["sample_rows"] for d in context["datasets"]):
-            readme_content += "\n## 📦 Datos Iniciales (Seeds)\n"
+            readme_content += "\n##  Datos Iniciales (Seeds)\n"
             readme_content += "Este proyecto incluye un archivo `data.json`. La API importará estos datos automáticamente en el primer arranque si la base de datos está vacía.\n"
 
-        readme_content += "\n## 🚀 Despliegue en la Nube\n\n"
+        readme_content += "\n##  Despliegue en la Nube\n\n"
         readme_content += "### Railway\n"
         readme_content += "```bash\n"
         readme_content += "# Instala Railway CLI y ejecuta:\nrailway login\nrailway up\n```\n"
@@ -381,7 +381,7 @@ def render_bundle(
         readme_content += "docker compose up -d --build\n"
         readme_content += "```\n"
 
-        readme_content += "\n---\n*Generado con ❤️ por API Maker Studio*"
+        readme_content += "\n---\n*Generado con  por API Maker Studio*"
         
         zf.writestr("README.md", readme_content)
 

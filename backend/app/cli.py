@@ -22,7 +22,7 @@ def cmd_deploy(args: argparse.Namespace) -> None:
     """Deploy a project from an exported JSON file."""
     json_path = Path(args.file)
     if not json_path.exists():
-        print(f"❌ File not found: {args.file}")
+        print(f" File not found: {args.file}")
         sys.exit(1)
 
     db_url = args.db
@@ -44,7 +44,7 @@ def cmd_deploy(args: argparse.Namespace) -> None:
 
 def _deploy_via_ssh(json_path: Path, ssh_target: str, port: int, db_url: str) -> None:
     """Deploy project to a remote server via SSH + Docker."""
-    print(f"🚀 Deploying to {ssh_target}...")
+    print(f" Deploying to {ssh_target}...")
 
     remote_dir = f"/opt/apimaker/{json_path.stem}"
 
@@ -97,8 +97,8 @@ volumes:
     )
 
     print(f"\n{'='*50}")
-    print(f"  ✅ '{project_name}' desplegado en {ssh_target}")
-    print(f"  📍 http://{ssh_target.split('@')[-1]}:{port}/api")
+    print(f"   '{project_name}' desplegado en {ssh_target}")
+    print(f"   http://{ssh_target.split('@')[-1]}:{port}/api")
     print(f"{'='*50}\n")
 
 
@@ -124,7 +124,7 @@ def cmd_init(args: argparse.Namespace) -> None:
             select(Project).where(Project.slug == args.project)
         ).first()
         if not project:
-            print(f"❌ Project '{args.project}' not found.")
+            print(f" Project '{args.project}' not found.")
             sys.exit(1)
 
         output = {
@@ -184,7 +184,7 @@ def cmd_init(args: argparse.Namespace) -> None:
 
     out_path = Path(args.output) if args.output else Path(f"{project.slug}.json")
     out_path.write_text(json.dumps(output, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"✅ Project '{project.name}' exported to {out_path}")
+    print(f" Project '{project.name}' exported to {out_path}")
 
 
 def main() -> None:

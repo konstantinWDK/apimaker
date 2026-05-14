@@ -45,7 +45,7 @@ def migrate(force: bool = False) -> None:
     
     # If projects.json doesn't exist, try to copy from frontend demo
     if not BACKEND_DEMO.exists() and FRONTEND_DEMO.exists():
-        print(f"💡 Copying demo from {FRONTEND_DEMO}...")
+        print(f" Copying demo from {FRONTEND_DEMO}...")
         content = json.loads(FRONTEND_DEMO.read_text(encoding="utf-8"))
         # Wrap in a list if it's a single object
         if isinstance(content, dict):
@@ -53,10 +53,10 @@ def migrate(force: bool = False) -> None:
         BACKEND_DEMO.write_text(json.dumps(content, indent=2), encoding="utf-8")
 
     if not BACKEND_DEMO.exists():
-        print("⚠️  No projects.json found. Nothing to migrate.")
+        print("  No projects.json found. Nothing to migrate.")
         return
 
-    print(f"📦 Migrating {BACKEND_DEMO} → Database...")
+    print(f" Migrating {BACKEND_DEMO} → Database...")
 
     # Create tables
     create_db_and_tables()
@@ -65,11 +65,11 @@ def migrate(force: bool = False) -> None:
     try:
         raw = json.loads(BACKEND_DEMO.read_text(encoding="utf-8"))
     except Exception as e:
-        print(f"❌ Error reading JSON: {e}")
+        print(f" Error reading JSON: {e}")
         return
 
     if not raw:
-        print("✅ projects.json is empty. Nothing to migrate.")
+        print(" projects.json is empty. Nothing to migrate.")
         return
 
     if isinstance(raw, dict):
@@ -78,7 +78,7 @@ def migrate(force: bool = False) -> None:
     # Convert all keys from camelCase to snake_case
     raw = [_convert_keys(item) for item in raw]
 
-    print(f"📋 Found {len(raw)} project(s) to migrate.")
+    print(f" Found {len(raw)} project(s) to migrate.")
 
     with Session(engine) as session:
         # Get first admin and workspace for ownership
@@ -99,14 +99,14 @@ def migrate(force: bool = False) -> None:
             try:
                 project_data = PydanticProject.model_validate(item)
             except Exception as e:
-                print(f"❌ Validation error for {item.get('name')}: {e}")
+                print(f" Validation error for {item.get('name')}: {e}")
                 continue
 
             # Check if already exists
             existing = session.exec(select(Project).where(Project.slug == project_data.slug)).first()
             if existing:
                 if force:
-                    print(f"    ♻️  Re-migrating (force): {project_data.name}")
+                    print(f"      Re-migrating (force): {project_data.name}")
                     # Delete existing mock data, fields, endpoints, datasets, project
                     from app.db_models import MockRecord
                     session.exec(
@@ -130,7 +130,7 @@ def migrate(force: bool = False) -> None:
                     )
                     session.commit()
                 else:
-                    print(f"    ⏭️  Already exists, skipping.")
+                    print(f"      Already exists, skipping.")
                     continue
 
             print(f"  → Migrating project: {project_data.name} (Slug: {project_data.slug})")
@@ -199,7 +199,7 @@ def migrate(force: bool = False) -> None:
 
         session.commit()
 
-    print("✅ Migration complete!")
+    print(" Migration complete!")
 
 
 if __name__ == "__main__":

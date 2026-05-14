@@ -68,9 +68,10 @@ function generatePassword() {
 }
 
 function DeployManager({ project, saveProject, updateProject, deployments, loading, onDeployDone }: any) {
+  const setGlobalDeployState = useProjectBuilder(s => s.setGlobalDeployState)
   const [deployType, setDeployType] = useState<'local' | 'remote'>('local')
   const [localPort, setLocalPort] = useState('8080')
-  const [deployDbType, setDeployDbType] = useState<'sqlite' | 'postgresql'>('sqlite')
+  const [deployDbType, setDeployDbType] = useState<'sqlite' | 'postgresql' | 'mysql'>('sqlite')
   const [deployPgMode, setDeployPgMode] = useState<'existing' | 'new_container'>('existing')
   const [deployPgHost, setDeployPgHost] = useState('localhost')
   const [deployPgPort, setDeployPgPort] = useState('5432')
@@ -80,6 +81,16 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
   const [containerPgUser] = useState('apimaker')
   const [containerPgPass] = useState(generatePassword)
   const [containerPgDb] = useState('api_deploy')
+
+  const [deployMySqlMode, setDeployMySqlMode] = useState<'existing' | 'new_container'>('existing')
+  const [deployMySqlHost, setDeployMySqlHost] = useState('localhost')
+  const [deployMySqlPort, setDeployMySqlPort] = useState('3306')
+  const [deployMySqlUser, setDeployMySqlUser] = useState('root')
+  const [deployMySqlPass, setDeployMySqlPass] = useState('')
+  const [deployMySqlDb, setDeployMySqlDb] = useState('api_deploy')
+  const [containerMySqlUser] = useState('apimaker')
+  const [containerMySqlPass] = useState(generatePassword)
+  const [containerMySqlDb] = useState('api_deploy')
   const [sshHost, setSshHost] = useState('')
   const [sshUser, setSshUser] = useState('root')
   const [sshPort, setSshPort] = useState('22')
@@ -114,13 +125,17 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
 
   const handleDeploy = async () => {
     setDeploying(true); setDeployDone(false); setDeployLog([])
+    const dbName = deployDbType === 'sqlite' ? 'SQLite' : deployDbType === 'postgresql' ? 'PostgreSQL' : 'MySQL'
+    setGlobalDeployState('deploying', `Desplegando API en ${dbName}...`)
+    let finalStatus: 'success' | 'error' = 'error'
+    let finalMsg = 'Error en el despliegue'
     try {
       const pid = await saveProject()
-      if (!pid) { log('❌ Error al guardar proyecto'); setDeploying(false); return }
-      log(`✅ Proyecto guardado`)
+      if (!pid) { log(' Error al guardar proyecto'); setDeploying(false); setGlobalDeployState('error', 'Error al guardar proyecto'); return }
+      log(` Proyecto guardado`)
 
       if (deployType === 'local') {
-        log(`🐳 Desplegando local en puerto ${localPort}...`)
+        log(` Desplegando local en puerto ${localPort}...`)
         const deployBody: any = { project_id: pid, port: parseInt(localPort, 10), db_type: deployDbType }
         if (deployDbType === 'postgresql') {
           deployBody.deploy_postgres_mode = deployPgMode
@@ -135,6 +150,19 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
             deployBody.db_password = containerPgPass
             deployBody.db_name = containerPgDb
           }
+        } else if (deployDbType === 'mysql') {
+          deployBody.deploy_mysql_mode = deployMySqlMode
+          if (deployMySqlMode === 'existing') {
+            deployBody.db_host = deployMySqlHost
+            deployBody.db_port = parseInt(deployMySqlPort, 10)
+            deployBody.db_user = deployMySqlUser
+            deployBody.db_password = deployMySqlPass
+            deployBody.db_name = deployMySqlDb
+          } else {
+            deployBody.db_user = containerMySqlUser
+            deployBody.db_password = containerMySqlPass
+            deployBody.db_name = containerMySqlDb
+          }
         }
         const res = await apiFetch('/api/deploy/local', {
           method: 'POST', body: JSON.stringify(deployBody),
@@ -146,25 +174,33 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
           updateProject({ deployment: { host: 'localhost', user: 'docker', port: '2375', apiPort, authType: 'password', deployedAt: new Date().toISOString(), status: 'running', lastCheckAt: new Date().toISOString() } })
           setDeployDone(true)
           onDeployDone()
+          finalStatus = 'success'
+          finalMsg = 'API Desplegada con éxito'
         } else if (result.status === 'no_docker') {
-          log('⚠️ Docker no disponible. Sigue instrucciones manuales.')
+          log(' Docker no disponible. Sigue instrucciones manuales.')
+          finalMsg = 'Docker no disponible'
+        } else {
+          finalMsg = 'Error al construir o levantar contenedor'
         }
       } else {
-        log('📦 Exportando proyecto...')
+        log(' Exportando proyecto...')
         const exportRes = await apiFetch(`/projects/${pid}/export`)
         const projectData = await exportRes.json()
-        log(`✅ "${projectData.name}" exportado`)
+        log(` "${projectData.name}" exportado`)
         const sshCmd = sshAuthType === 'key' && sshKey.trim() ? `ssh -i ~/.ssh/deploy_key -p ${sshPort} ${sshUser}@${sshHost}` : `ssh ${sshUser}@${sshHost} -p ${sshPort}`
         const scpCmd = sshAuthType === 'key' && sshKey.trim() ? `scp -P ${sshPort} -i ~/.ssh/deploy_key proyecto.json ${sshUser}@${sshHost}:/tmp/` : `scp -P ${sshPort} proyecto.json ${sshUser}@${sshHost}:/tmp/`
-        log(`📌 Despliegue manual:`)
+        log(` Despliegue manual:`)
         log(`   1. apimaker init ${project.slug || project.id} -o proyecto.json`)
         log(`   2. ${scpCmd}`)
         log(`   3. ${sshCmd}`)
         log(`   4. apimaker deploy /tmp/proyecto.json --port ${apiPort}`)
         setDeployDone(true)
+        finalStatus = 'success'
+        finalMsg = 'Instrucciones generadas'
       }
-    } catch (e: any) { log(`❌ ${e.message || e}`) }
+    } catch (e: any) { log(` ${e.message || e}`); finalMsg = e.message || 'Error desconocido' }
     setDeploying(false)
+    setGlobalDeployState(finalStatus, finalMsg)
   }
 
   const statusColor = (s: string) => s === 'running' ? '#22c55e' : s === 'stopped' ? '#ef4444' : '#94a3b8'
@@ -212,7 +248,7 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                 </div>
                 {dep.db_credentials && (
                   <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
-                    <div style={{ color: '#047857', marginBottom: '0.3rem', fontWeight: 600 }}>🗄️ PostgreSQL</div>
+                    <div style={{ color: '#047857', marginBottom: '0.3rem', fontWeight: 600 }}> PostgreSQL</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.1rem 0.6rem', color: '#374151', alignItems: 'center' }}>
                       <span>Usuario:</span>
                       <span style={{ fontFamily: 'monospace' }}>{dep.db_credentials.user}</span>
@@ -251,11 +287,11 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem', cursor: 'pointer' }}>
             <input type="radio" name="dt" checked={deployType === 'local'} onChange={() => setDeployType('local')} />
-            🖥️ Local (Docker)
+             Local (Docker)
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem', cursor: 'pointer' }}>
             <input type="radio" name="dt" checked={deployType === 'remote'} onChange={() => setDeployType('remote')} />
-            ☁️ Remoto (SSH)
+             Remoto (SSH)
           </label>
         </div>
 
@@ -272,12 +308,12 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
             {dockerAvail?.available && (
               <button type="button" className="btn ghost" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
                 onClick={async () => {
-                  log('🔄 Reconstruyendo imagen Docker local...')
+                  log(' Reconstruyendo imagen Docker local...')
                   try {
                     const res = await apiFetch('/api/deploy/local/rebuild-image', { method: 'POST' })
                     const data = await res.json()
                     data.logs?.forEach((l: string) => log(l))
-                  } catch (e: any) { log(`❌ ${e.message}`) }
+                  } catch (e: any) { log(` ${e.message}`) }
                 }}>
                 Reconstruir imagen
               </button>
@@ -294,15 +330,33 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
             <span className="label" style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.4rem' }}>
               Base de datos de la API desplegada
             </span>
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-              <label style={{ fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                <input type="radio" name="ddb" checked={deployDbType === 'sqlite'} onChange={() => setDeployDbType('sqlite')} />
-                SQLite (embebida)
-              </label>
-              <label style={{ fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                <input type="radio" name="ddb" checked={deployDbType === 'postgresql'} onChange={() => setDeployDbType('postgresql')} />
-                PostgreSQL (externa)
-              </label>
+            <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '1rem' }}>
+              {[
+                { id: 'sqlite', label: 'SQLite', meta: 'Embebida' },
+                { id: 'postgresql', label: 'PostgreSQL', meta: 'Externa/Docker' },
+                { id: 'mysql', label: 'MySQL', meta: 'Externa/Docker' },
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  onClick={() => setDeployDbType(opt.id as any)}
+                  style={{
+                    flex: 1,
+                    padding: '0.8rem 0.5rem',
+                    borderRadius: '12px',
+                    border: `2px solid ${deployDbType === opt.id ? '#6366f1' : 'rgba(148, 163, 184, 0.2)'}`,
+                    background: deployDbType === opt.id ? '#f5f7ff' : '#fff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: deployDbType === opt.id ? '#4338ca' : '#1e293b' }}>{opt.label}</span>
+                  <span style={{ fontSize: '0.65rem', color: deployDbType === opt.id ? '#6366f1' : '#64748b' }}>{opt.meta}</span>
+                </button>
+              ))}
             </div>
             {deployDbType === 'postgresql' && (
               <div>
@@ -331,7 +385,7 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                   </div>
                 ) : (
                   <div style={{ padding: '0.75rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '0.82rem', color: '#166534' }}>
-                    <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>📦 Nuevo contenedor PostgreSQL 16</div>
+                    <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}> Nuevo contenedor PostgreSQL 16</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.2rem 0.75rem', fontSize: '0.78rem' }}>
                       <span style={{ color: '#4b5563' }}>Usuario:</span>
                       <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerPgUser}</span>
@@ -341,6 +395,49 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                       <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerPgDb}</span>
                       <span style={{ color: '#4b5563' }}>Volumen:</span>
                       <span style={{ fontFamily: 'monospace' }}>pgdata</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {deployDbType === 'mysql' && (
+              <div>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <label style={{ fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <input type="radio" name="msmode" checked={deployMySqlMode === 'existing'} onChange={() => setDeployMySqlMode('existing')} />
+                    Conectar a MySQL existente
+                  </label>
+                  <label style={{ fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <input type="radio" name="msmode" checked={deployMySqlMode === 'new_container'} onChange={() => setDeployMySqlMode('new_container')} />
+                    Nuevo contenedor MySQL
+                  </label>
+                </div>
+                {deployMySqlMode === 'existing' ? (
+                  <div className="form-grid" style={{ gap: '0.4rem' }}>
+                    <label className="form-field"><span className="label">Host</span>
+                      <input className="field" value={deployMySqlHost} onChange={e => setDeployMySqlHost(e.target.value)} placeholder="localhost" /></label>
+                    <label className="form-field"><span className="label">Puerto</span>
+                      <input className="field" value={deployMySqlPort} onChange={e => setDeployMySqlPort(e.target.value)} placeholder="3306" /></label>
+                    <label className="form-field"><span className="label">Usuario</span>
+                      <input className="field" value={deployMySqlUser} onChange={e => setDeployMySqlUser(e.target.value)} placeholder="root" /></label>
+                    <label className="form-field"><span className="label">Contraseña</span>
+                      <input className="field" type="password" value={deployMySqlPass} onChange={e => setDeployMySqlPass(e.target.value)} /></label>
+                    <label className="form-field" style={{ gridColumn: 'span 2' }}><span className="label">Base de datos</span>
+                      <input className="field" value={deployMySqlDb} onChange={e => setDeployMySqlDb(e.target.value)} placeholder="api_deploy" /></label>
+                  </div>
+                ) : (
+                  <div style={{ padding: '0.75rem', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', fontSize: '0.82rem', color: '#0369a1' }}>
+                    <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}> Nuevo contenedor MySQL 8.0</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.2rem 0.75rem', fontSize: '0.78rem' }}>
+                      <span style={{ color: '#4b5563' }}>Usuario:</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerMySqlUser}</span>
+                      <span style={{ color: '#4b5563' }}>Contraseña:</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerMySqlPass}</span>
+                      <span style={{ color: '#4b5563' }}>Base de datos:</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerMySqlDb}</span>
+                      <span style={{ color: '#4b5563' }}>Volumen:</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>mysqldata</span>
                     </div>
                   </div>
                 )}
@@ -381,7 +478,7 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
 
         <button type="button" className="btn" style={{ width: '100%', padding: '0.6rem', fontWeight: 600, marginTop: '0.75rem' }}
           onClick={handleDeploy} disabled={deploying}>
-          {deploying ? 'Desplegando...' : deployDone ? '✅ Desplegado' : deployType === 'local' ? '🐳 Desplegar Local' : '🚀 Desplegar Remoto'}
+          {deploying ? 'Desplegando...' : deployDone ? ' Desplegado' : deployType === 'local' ? ' Desplegar Local' : ' Desplegar Remoto'}
         </button>
 
         {deployLog.length > 0 && (
@@ -404,11 +501,11 @@ function PasswordDisplay({ value }: { value: string }) {
       <button type="button" onClick={() => setVisible(!visible)}
         style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '0.15rem', fontSize: '0.85rem', lineHeight: 1, color: '#64748b' }}
         title={visible ? 'Ocultar' : 'Mostrar'}>
-        {visible ? '🙈' : '👁️'}
+        {visible ? '' : ''}
       </button>
       <button type="button" onClick={async () => { await navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
         style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '0.15rem', fontSize: '0.75rem', lineHeight: 1, color: copied ? '#16a34a' : '#64748b' }}>
-        {copied ? '✓' : '📋'}
+        {copied ? '✓' : ''}
       </button>
     </span>
   )

@@ -148,7 +148,7 @@ export function DatabaseConfigPanel() {
         {/* SQLite Info */}
         {config.database_type === 'sqlite' && (
           <div className="sqlite-info">
-            <div className="info-icon">📦</div>
+            <div className="info-icon"></div>
             <div className="info-text">
               <p>Base de datos local</p>
               <span>No requiere configuración adicional. Ideal para desarrollo.</span>
@@ -207,7 +207,7 @@ export function DatabaseConfigPanel() {
         )}
         {saveResult && (
           <div className="feedback notice">
-            <span className="icon">ℹ</span>
+            <span className="icon"></span>
             <span className="msg">{saveResult}</span>
           </div>
         )}

@@ -15,8 +15,20 @@ os.environ["APIMAKER_DATABASE_URL"] = db_url
 from app.standalone_server import _ensure_project_in_db, create_app_for_project
 import uvicorn
 
+print(f" Reading project data from: {json_path.absolute()}")
+if not json_path.exists():
+    print(f" ERROR: File not found: {json_path.absolute()}")
+    # List directory to help debug
+    print(f" Directory contents of {json_path.parent}:")
+    try:
+        for f in json_path.parent.iterdir():
+            print(f"  - {f.name}")
+    except Exception as e:
+        print(f"  Could not list directory: {e}")
+    sys.exit(1)
+
 project_data = json.loads(json_path.read_text())
 pid = _ensure_project_in_db(project_data, os.environ["APIMAKER_DATABASE_URL"])
 app = create_app_for_project(pid, title=project_data.get("name", "API"))
-print(f"🚀 API running on http://0.0.0.0:{port}")
+print(f" API running on http://0.0.0.0:{port}")
 uvicorn.run(app, host="0.0.0.0", port=port)

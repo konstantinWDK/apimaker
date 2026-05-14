@@ -40,6 +40,9 @@ export function App() {
     refreshProjects,
     projects,
     saveProject,
+    globalDeployState,
+    globalDeployStatus,
+    setGlobalDeployState,
   } = useProjectBuilder()
 
   const navigate = useNavigate()
@@ -247,6 +250,28 @@ export function App() {
           </Routes>
         </div>
       </div>
+
+      {globalDeployState !== 'idle' && (
+        <div className={`global-deploy-toast ${globalDeployState}`}>
+          {globalDeployState === 'deploying' && <div className="global-deploy-spinner"></div>}
+          {globalDeployState === 'success' && <span style={{color: '#4ade80', fontSize: '1.2rem'}}>✓</span>}
+          {globalDeployState === 'error' && <span style={{color: '#f87171', fontSize: '1.2rem'}}>✕</span>}
+          <span>{globalDeployStatus}</span>
+          {globalDeployState !== 'deploying' && (
+            <button 
+              onClick={() => setGlobalDeployState('idle')}
+              style={{
+                background: 'none', border: 'none', color: '#94a3b8', 
+                cursor: 'pointer', fontSize: '1.1rem', padding: '0 0.2rem',
+                marginLeft: '0.5rem'
+              }}
+              title="Cerrar"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
