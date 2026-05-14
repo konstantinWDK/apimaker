@@ -23,12 +23,12 @@ ADMIN_CONFIG_PATH = Path(__file__).resolve().parent / "data" / "admin_config.jso
 def _get_database_url() -> str:
     """Get database URL from settings or legacy config."""
     # Settings (from env or .env) takes priority
-    if settings.database_url and not settings.database_url.startswith("sqlite:///./app/data/apimaker.db"):
+    if settings.database_url:
         return settings.database_url
 
     default_sqlite = f"sqlite:///{Path(__file__).resolve().parent / 'data' / 'apimaker.db'}"
 
-    # Check admin config file
+    # Check admin config file (Legacy)
     if ADMIN_CONFIG_PATH.exists():
         try:
             with open(ADMIN_CONFIG_PATH, "r") as f:

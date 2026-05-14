@@ -13,6 +13,7 @@ if not exist .venv (
 )
 call .venv\Scripts\activate
 pip install -e ".[dev]"
+if not exist app\data mkdir app\data
 cd ..
 
 cd frontend
@@ -132,8 +133,7 @@ if "!NEED_DOCKER_DB!"=="true" (
         echo POSTGRES_DB=!PG_DB! >> .env
         
         echo Levantando base de datos PostgreSQL en Docker...
-        :: Pasamos las variables directamente para forzar la inicializacion correcta
-        docker compose --profile postgres up -d -e POSTGRES_USER=!PG_USER! -e POSTGRES_PASSWORD=!PG_PASS! -e POSTGRES_DB=!PG_DB! postgres
+        docker compose --profile postgres up -d postgres
     )
     if "!DB_TYPE!"=="mysql" (
         echo MYSQL_USER=!MY_USER! >> .env
@@ -142,10 +142,10 @@ if "!NEED_DOCKER_DB!"=="true" (
         echo MYSQL_ROOT_PASSWORD=!MY_PASS!_root >> .env
         
         echo Levantando base de datos MySQL en Docker...
-        docker compose --profile mysql up -d -e MYSQL_USER=!MY_USER! -e MYSQL_PASSWORD=!MY_PASS! -e MYSQL_DATABASE=!MY_DB! -e MYSQL_ROOT_PASSWORD=!MY_PASS!_root mysql
+        docker compose --profile mysql up -d mysql
     )
-    echo Esperando a que el servicio este listo...
-    timeout /t 10 /nobreak > nul
+    echo Esperando a que el motor de base de datos este totalmente listo ^(puede tardar unos segundos^)...
+    timeout /t 20 /nobreak > nul
 )
 
 :: 6. Seed y Demo
@@ -173,6 +173,9 @@ if "!USE_DOCKER!"=="y" (
     set PROFILES=
     if "!DB_TYPE!"=="postgresql" if "!NEED_DOCKER_DB!"=="true" set PROFILES=--profile postgres
     if "!DB_TYPE!"=="mysql" if "!NEED_DOCKER_DB!"=="true" set PROFILES=--profile mysql
+    
+    :: Forzamos la variable al valor de Docker para que no herede el localhost de la sesion actual
+    set APIMAKER_DATABASE_URL=!DB_URL_DOCKER!
     
     docker compose !PROFILES! up -d --build
 )

@@ -129,11 +129,7 @@ if [ "$NEED_DOCKER_DB" == "true" ]; then
         echo "POSTGRES_PASSWORD=$PG_PASS" >> .env
         echo "POSTGRES_DB=$PG_DB" >> .env
         echo -e "${BLUE}🚀 Levantando PostgreSQL en Docker...${NC}"
-        docker compose --profile postgres up -d \
-          -e POSTGRES_USER="$PG_USER" \
-          -e POSTGRES_PASSWORD="$PG_PASS" \
-          -e POSTGRES_DB="$PG_DB" \
-          postgres
+        docker compose --profile postgres up -d postgres
     fi
     if [ "$DB_TYPE" == "mysql" ]; then
         echo "MYSQL_USER=$MY_USER" >> .env
@@ -141,15 +137,10 @@ if [ "$NEED_DOCKER_DB" == "true" ]; then
         echo "MYSQL_DATABASE=$MY_DB" >> .env
         echo "MYSQL_ROOT_PASSWORD=${MY_PASS}_root" >> .env
         echo -e "${BLUE}🚀 Levantando MySQL en Docker...${NC}"
-        docker compose --profile mysql up -d \
-          -e MYSQL_USER="$MY_USER" \
-          -e MYSQL_PASSWORD="$MY_PASS" \
-          -e MYSQL_DATABASE="$MY_DB" \
-          -e MYSQL_ROOT_PASSWORD="${MY_PASS}_root" \
-          mysql
+        docker compose --profile mysql up -d mysql
     fi
     echo -e "${CYAN}⌛ Esperando base de datos...${NC}"
-    sleep 10
+    sleep 20
 fi
 
 # ─── 6. Seed y Demo ───────────────────────────────────────
@@ -174,6 +165,9 @@ if [ "$USE_DOCKER" == "y" ]; then
     PROFILES=""
     if [ "$DB_TYPE" == "postgresql" ] && [ "$NEED_DOCKER_DB" == "true" ]; then PROFILES="--profile postgres"; fi
     if [ "$DB_TYPE" == "mysql" ] && [ "$NEED_DOCKER_DB" == "true" ]; then PROFILES="--profile mysql"; fi
+    
+    # Forzamos la variable exportada al valor correcto para Docker (network interna)
+    export APIMAKER_DATABASE_URL=$DB_URL_DOCKER
     
     echo -e "${BLUE}🚀 Levantando servicios con Docker...${NC}"
     docker compose $PROFILES up -d --build
