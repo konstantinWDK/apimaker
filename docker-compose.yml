@@ -1,4 +1,46 @@
+version: '3.8'
+
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-apimaker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-apimaker}
+      POSTGRES_DB: ${POSTGRES_DB:-apimaker}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-apimaker} -d ${POSTGRES_DB:-apimaker}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    # Solo arranca si se definen estas variables en el .env
+    profiles:
+      - postgres
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-apimaker_root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-apimaker}
+      MYSQL_USER: ${MYSQL_USER:-apimaker}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-apimaker}
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysqldata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    profiles:
+      - mysql
+
   backend:
     build: 
       context: ./backend
@@ -7,11 +49,19 @@ services:
     environment:
       - APIMAKER_DATABASE_URL=${APIMAKER_DATABASE_URL:-sqlite:///./app/data/apimaker.db}
       - APIMAKER_ENVIRONMENT=${APIMAKER_ENVIRONMENT:-development}
+      - APIMAKER_JWT_SECRET_KEY=${APIMAKER_JWT_SECRET_KEY:-secret}
       - APIMAKER_DEPLOY_HOST_PATH=${APIMAKER_DEPLOY_HOST_PATH:-.}
     volumes:
       - ./backend/app/data:/app/app/data
       - ./deployments:/app/deployments
       - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+      mysql:
+        condition: service_healthy
+        required: false
     restart: unless-stopped
 
   frontend:
@@ -19,6 +69,12 @@ services:
       context: ./frontend
     ports:
       - "5173:5173"
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
     depends_on:
       - backend
     restart: unless-stopped
+
+volumes:
+  pgdata:
+  mysqldata:

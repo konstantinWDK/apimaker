@@ -27,173 +27,189 @@ if "!ADMIN_USER!"=="" set ADMIN_USER=admin
 set /p ADMIN_PASS="Introduce la contrasena [admin]: "
 if "!ADMIN_PASS!"=="" set ADMIN_PASS=admin
 
-:: 3. Base de Datos
+:: 3. Base de Datos (AHORA PRIMERO)
 echo.
 echo ^<^<^< CONFIGURACION DE BASE DE DATOS ^>^>^>
 echo 1) SQLite (local, rapida)
-echo 2) PostgreSQL existente (conectarse a uno que ya tengas)
-echo 3) PostgreSQL nuevo en Docker (crear contenedor automaticamente)
-set /p DB_OPTION="Elige una opcion [1]: "
-if "!DB_OPTION!"=="" set DB_OPTION=1
+echo 2) PostgreSQL
+echo 3) MySQL / MariaDB
+set /p DB_CHOICE="Elige una opcion [1]: "
+if "!DB_CHOICE!"=="" set DB_CHOICE=1
 
 set DB_TYPE=sqlite
 set NEED_DOCKER_DB=false
+set DB_URL=
 
-if "!DB_OPTION!"=="2" set NEED_DOCKER_DB=false
-if "!DB_OPTION!"=="3" set NEED_DOCKER_DB=true
-
-if "!DB_OPTION!"=="2" (
-    set /p PG_HOST="Host de Postgres [localhost]: "
-    if "!PG_HOST!"=="" set PG_HOST=localhost
-    set /p PG_PORT="Puerto [5432]: "
-    if "!PG_PORT!"=="" set PG_PORT=5432
-    set /p PG_USER="Usuario [postgres]: "
-    if "!PG_USER!"=="" set PG_USER=postgres
-    set /p PG_PASS="Contrasena: "
-    set /p PG_DB="Nombre BD [apimaker]: "
-    if "!PG_DB!"=="" set PG_DB=apimaker
+if "!DB_CHOICE!"=="1" (
+    set DB_TYPE=sqlite
+    set DB_URL=sqlite:///./app/data/apimaker.db
 )
 
-if "!DB_OPTION!"=="3" (
-    set PG_HOST=localhost
-    set PG_PORT=5432
-    set PG_USER=apimaker
-    set PG_PASS=apimaker_secret_%RANDOM%
-    set PG_DB=apimaker
-    echo Se generara un contenedor PostgreSQL con credenciales seguras.
-)
-
-if "!DB_OPTION!"=="2" (
+if "!DB_CHOICE!"=="2" (
     set DB_TYPE=postgresql
-    set DB_URL=postgresql+psycopg2://!PG_USER!:!PG_PASS!@!PG_HOST!:!PG_PORT!/!PG_DB!
-    set APIMAKER_DATABASE_URL=!DB_URL!
-
-    mkdir backend\app\data 2>nul
-    (
-      echo {
-      echo   "dev": {
-      echo     "database_type": "postgresql",
-      echo     "postgres_url": "!DB_URL!",
-      echo     "host": "!PG_HOST!",
-      echo     "port": !PG_PORT!,
-      echo     "username": "!PG_USER!",
-      echo     "password": "!PG_PASS!",
-      echo     "database": "!PG_DB!"
-      echo   }
-      echo }
-    ) > backend\app\data\admin_config.json
-    echo Configuracion de PostgreSQL guardada.
-)
-
-if "!DB_OPTION!"=="3" (
-    set DB_TYPE=postgresql
-    set DB_URL=postgresql+psycopg2://!PG_USER!:!PG_PASS!@!PG_HOST!:!PG_PORT!/!PG_DB!
-    set APIMAKER_DATABASE_URL=!DB_URL!
-
-    mkdir backend\app\data 2>nul
-    (
-      echo {
-      echo   "dev": {
-      echo     "database_type": "postgresql",
-      echo     "postgres_url": "!DB_URL!",
-      echo     "host": "!PG_HOST!",
-      echo     "port": !PG_PORT!,
-      echo     "username": "!PG_USER!",
-      echo     "password": "!PG_PASS!",
-      echo     "database": "!PG_DB!"
-      echo   }
-      echo }
-    ) > backend\app\data\admin_config.json
-
-    :: Guardar .env
-    (
-      echo APIMAKER_ENVIRONMENT=development
-      echo APIMAKER_DATABASE_URL=!DB_URL!
-      echo POSTGRES_USER=!PG_USER!
-      echo POSTGRES_PASSWORD=!PG_PASS!
-      echo POSTGRES_DB=!PG_DB!
-    ) > .env
-    echo Archivo .env generado con credenciales de PostgreSQL.
     echo.
-    echo ^>^>^> PostgreSQL en contenedor configurado.
-    echo     Usuario: !PG_USER!
-    echo     Contrasena: !PG_PASS!
-    echo     Base de datos: !PG_DB!
+    echo 1^) Usar PostgreSQL existente
+    echo 2^) Crear nuevo PostgreSQL en Docker
+    set /p DB_SUB="Elige una opcion [2]: "
+    if "!DB_SUB!"=="" set DB_SUB=2
+    
+    if "!DB_SUB!"=="1" (
+        set /p PG_HOST="Host [localhost]: "
+        if "!PG_HOST!"=="" set PG_HOST=localhost
+        set /p PG_PORT="Puerto [5432]: "
+        if "!PG_PORT!"=="" set PG_PORT=5432
+        set /p PG_USER="Usuario [postgres]: "
+        if "!PG_USER!"=="" set PG_USER=postgres
+        set /p PG_PASS="Contrasena: "
+        set /p PG_DB="Nombre BD [apimaker]: "
+        if "!PG_DB!"=="" set PG_DB=apimaker
+    ) else (
+        set NEED_DOCKER_DB=true
+        set PG_HOST=localhost
+        set PG_PORT=5432
+        set PG_USER=apimaker
+        set PG_PASS=apimaker_secret_%RANDOM%
+        set PG_DB=apimaker
+        echo Se generara un contenedor PostgreSQL automaticamente.
+    )
+    set DB_URL=postgresql+psycopg2://!PG_USER!:!PG_PASS!@!PG_HOST!:!PG_PORT!/!PG_DB!
 )
 
-:: 4. Seed
+if "!DB_CHOICE!"=="3" (
+    set DB_TYPE=mysql
+    echo.
+    echo 1^) Usar MySQL/MariaDB existente
+    echo 2^) Crear nuevo MySQL en Docker
+    set /p DB_SUB="Elige una opcion [2]: "
+    if "!DB_SUB!"=="" set DB_SUB=2
+    
+    if "!DB_SUB!"=="1" (
+        set /p MY_HOST="Host [localhost]: "
+        if "!MY_HOST!"=="" set MY_HOST=localhost
+        set /p MY_PORT="Puerto [3306]: "
+        if "!MY_PORT!"=="" set MY_PORT=3306
+        set /p MY_USER="Usuario [root]: "
+        if "!MY_USER!"=="" set MY_USER=root
+        set /p MY_PASS="Contrasena: "
+        set /p MY_DB="Nombre BD [apimaker]: "
+        if "!MY_DB!"=="" set MY_DB=apimaker
+    ) else (
+        set NEED_DOCKER_DB=true
+        set MY_HOST=localhost
+        set MY_PORT=3306
+        set MY_USER=apimaker
+        set MY_PASS=apimaker_secret_%RANDOM%
+        set MY_DB=apimaker
+        echo Se generara un contenedor MySQL automaticamente.
+    )
+    set DB_URL=mysql+pymysql://!MY_USER!:!MY_PASS!@!MY_HOST!:!MY_PORT!/!MY_DB!
+)
+
+:: 4. Docker Deployment
 echo.
-echo Inicializando base de datos y usuario...
+echo ^<^<^< DESPLIEGUE ^>^>^>
+set /p USE_DOCKER="Levantar la aplicacion con Docker? (y/n) [n]: "
+if "!USE_DOCKER!"=="" set USE_DOCKER=n
+
+:: 5. Generar configuracion y .env
+set DB_URL_DOCKER=!DB_URL!
+if "!USE_DOCKER!"=="y" (
+    if "!DB_TYPE!"=="postgresql" if "!NEED_DOCKER_DB!"=="true" set DB_URL_DOCKER=postgresql+psycopg2://!PG_USER!:!PG_PASS!@postgres:5432/!PG_DB!
+    if "!DB_TYPE!"=="mysql" if "!NEED_DOCKER_DB!"=="true" set DB_URL_DOCKER=mysql+pymysql://!MY_USER!:!MY_PASS!@mysql:3306/!MY_DB!
+)
+
+echo APIMAKER_ENVIRONMENT=development > .env
+echo APIMAKER_DATABASE_URL=!DB_URL_DOCKER! >> .env
+echo APIMAKER_JWT_SECRET_KEY=secret_%RANDOM% >> .env
+
+if "!NEED_DOCKER_DB!"=="true" (
+    echo Limpiando instalaciones previas de base de datos...
+    docker compose --profile postgres --profile mysql down -v > nul 2>&1
+    
+    if "!DB_TYPE!"=="postgresql" (
+        echo POSTGRES_USER=!PG_USER! >> .env
+        echo POSTGRES_PASSWORD=!PG_PASS! >> .env
+        echo POSTGRES_DB=!PG_DB! >> .env
+        
+        echo Levantando base de datos PostgreSQL en Docker...
+        :: Pasamos las variables directamente para forzar la inicializacion correcta
+        docker compose --profile postgres up -d -e POSTGRES_USER=!PG_USER! -e POSTGRES_PASSWORD=!PG_PASS! -e POSTGRES_DB=!PG_DB! postgres
+    )
+    if "!DB_TYPE!"=="mysql" (
+        echo MYSQL_USER=!MY_USER! >> .env
+        echo MYSQL_PASSWORD=!MY_PASS! >> .env
+        echo MYSQL_DATABASE=!MY_DB! >> .env
+        echo MYSQL_ROOT_PASSWORD=!MY_PASS!_root >> .env
+        
+        echo Levantando base de datos MySQL en Docker...
+        docker compose --profile mysql up -d -e MYSQL_USER=!MY_USER! -e MYSQL_PASSWORD=!MY_PASS! -e MYSQL_DATABASE=!MY_DB! -e MYSQL_ROOT_PASSWORD=!MY_PASS!_root mysql
+    )
+    echo Esperando a que el servicio este listo...
+    timeout /t 10 /nobreak > nul
+)
+
+:: 6. Seed y Demo
+echo.
+echo Inicializando base de datos...
 cd backend
+:: Usamos la URL local para el seed desde Windows
+set APIMAKER_DATABASE_URL=!DB_URL!
 .venv\Scripts\python.exe app\scripts\seed_admin.py --username !ADMIN_USER! --password !ADMIN_PASS!
 cd ..
 
-:: 5. Demo
-echo.
-set /p IMPORT_POKEDEX="Importar proyecto Pokedex? (y/n) [y]: "
-if "!IMPORT_POKEDEX!"=="" set IMPORT_POKEDEX=y
-if "!IMPORT_POKEDEX!"=="y" (
-    echo Importando Pokedex...
+set /p IMPORT_DEMO="Importar proyecto Pokedex? (y/n) [y]: "
+if "!IMPORT_DEMO!"=="" set IMPORT_DEMO=y
+if "!IMPORT_DEMO!"=="y" (
     cd backend
+    set APIMAKER_DATABASE_URL=!DB_URL!
     .venv\Scripts\python.exe migrate_json_to_db.py
     .venv\Scripts\python.exe repair_pokedex.py
     cd ..
 )
 
-:: 6. Docker
-echo.
-echo ^<^<^< DESPLIEGUE CON DOCKER ^>^>^>
-set /p USE_DOCKER="Levantar la app ahora con Docker? (y/n) [n]: "
-if "!USE_DOCKER!"=="" set USE_DOCKER=n
-
+:: 7. Docker Final
 if "!USE_DOCKER!"=="y" (
-    set COMPOSE_FILES=-f docker-compose.yml
-
-    if "!NEED_DOCKER_DB!"=="true" (
-        set COMPOSE_FILES=!COMPOSE_FILES! -f docker-compose.prod.yml
-        echo Usando PostgreSQL en contenedor.
-    ) else if "!DB_TYPE!"=="postgresql" (
-        set APIMAKER_DATABASE_URL=!DB_URL!
-        echo Usando PostgreSQL existente: !PG_HOST!:!PG_PORT!/!PG_DB!
-    ) else (
-        echo Usando SQLite.
-    )
-
-    echo.
-    echo Construyendo y levantando contenedores...
-    docker compose %COMPOSE_FILES% up -d --build || docker-compose %COMPOSE_FILES% up -d --build
-
-    echo.
-    echo =======================================
-    echo    INSTALACION COMPLETADA CON EXITO
-    echo =======================================
-    echo.
-    echo Frontend: http://localhost:5173
-    echo Backend:  http://localhost:8000
-    echo Usuario:  !ADMIN_USER!
-    if "!NEED_DOCKER_DB!"=="true" (
-        echo.
-        echo Credenciales PostgreSQL (contenedor):
-        echo   Host:      localhost
-        echo   Puerto:    5432
-        echo   Usuario:   !PG_USER!
-        echo   Password:  !PG_PASS!
-        echo   Base:      !PG_DB!
-    )
-    goto :end
+    echo Levantando servicios de la aplicacion...
+    set PROFILES=
+    if "!DB_TYPE!"=="postgresql" if "!NEED_DOCKER_DB!"=="true" set PROFILES=--profile postgres
+    if "!DB_TYPE!"=="mysql" if "!NEED_DOCKER_DB!"=="true" set PROFILES=--profile mysql
+    
+    docker compose !PROFILES! up -d --build
 )
 
 echo.
 echo =======================================
-echo    INSTALACION COMPLETADA CON EXITO
+echo    INSTALACION COMPLETADA
 echo =======================================
 echo.
-echo Para arrancar manualmente:
-echo   1. cd backend ^&^& .venv\Scripts\activate ^&^& uvicorn app.main:app --reload
-echo   2. cd frontend ^&^& npm run dev
+echo URL Acceso: http://localhost:5173
+echo Usuario Admin: !ADMIN_USER!
+echo Password Admin: !ADMIN_PASS!
 echo.
-echo Usuario: !ADMIN_USER!
-echo URL: http://localhost:5173
+echo --- DETALLES DE BASE DE DATOS ---
+echo Tipo: !DB_TYPE!
+if "!DB_TYPE!"=="postgresql" (
+    echo Host: !PG_HOST!
+    echo Usuario: !PG_USER!
+    echo Password: !PG_PASS!
+    echo Database: !PG_DB!
+)
+if "!DB_TYPE!"=="mysql" (
+    echo Host: !MY_HOST!
+    echo Usuario: !MY_USER!
+    echo Password: !MY_PASS!
+    echo Database: !MY_DB!
+)
+if "!DB_TYPE!"=="sqlite" (
+    echo Archivo: backend\app\data\apimaker.db
+)
+if "!NEED_DOCKER_DB!"=="true" (
+    echo [!] Estado: Contenedor Docker creado y corriendo.
+)
+echo.
 
 :end
 pause
+
+
+
