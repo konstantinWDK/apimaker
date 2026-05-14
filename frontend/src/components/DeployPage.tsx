@@ -483,6 +483,7 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
             )}
           </div>
           </div>
+          </div>
         ) : (
           <div className="form-grid" style={{ gap: '0.6rem' }}>
             <label className="form-field"><span className="label">Usuario</span>
