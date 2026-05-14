@@ -104,9 +104,21 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
   const [deploying, setDeploying] = useState(false)
   const [deployDone, setDeployDone] = useState(false)
   const [dockerAvail, setDockerAvail] = useState<{ available: boolean; version?: string; containers_running?: number; error?: string } | null>(null)
+  const [portStatus, setPortStatus] = useState<Record<string, 'checking' | 'free' | 'busy' | null>>({})
 
   useEffect(() => {
     apiFetch('/api/deploy/docker-status').then(r => r.json()).then(setDockerAvail).catch(() => setDockerAvail({ available: false }))
+  }, [])
+
+  const checkPort = useCallback(async (port: string, key: string) => {
+    setPortStatus(p => ({ ...p, [key]: 'checking' }))
+    try {
+      const res = await apiFetch(`/api/deploy/local/check-port?port=${parseInt(port, 10)}`)
+      const data = await res.json()
+      setPortStatus(p => ({ ...p, [key]: data.free ? 'free' : 'busy' }))
+    } catch {
+      setPortStatus(p => ({ ...p, [key]: 'busy' }))
+    }
   }, [])
 
   const log = useCallback((msg: string) => setDeployLog((prev: string[]) => [...prev, msg]), [])
@@ -326,10 +338,18 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
           <p className="muted-text" style={{ fontSize: '0.82rem', marginBottom: '0.75rem' }}>
             Despliega en el mismo servidor (requiere Docker). Si el puerto está ocupado, se asigna el siguiente disponible.
           </p>
-          <label className="form-field" style={{ maxWidth: '200px' }}>
-            <span className="label">Puerto preferido</span>
-            <input className="field" type="number" value={localPort} onChange={e => setLocalPort(e.target.value)} placeholder="8080" />
-          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            <label className="form-field" style={{ margin: 0 }}>
+              <span className="label">Puerto API</span>
+              <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                <input className="field" type="number" value={localPort} onChange={e => setLocalPort(e.target.value)} placeholder="8080"
+                  style={{ width: '100px' }} />
+                <button type="button" className="btn ghost" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+                  onClick={() => checkPort(localPort, 'api')}>
+                  {portStatus.api === 'checking' ? '...' : portStatus.api === 'free' ? '✓ Libre' : portStatus.api === 'busy' ? '✗ Ocupado' : 'Comprobar'}
+                </button>
+              </div>
+            </label>
           <div style={{ marginTop: '0.75rem' }}>
             <span className="label" style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.4rem' }}>
               Base de datos de la API desplegada
@@ -392,8 +412,14 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                     <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}> Nuevo contenedor PostgreSQL 16</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.2rem 0.75rem', fontSize: '0.78rem' }}>
                       <span style={{ color: '#4b5563' }}>Puerto:</span>
-                      <input className="field" type="number" value={containerPgPort} onChange={e => setContainerPgPort(e.target.value)} placeholder="5432"
-                        style={{ width: '90px', fontSize: '0.78rem', padding: '0.2rem 0.4rem' }} />
+                      <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                        <input className="field" type="number" value={containerPgPort} onChange={e => setContainerPgPort(e.target.value)} placeholder="5432"
+                          style={{ width: '90px', fontSize: '0.78rem', padding: '0.2rem 0.4rem' }} />
+                        <button type="button" className="btn ghost" style={{ fontSize: '0.65rem', padding: '0.15rem 0.4rem' }}
+                          onClick={() => checkPort(containerPgPort, 'pg')}>
+                          {portStatus.pg === 'checking' ? '...' : portStatus.pg === 'free' ? '✓ Libre' : portStatus.pg === 'busy' ? '✗ Ocupado' : 'Comprobar'}
+                        </button>
+                      </div>
                       <span style={{ color: '#4b5563' }}>Usuario:</span>
                       <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerPgUser}</span>
                       <span style={{ color: '#4b5563' }}>Contraseña:</span>
@@ -436,8 +462,14 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                     <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}> Nuevo contenedor MySQL 8.0</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.2rem 0.75rem', fontSize: '0.78rem' }}>
                       <span style={{ color: '#4b5563' }}>Puerto:</span>
-                      <input className="field" type="number" value={containerMySqlPort} onChange={e => setContainerMySqlPort(e.target.value)} placeholder="3306"
-                        style={{ width: '90px', fontSize: '0.78rem', padding: '0.2rem 0.4rem' }} />
+                      <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                        <input className="field" type="number" value={containerMySqlPort} onChange={e => setContainerMySqlPort(e.target.value)} placeholder="3306"
+                          style={{ width: '90px', fontSize: '0.78rem', padding: '0.2rem 0.4rem' }} />
+                        <button type="button" className="btn ghost" style={{ fontSize: '0.65rem', padding: '0.15rem 0.4rem' }}
+                          onClick={() => checkPort(containerMySqlPort, 'mysql')}>
+                          {portStatus.mysql === 'checking' ? '...' : portStatus.mysql === 'free' ? '✓ Libre' : portStatus.mysql === 'busy' ? '✗ Ocupado' : 'Comprobar'}
+                        </button>
+                      </div>
                       <span style={{ color: '#4b5563' }}>Usuario:</span>
                       <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerMySqlUser}</span>
                       <span style={{ color: '#4b5563' }}>Contraseña:</span>

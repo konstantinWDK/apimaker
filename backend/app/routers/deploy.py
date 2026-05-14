@@ -120,7 +120,19 @@ def _save_tracking(data: dict) -> None:
 
 
 def _port_is_free(port: int) -> bool:
-    """Check if a port is available on the host."""
+    """Check if a port is available on the host. Works from inside Docker too."""
+    if Path("/.dockerenv").exists():
+        try:
+            result = subprocess.run(
+                ["docker", "ps", "--format", "{{.Ports}}"],
+                capture_output=True, text=True, timeout=5,
+            )
+            if result.returncode == 0:
+                for line in result.stdout.strip().split("\n"):
+                    if f":{port}-" in line or f":{port}->" in line or f":{port}/" in line:
+                        return False
+        except Exception:
+            pass
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         try:
             s.bind(("0.0.0.0", port))
@@ -561,6 +573,12 @@ def list_ports() -> dict:
     }
 
 
+@router.get("/local/check-port")
+def check_port(port: int) -> dict:
+    """Check if a specific port is available on the host."""
+    return {"port": port, "free": _port_is_free(port)}
+
+
 @router.post("/local/rebuild-image")
 def rebuild_deploy_image() -> DeployStatus:
     """Rebuild the local deploy Docker image."""
@@ -651,7 +669,13 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
 
     # Write docker-compose.yml
     if include_postgres_container:
-        pg_host_port = req.db_port or 5432
+        if req.db_port:
+            pg_host_port = req.db_port
+        elif _port_is_free(5432):
+            pg_host_port = 5432
+        else:
+            pg_host_port = port + 1
+            logs.append(f" Puerto 5432 ocupado, usando {pg_host_port}")
         compose = _build_docker_compose(
             port=port, slug=slug, db_url="",
             include_postgres_container=True,
@@ -659,7 +683,13 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
             pg_port=pg_host_port,
         )
     elif include_mysql_container:
-        mysql_host_port = req.db_port or 3306
+        if req.db_port:
+            mysql_host_port = req.db_port
+        elif _port_is_free(3306):
+            mysql_host_port = 3306
+        else:
+            mysql_host_port = port + 1
+            logs.append(f" Puerto 3306 ocupado, usando {mysql_host_port}")
         compose = _build_docker_compose(
             port=port, slug=slug, db_url="",
             include_mysql_container=True,
@@ -727,7 +757,7 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
             "password": container_pg_pass,
             "database": container_pg_db,
             "host": "localhost",
-            "port": req.db_port or 5432,
+            "port": pg_host_port,
         }
     elif include_mysql_container:
         tracking[slug]["db_credentials"] = {
@@ -735,7 +765,7 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
             "password": container_mysql_pass,
             "database": container_mysql_db,
             "host": "localhost",
-            "port": req.db_port or 3306,
+            "port": mysql_host_port,
         }
     _save_tracking(tracking)
 
