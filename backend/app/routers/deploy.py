@@ -8,6 +8,7 @@ import os
 import socket
 import shutil
 import subprocess
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -199,6 +200,7 @@ def _build_docker_compose(
     if include_postgres_container:
         if not pg_pass:
             pg_pass = f"deploy_secret_{int(Path(__file__).stat().st_mtime)}"
+        db_port = port + 1
         return f"""services:
   api:
     image: {DEPLOY_IMAGE}
@@ -216,6 +218,8 @@ def _build_docker_compose(
 
   db:
     image: postgres:16-alpine
+    ports:
+      - "127.0.0.1:{db_port}:5432"
     environment:
       - POSTGRES_USER={pg_user}
       - POSTGRES_PASSWORD={pg_pass}
@@ -236,7 +240,8 @@ volumes:
     if include_mysql_container:
         if not mysql_pass:
             mysql_pass = f"deploy_secret_{int(Path(__file__).stat().st_mtime)}"
-        return f"""services:
+        db_port = port + 1
+    return f"""services:
   api:
     image: {DEPLOY_IMAGE}
     ports:
@@ -253,6 +258,8 @@ volumes:
 
   db:
     image: mysql:8.0
+    ports:
+      - "127.0.0.1:{db_port}:3306"
     environment:
       - MYSQL_ROOT_PASSWORD={mysql_pass}
       - MYSQL_DATABASE={mysql_db}
@@ -605,7 +612,7 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
         if req.deploy_postgres_mode == "new_container":
             include_postgres_container = True
             container_pg_user = req.db_user or "apimaker"
-            container_pg_pass = req.db_password or ""
+            container_pg_pass = req.db_password or uuid.uuid4().hex[:16]
             container_pg_db = req.db_name or "api_deploy"
             logs.append(f" Nuevo contenedor PostgreSQL: usuario={container_pg_user}, bd={container_pg_db}")
             deploy_db_url = ""
@@ -619,7 +626,7 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
         if req.deploy_mysql_mode == "new_container":
             include_mysql_container = True
             container_mysql_user = req.db_user or "apimaker"
-            container_mysql_pass = req.db_password or ""
+            container_mysql_pass = req.db_password or uuid.uuid4().hex[:16]
             container_mysql_db = req.db_name or "api_deploy"
             logs.append(f" Nuevo contenedor MySQL: usuario={container_mysql_user}, bd={container_mysql_db}")
             deploy_db_url = ""
@@ -716,7 +723,7 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
             "password": container_pg_pass,
             "database": container_pg_db,
             "host": "localhost",
-            "port": 5432,
+            "port": port + 1,
         }
     elif include_mysql_container:
         tracking[slug]["db_credentials"] = {
@@ -724,7 +731,7 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
             "password": container_mysql_pass,
             "database": container_mysql_db,
             "host": "localhost",
-            "port": 3306,
+            "port": port + 1,
         }
     _save_tracking(tracking)
 
