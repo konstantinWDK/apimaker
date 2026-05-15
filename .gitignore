@@ -47,3 +47,5 @@ frontend/coverage/
 backend/.python-version
 backend/deployments/
 deployments/
+start.sh
+start.bat
