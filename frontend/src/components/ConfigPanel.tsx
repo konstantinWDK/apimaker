@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { DatabaseConfigPanel } from './DatabaseConfigPanel'
 import { CredentialPanel } from './CredentialPanel'
-import { TestRunnerPanel } from './TestRunnerPanel'
+
 
 interface Props {
   currentUsername: string
@@ -10,7 +10,7 @@ interface Props {
 }
 
 export function ConfigPanel({ currentUsername, onUpdateCredentials, onResetCredentials }: Props) {
-  const [activeTab, setActiveTab] = useState<'database' | 'admin' | 'tests'>('database')
+  const [activeTab, setActiveTab] = useState<'database' | 'admin'>('database')
 
   return (
     <div className="config-panel">
@@ -28,13 +28,6 @@ export function ConfigPanel({ currentUsername, onUpdateCredentials, onResetCrede
           onClick={() => setActiveTab('admin')}
         >
           Administración
-        </button>
-        <button
-          type="button"
-          className={activeTab === 'tests' ? 'active' : ''}
-          onClick={() => setActiveTab('tests')}
-        >
-          Tests
         </button>
       </div>
 
@@ -63,11 +56,7 @@ export function ConfigPanel({ currentUsername, onUpdateCredentials, onResetCrede
           </div>
         )}
 
-        {activeTab === 'tests' && (
-          <div className="config-section">
-            <TestRunnerPanel />
-          </div>
-        )}
+
       </div>
 
       <style>{`

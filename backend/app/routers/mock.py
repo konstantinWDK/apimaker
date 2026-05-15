@@ -20,7 +20,7 @@ router = APIRouter(prefix="/projects", tags=["mock"])
 def mock_start(
     project_id: str,
     session: Session = Depends(get_session),
-    user: CurrentUser = Depends(require_admin),
+    _project: Project = Depends(require_project_access),
 ) -> dict:
     """Start mock server for a project."""
     try:
@@ -34,7 +34,7 @@ def mock_start(
 def mock_stop(
     project_id: str,
     session: Session = Depends(get_session),
-    user: CurrentUser = Depends(require_admin),
+    _project: Project = Depends(require_project_access),
 ) -> dict:
     """Stop mock server for a project."""
     try:

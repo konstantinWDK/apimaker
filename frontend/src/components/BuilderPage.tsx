@@ -30,6 +30,7 @@ export function BuilderPage() {
     setGenerationResult,
     removeDataset,
     saveProject,
+    isSyncing,
     isGenerating,
     setIsGenerating,
     selectedDatasetId,

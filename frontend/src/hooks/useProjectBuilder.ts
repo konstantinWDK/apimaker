@@ -104,7 +104,7 @@ const getAuthHeaders = (): HeadersInit => {
   return headers
 }
 
-const api = {
+export const api = {
   async listProjects(workspaceId?: string): Promise<ProjectDraft[]> {
     const url = workspaceId
       ? `${getBaseUrl()}/projects?workspace_id=${workspaceId}`
@@ -681,8 +681,12 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
   checkMockStatus: async () => {
     const project = get().project
     if (!project.remoteId && !project.id) return
-    const status = await api.getMockStatus(project.remoteId || project.id)
-    set({ mockRunning: status === 'running' })
+    try {
+      const status = await api.getMockStatus(project.remoteId || project.id)
+      set({ mockRunning: status === 'running' })
+    } catch {
+      set({ mockRunning: false })
+    }
   },
 
   deleteProject: async (id: string) => {

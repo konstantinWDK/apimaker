@@ -15,6 +15,7 @@ import { DeployPage } from './components/DeployPage'
 import { BuilderPage } from './components/BuilderPage'
 import { SimulatorPage } from './components/SimulatorPage'
 import { ProductOpsPage } from './components/ProductOpsPage'
+import { TestsPage } from './components/TestsPage'
 import { useProjectBuilder } from './hooks/useProjectBuilder'
 import { useAuth } from './hooks/useAuth'
 import { useToast } from './components/Toast'
@@ -91,26 +92,33 @@ export function App() {
     checkSetup()
   }, [])
 
+  // Polling for mock status and initial auto-start
   useEffect(() => {
     if (!project.remoteId || !isAuthenticated) return
     let cancelled = false
-    ;(async () => {
+
+    const checkAndStart = async () => {
       try {
         const res = await apiFetch(`/projects/${project.remoteId}/mock/status`).then(r => r.json())
         if (cancelled) return
         if (res.status !== 'running') {
           await apiFetch(`/projects/${project.remoteId}/mock/start`, { method: 'POST' })
-          if (!cancelled) {
-            useProjectBuilder.getState().checkMockStatus()
-          }
+          if (!cancelled) checkMockStatus()
         } else {
           if (!cancelled) checkMockStatus()
         }
       } catch {
-        // Mock server not available — don't block the UI
+        if (!cancelled) checkMockStatus()
       }
-    })()
-    return () => { cancelled = true }
+    }
+
+    checkAndStart()
+    const interval = setInterval(checkMockStatus, 10000) // Poll every 10s
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.remoteId, isAuthenticated])
 
@@ -233,6 +241,12 @@ export function App() {
                 Configuración
               </NavLink>
               <NavLink
+                to="/tests"
+                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+              >
+                Tests
+              </NavLink>
+              <NavLink
                 to="/docs"
                 className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
               >
@@ -257,6 +271,7 @@ export function App() {
               <Route path="/operations" element={<ProductOpsPage />} />
               <Route path="/config" element={<ConfigPage authStatus={authStatus} onLogout={performLogout} />} />
               <Route path="/docs" element={<DocsPage />} />
+              <Route path="/tests" element={<TestsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
