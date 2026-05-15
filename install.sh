@@ -246,6 +246,13 @@ cd "\$(dirname "\$0")"
 echo "Iniciando API Maker con Docker..."
 $DOCKER_CMD $PROFILES up -d
 EOF
+    cat << EOF > start.bat
+@echo off
+cd /d "%~dp0"
+echo Iniciando API Maker con Docker...
+$DOCKER_CMD $PROFILES up -d
+pause
+EOF
 else
     cat << 'EOF' > start.sh
 #!/usr/bin/env bash
@@ -261,9 +268,17 @@ FRONTEND_PID=$!
 trap "kill $BACKEND_PID $FRONTEND_PID 2>/dev/null" EXIT INT TERM
 wait
 EOF
+    cat << 'EOF' > start.bat
+@echo off
+cd /d "%~dp0"
+echo Iniciando API Maker...
+start "API Maker Backend" cmd /c "cd backend && .venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
+start "API Maker Frontend" cmd /c "cd frontend && npm run dev"
+echo Servicios iniciados en nuevas ventanas.
+EOF
 fi
 chmod +x start.sh
-echo -e "${CYAN}Se ha generado 'start.sh' para iniciar la aplicacion comodamente.${NC}"
+echo -e "${CYAN}Se han generado 'start.sh' y 'start.bat' para iniciar la aplicacion comodamente.${NC}"
 
 echo ""
 echo -e "${GREEN}=======================================${NC}"

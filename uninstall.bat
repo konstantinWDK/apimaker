@@ -54,6 +54,8 @@ if exist "frontend\.vite" rmdir /s /q "frontend\.vite"
 
 echo   - Raiz...
 if exist ".env" del /q ".env"
+if exist "start.sh" del /q "start.sh"
+if exist "start.bat" del /q "start.bat"
 if exist ".pytest_cache" rmdir /s /q ".pytest_cache"
 del /q "*.log" 2>nul
 

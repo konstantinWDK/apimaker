@@ -175,6 +175,12 @@ if /i "%USE_DOCKER%"=="y" (
         echo %DOCKER_CMD% !PROFILES! up -d
         echo pause
     ) > start.bat
+    (
+        echo #!/usr/bin/env bash
+        echo cd "$(dirname "$0")"
+        echo echo "Iniciando API Maker con Docker..."
+        echo %DOCKER_CMD% !PROFILES! up -d
+    ) > start.sh
 ) else (
     (
         echo @echo off
@@ -184,8 +190,19 @@ if /i "%USE_DOCKER%"=="y" (
         echo start "API Maker Frontend" cmd /c "cd frontend ^&^& npm run dev"
         echo echo Servicios iniciados en nuevas ventanas.
     ) > start.bat
+    (
+        echo #!/usr/bin/env bash
+        echo cd "$(dirname "$0")"
+        echo echo "Iniciando API Maker..."
+        echo "(cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000) &"
+        echo "BACKEND_PID=\$!"
+        echo "(cd frontend && npm run dev) &"
+        echo "FRONTEND_PID=\$!"
+        echo "trap \"kill \$BACKEND_PID \$FRONTEND_PID 2>/dev/null\" EXIT INT TERM"
+        echo "wait"
+    ) > start.sh
 )
-echo Se ha generado 'start.bat' para iniciar la aplicacion comodamente.
+echo Se han generado 'start.sh' y 'start.bat' para iniciar la aplicacion comodamente.
 
 echo.
 echo =======================================

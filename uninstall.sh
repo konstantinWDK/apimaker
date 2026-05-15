@@ -69,6 +69,8 @@ rm -rf frontend/.vite
 
 echo "  - Raiz..."
 rm -f .env
+rm -f start.sh
+rm -f start.bat
 rm -rf .pytest_cache
 find . -maxdepth 2 -name "*.log" -delete
 
