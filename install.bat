@@ -186,20 +186,13 @@ if /i "%USE_DOCKER%"=="y" (
         echo @echo off
         echo cd /d "%%~dp0"
         echo echo Iniciando API Maker...
-        echo start "API Maker Backend" cmd /c "cd backend ^&^& .venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
-        echo start "API Maker Frontend" cmd /c "cd frontend ^&^& npm run dev"
-        echo echo Servicios iniciados en nuevas ventanas.
+        echo npx concurrently -n "Backend,Frontend" -c "blue,green" "cd backend ^&^& .venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000" "cd frontend ^&^& npm run dev"
     ) > start.bat
     (
         echo #!/usr/bin/env bash
         echo cd "$(dirname "$0")"
         echo echo "Iniciando API Maker..."
-        echo "(cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000) &"
-        echo "BACKEND_PID=\$!"
-        echo "(cd frontend && npm run dev) &"
-        echo "FRONTEND_PID=\$!"
-        echo "trap \"kill \$BACKEND_PID \$FRONTEND_PID 2>/dev/null\" EXIT INT TERM"
-        echo "wait"
+        echo "npx concurrently -n \"Backend,Frontend\" -c \"blue,green\" \"cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000\" \"cd frontend && npm run dev\""
     ) > start.sh
 )
 echo Se han generado 'start.sh' y 'start.bat' para iniciar la aplicacion comodamente.

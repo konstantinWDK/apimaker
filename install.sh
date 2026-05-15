@@ -258,23 +258,15 @@ else
 #!/usr/bin/env bash
 cd "$(dirname "$0")"
 echo -e "\033[0;32mIniciando API Maker...\033[0m"
-echo "Backend: http://localhost:8000"
-echo "Frontend: http://localhost:5173"
-echo "Presiona Ctrl+C para detener ambos."
-(cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000) &
-BACKEND_PID=$!
-(cd frontend && npm run dev) &
-FRONTEND_PID=$!
-trap "kill $BACKEND_PID $FRONTEND_PID 2>/dev/null" EXIT INT TERM
-wait
+npx concurrently -n "Backend,Frontend" -c "blue,green" \
+    "cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000" \
+    "cd frontend && npm run dev"
 EOF
     cat << 'EOF' > start.bat
 @echo off
 cd /d "%~dp0"
 echo Iniciando API Maker...
-start "API Maker Backend" cmd /c "cd backend && .venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
-start "API Maker Frontend" cmd /c "cd frontend && npm run dev"
-echo Servicios iniciados en nuevas ventanas.
+npx concurrently -n "Backend,Frontend" -c "blue,green" "cd backend && .venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000" "cd frontend && npm run dev"
 EOF
 fi
 chmod +x start.sh
