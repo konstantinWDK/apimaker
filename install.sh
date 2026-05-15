@@ -1,7 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# API Maker - Advanced Installer (Linux/macOS)
-set -e
+set -Eeuo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT_DIR"
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -10,181 +12,219 @@ RED='\033[0;31m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
+fail() {
+    echo -e "${RED}ERROR: $*${NC}" >&2
+    exit 1
+}
+
+require_cmd() {
+    command -v "$1" >/dev/null 2>&1 || fail "Falta $2 ($1). Instalalo y vuelve a ejecutar este script."
+}
+
+compose_cmd() {
+    if docker compose version >/dev/null 2>&1; then
+        echo "docker compose"
+    elif command -v docker-compose >/dev/null 2>&1; then
+        echo "docker-compose"
+    else
+        echo ""
+    fi
+}
+
+urlencode() {
+    python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$1"
+}
+
+random_hex() {
+    if command -v openssl >/dev/null 2>&1; then
+        openssl rand -hex "$1"
+    else
+        python3 -c "import secrets; print(secrets.token_hex($1))"
+    fi
+}
+
 echo -e "${BLUE}=======================================${NC}"
-echo -e "${BLUE}   🚀 API Maker - Configuración        ${NC}"
+echo -e "${BLUE}   API Maker - Configuracion${NC}"
 echo -e "${BLUE}=======================================${NC}"
 
-# ─── 1. Dependencias ──────────────────────────────────────
-echo -e "${BLUE}📦 Instalando dependencias...${NC}"
+require_cmd python3 "Python 3.11+"
+require_cmd npm "Node.js/npm"
+
+DOCKER_CMD="$(compose_cmd)"
+
+echo -e "${BLUE}Instalando dependencias...${NC}"
 cd backend
 if [ ! -d ".venv" ]; then
-    python3 -m venv .venv || python -m venv .venv
+    python3 -m venv .venv
 fi
 source .venv/bin/activate
+python -m pip install --upgrade pip
 pip install -e ".[dev]"
+mkdir -p app/data
 cd ..
 
 cd frontend
 npm install
 cd ..
 
-# ─── 2. Admin ─────────────────────────────────────────────
 echo ""
-echo -e "${YELLOW}👤 CONFIGURACIÓN DEL ADMINISTRADOR${NC}"
-read -p "Introduce el nombre de usuario [admin]: " ADMIN_USER
-ADMIN_USER=${ADMIN_USER:-admin}
+echo -e "${YELLOW}CONFIGURACION DEL ADMINISTRADOR${NC}"
+read -r -p "Introduce el nombre de usuario [admin]: " ADMIN_USER
+ADMIN_USER="${ADMIN_USER:-admin}"
+read -r -s -p "Introduce la contrasena para $ADMIN_USER [admin]: " ADMIN_PASS
+echo ""
+ADMIN_PASS="${ADMIN_PASS:-admin}"
 
-echo -n "Introduce la contraseña para $ADMIN_USER [admin]: "
-read -s ADMIN_PASS
 echo ""
-ADMIN_PASS=${ADMIN_PASS:-admin}
-
-# ─── 3. Base de Datos (AHORA PRIMERO) ─────────────────────
-echo ""
-echo -e "${YELLOW}🗄️  CONFIGURACIÓN DE BASE DE DATOS${NC}"
-echo "1) SQLite (local, rápida)"
+echo -e "${YELLOW}CONFIGURACION DE BASE DE DATOS${NC}"
+echo "1) SQLite (local, rapida)"
 echo "2) PostgreSQL"
 echo "3) MySQL / MariaDB"
-read -p "Elige una opción [1]: " DB_CHOICE
-DB_CHOICE=${DB_CHOICE:-1}
+read -r -p "Elige una opcion [1]: " DB_CHOICE
+DB_CHOICE="${DB_CHOICE:-1}"
 
 DB_TYPE="sqlite"
-DB_URL=""
+DB_URL="sqlite:///./app/data/apimaker.db"
+DB_URL_DOCKER="$DB_URL"
 NEED_DOCKER_DB=false
 
-if [ "$DB_CHOICE" == "1" ]; then
-    DB_TYPE="sqlite"
-    DB_URL="sqlite:///./app/data/apimaker.db"
-fi
+case "$DB_CHOICE" in
+    1)
+        ;;
+    2)
+        DB_TYPE="postgresql"
+        echo ""
+        echo "1) Usar PostgreSQL existente"
+        echo "2) Crear nuevo PostgreSQL en Docker"
+        read -r -p "Elige una opcion [2]: " DB_SUB
+        DB_SUB="${DB_SUB:-2}"
+        if [ "$DB_SUB" = "1" ]; then
+            read -r -p "Host [localhost]: " PG_HOST; PG_HOST="${PG_HOST:-localhost}"
+            read -r -p "Puerto [5432]: " PG_PORT; PG_PORT="${PG_PORT:-5432}"
+            read -r -p "Usuario [postgres]: " PG_USER; PG_USER="${PG_USER:-postgres}"
+            read -r -s -p "Contrasena: " PG_PASS; echo ""
+            read -r -p "Nombre BD [apimaker]: " PG_DB; PG_DB="${PG_DB:-apimaker}"
+        else
+            NEED_DOCKER_DB=true
+            PG_HOST="localhost"; PG_PORT="5432"; PG_USER="apimaker"; PG_DB="apimaker"
+            PG_PASS="$(random_hex 12)"
+            echo -e "${CYAN}Se generara un contenedor PostgreSQL.${NC}"
+        fi
+        PG_PASS_ENC="$(urlencode "$PG_PASS")"
+        DB_URL="postgresql+psycopg2://$PG_USER:$PG_PASS_ENC@$PG_HOST:$PG_PORT/$PG_DB"
+        DB_URL_DOCKER="$DB_URL"
+        ;;
+    3)
+        DB_TYPE="mysql"
+        echo ""
+        echo "1) Usar MySQL/MariaDB existente"
+        echo "2) Crear nuevo MySQL en Docker"
+        read -r -p "Elige una opcion [2]: " DB_SUB
+        DB_SUB="${DB_SUB:-2}"
+        if [ "$DB_SUB" = "1" ]; then
+            read -r -p "Host [localhost]: " MY_HOST; MY_HOST="${MY_HOST:-localhost}"
+            read -r -p "Puerto [3306]: " MY_PORT; MY_PORT="${MY_PORT:-3306}"
+            read -r -p "Usuario [root]: " MY_USER; MY_USER="${MY_USER:-root}"
+            read -r -s -p "Contrasena: " MY_PASS; echo ""
+            read -r -p "Nombre BD [apimaker]: " MY_DB; MY_DB="${MY_DB:-apimaker}"
+        else
+            NEED_DOCKER_DB=true
+            MY_HOST="localhost"; MY_PORT="3306"; MY_USER="apimaker"; MY_DB="apimaker"
+            MY_PASS="$(random_hex 12)"
+            echo -e "${CYAN}Se generara un contenedor MySQL.${NC}"
+        fi
+        MY_PASS_ENC="$(urlencode "$MY_PASS")"
+        DB_URL="mysql+pymysql://$MY_USER:$MY_PASS_ENC@$MY_HOST:$MY_PORT/$MY_DB"
+        DB_URL_DOCKER="$DB_URL"
+        ;;
+    *)
+        fail "Opcion de base de datos no valida."
+        ;;
+esac
 
-if [ "$DB_CHOICE" == "2" ]; then
-    DB_TYPE="postgresql"
-    echo ""
-    echo "1) Usar PostgreSQL existente"
-    echo "2) Crear nuevo PostgreSQL en Docker"
-    read -p "Elige una opción [2]: " DB_SUB
-    DB_SUB=${DB_SUB:-2}
-    
-    if [ "$DB_SUB" == "1" ]; then
-        read -p "Host [localhost]: " PG_HOST; PG_HOST=${PG_HOST:-localhost}
-        read -p "Puerto [5432]: " PG_PORT; PG_PORT=${PG_PORT:-5432}
-        read -p "Usuario [postgres]: " PG_USER; PG_USER=${PG_USER:-postgres}
-        echo -n "Contraseña: "; read -s PG_PASS; echo ""
-        read -p "Nombre BD [apimaker]: " PG_DB; PG_DB=${PG_DB:-apimaker}
-    else
-        NEED_DOCKER_DB=true
-        PG_HOST="localhost"; PG_PORT=5432; PG_USER="apimaker"; PG_DB="apimaker"
-        PG_PASS=$(openssl rand -base64 12 2>/dev/null || echo "apimaker_secret_$(date +%s)")
-        echo -e "${CYAN}   → Se generará un contenedor PostgreSQL.${NC}"
-    fi
-    DB_URL="postgresql+psycopg2://$PG_USER:$PG_PASS@$PG_HOST:$PG_PORT/$PG_DB"
-fi
-
-if [ "$DB_CHOICE" == "3" ]; then
-    DB_TYPE="mysql"
-    echo ""
-    echo "1) Usar MySQL/MariaDB existente"
-    echo "2) Crear nuevo MySQL en Docker"
-    read -p "Elige una opción [2]: " DB_SUB
-    DB_SUB=${DB_SUB:-2}
-    
-    if [ "$DB_SUB" == "1" ]; then
-        read -p "Host [localhost]: " MY_HOST; MY_HOST=${MY_HOST:-localhost}
-        read -p "Puerto [3306]: " MY_PORT; MY_PORT=${MY_PORT:-3306}
-        read -p "Usuario [root]: " MY_USER; MY_USER=${MY_USER:-root}
-        echo -n "Contraseña: "; read -s MY_PASS; echo ""
-        read -p "Nombre BD [apimaker]: " MY_DB; MY_DB=${MY_DB:-apimaker}
-    else
-        NEED_DOCKER_DB=true
-        MY_HOST="localhost"; MY_PORT=3306; MY_USER="apimaker"; MY_DB="apimaker"
-        MY_PASS=$(openssl rand -base64 12 2>/dev/null || echo "apimaker_secret_$(date +%s)")
-        echo -e "${CYAN}   → Se generará un contenedor MySQL.${NC}"
-    fi
-    DB_URL="mysql+pymysql://$MY_USER:$MY_PASS@$MY_HOST:$MY_PORT/$MY_DB"
-fi
-
-# ─── 4. Despliegue ────────────────────────────────────────
 echo ""
-echo -e "${YELLOW}🐳 DESPLIEGUE${NC}"
-read -p "¿Quieres levantar la app con Docker? (y/n) [n]: " USE_DOCKER
-USE_DOCKER=${USE_DOCKER:-n}
+echo -e "${YELLOW}DESPLIEGUE${NC}"
+read -r -p "Quieres levantar la app con Docker? (y/n) [n]: " USE_DOCKER
+USE_DOCKER="${USE_DOCKER:-n}"
 
-# ─── 5. Generar .env y Levantar DB si es necesario ────────
-DB_URL_DOCKER=$DB_URL
-if [ "$USE_DOCKER" == "y" ]; then
-    if [ "$DB_TYPE" == "postgresql" ] && [ "$NEED_DOCKER_DB" == "true" ]; then DB_URL_DOCKER="postgresql+psycopg2://$PG_USER:$PG_PASS@postgres:5432/$PG_DB"; fi
-    if [ "$DB_TYPE" == "mysql" ] && [ "$NEED_DOCKER_DB" == "true" ]; then DB_URL_DOCKER="mysql+pymysql://$MY_USER:$MY_PASS@mysql:3306/$MY_DB"; fi
+if [ "$USE_DOCKER" = "y" ]; then
+    [ -n "$DOCKER_CMD" ] || fail "Docker Compose no esta disponible."
+    if [ "$DB_TYPE" = "postgresql" ] && [ "$NEED_DOCKER_DB" = true ]; then
+        DB_URL_DOCKER="postgresql+psycopg2://$PG_USER:$PG_PASS_ENC@postgres:5432/$PG_DB"
+    fi
+    if [ "$DB_TYPE" = "mysql" ] && [ "$NEED_DOCKER_DB" = true ]; then
+        DB_URL_DOCKER="mysql+pymysql://$MY_USER:$MY_PASS_ENC@mysql:3306/$MY_DB"
+    fi
 fi
 
-echo "APIMAKER_ENVIRONMENT=development" > .env
-echo "APIMAKER_DATABASE_URL=$DB_URL_DOCKER" >> .env
-echo "APIMAKER_JWT_SECRET_KEY=$(openssl rand -hex 32 2>/dev/null || echo 'secret')" >> .env
+{
+    echo "APIMAKER_ENVIRONMENT=development"
+    echo "APIMAKER_DATABASE_URL=$DB_URL_DOCKER"
+    echo "APIMAKER_JWT_SECRET_KEY=$(random_hex 32)"
+} > .env
 
-if [ "$NEED_DOCKER_DB" == "true" ]; then
-    echo -e "${BLUE}🧹 Limpiando instalaciones previas de base de datos...${NC}"
-    docker compose --profile postgres --profile mysql down -v > /dev/null 2>&1
-    
-    if [ "$DB_TYPE" == "postgresql" ]; then
-        echo "POSTGRES_USER=$PG_USER" >> .env
-        echo "POSTGRES_PASSWORD=$PG_PASS" >> .env
-        echo "POSTGRES_DB=$PG_DB" >> .env
-        echo -e "${BLUE}🚀 Levantando PostgreSQL en Docker...${NC}"
-        docker compose --profile postgres up -d postgres
+if [ "$NEED_DOCKER_DB" = true ]; then
+    [ -n "$DOCKER_CMD" ] || fail "Docker Compose no esta disponible para crear la base de datos."
+    echo -e "${BLUE}Limpiando bases de datos Docker previas de este proyecto...${NC}"
+    $DOCKER_CMD --profile postgres --profile mysql down -v >/dev/null 2>&1 || true
+
+    if [ "$DB_TYPE" = "postgresql" ]; then
+        {
+            echo "POSTGRES_USER=$PG_USER"
+            echo "POSTGRES_PASSWORD=$PG_PASS"
+            echo "POSTGRES_DB=$PG_DB"
+        } >> .env
+        echo -e "${BLUE}Levantando PostgreSQL en Docker...${NC}"
+        $DOCKER_CMD --profile postgres up -d postgres
     fi
-    if [ "$DB_TYPE" == "mysql" ]; then
-        echo "MYSQL_USER=$MY_USER" >> .env
-        echo "MYSQL_PASSWORD=$MY_PASS" >> .env
-        echo "MYSQL_DATABASE=$MY_DB" >> .env
-        echo "MYSQL_ROOT_PASSWORD=${MY_PASS}_root" >> .env
-        echo -e "${BLUE}🚀 Levantando MySQL en Docker...${NC}"
-        docker compose --profile mysql up -d mysql
+
+    if [ "$DB_TYPE" = "mysql" ]; then
+        {
+            echo "MYSQL_USER=$MY_USER"
+            echo "MYSQL_PASSWORD=$MY_PASS"
+            echo "MYSQL_DATABASE=$MY_DB"
+            echo "MYSQL_ROOT_PASSWORD=${MY_PASS}_root"
+        } >> .env
+        echo -e "${BLUE}Levantando MySQL en Docker...${NC}"
+        $DOCKER_CMD --profile mysql up -d mysql
     fi
-    echo -e "${CYAN}⌛ Esperando base de datos...${NC}"
+    echo -e "${CYAN}Esperando a que la base de datos este lista...${NC}"
     sleep 20
 fi
 
-# ─── 6. Seed y Demo ───────────────────────────────────────
-echo -e "${BLUE}🌱 Inicializando base de datos...${NC}"
+echo -e "${BLUE}Inicializando base de datos...${NC}"
 cd backend
-export APIMAKER_DATABASE_URL=$DB_URL
+export APIMAKER_DATABASE_URL="$DB_URL"
 ./.venv/bin/python app/scripts/seed_admin.py --username "$ADMIN_USER" --password "$ADMIN_PASS"
 cd ..
 
-read -p "¿Importar proyecto Pokedex? (y/n) [y]: " IMPORT_DEMO
-IMPORT_DEMO=${IMPORT_DEMO:-y}
-if [ "$IMPORT_DEMO" == "y" ]; then
+read -r -p "Importar proyecto Pokedex? (y/n) [y]: " IMPORT_DEMO
+IMPORT_DEMO="${IMPORT_DEMO:-y}"
+if [ "$IMPORT_DEMO" = "y" ]; then
     cd backend
-    export APIMAKER_DATABASE_URL=$DB_URL
+    export APIMAKER_DATABASE_URL="$DB_URL"
     ./.venv/bin/python migrate_json_to_db.py
     ./.venv/bin/python repair_pokedex.py
     cd ..
 fi
 
-# ─── 7. Docker Final ──────────────────────────────────────
-if [ "$USE_DOCKER" == "y" ]; then
+if [ "$USE_DOCKER" = "y" ]; then
     PROFILES=""
-    if [ "$DB_TYPE" == "postgresql" ] && [ "$NEED_DOCKER_DB" == "true" ]; then PROFILES="--profile postgres"; fi
-    if [ "$DB_TYPE" == "mysql" ] && [ "$NEED_DOCKER_DB" == "true" ]; then PROFILES="--profile mysql"; fi
-    
-    # Forzamos la variable exportada al valor correcto para Docker (network interna)
-    export APIMAKER_DATABASE_URL=$DB_URL_DOCKER
-    
-    echo -e "${BLUE}🚀 Levantando servicios con Docker...${NC}"
-    docker compose $PROFILES up -d --build
+    if [ "$DB_TYPE" = "postgresql" ] && [ "$NEED_DOCKER_DB" = true ]; then PROFILES="--profile postgres"; fi
+    if [ "$DB_TYPE" = "mysql" ] && [ "$NEED_DOCKER_DB" = true ]; then PROFILES="--profile mysql"; fi
+    export APIMAKER_DATABASE_URL="$DB_URL_DOCKER"
+    echo -e "${BLUE}Levantando servicios con Docker...${NC}"
+    $DOCKER_CMD $PROFILES up -d --build
 fi
 
 echo ""
 echo -e "${GREEN}=======================================${NC}"
-echo -e "${GREEN}✅ INSTALACIÓN COMPLETADA${NC}"
+echo -e "${GREEN}INSTALACION COMPLETADA${NC}"
 echo -e "${GREEN}=======================================${NC}"
-echo ""
-echo -e "   Acceso:    ${BLUE}http://localhost:5173${NC}"
-echo -e "   Usuario:   ${YELLOW}$ADMIN_USER${NC}"
-echo -e "   Password:  ${YELLOW}$ADMIN_PASS${NC}"
-echo -e "   Base Datos: ${CYAN}$DB_TYPE${NC}"
-if [ "$NEED_DOCKER_DB" == "true" ]; then
-    echo -e "${CYAN}   [!] BD ejecutándose en Docker.${NC}"
+echo -e "Acceso:       ${BLUE}http://localhost:5173${NC}"
+echo -e "Usuario:      ${YELLOW}$ADMIN_USER${NC}"
+echo -e "Password:     ${YELLOW}$ADMIN_PASS${NC}"
+echo -e "Base Datos:   ${CYAN}$DB_TYPE${NC}"
+if [ "$NEED_DOCKER_DB" = true ]; then
+    echo -e "${CYAN}BD ejecutandose en Docker.${NC}"
 fi
-echo ""
-
-
