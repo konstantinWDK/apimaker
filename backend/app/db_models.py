@@ -207,3 +207,115 @@ class ProjectVersion(SQLModel, table=True):
     message: str = ""
     snapshot_data: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class Datasource(SQLModel, table=True):
+    """Unified data source attached to a project."""
+
+    __tablename__ = "datasources"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    project_id: str = Field(foreign_key="projects.id", index=True)
+    name: str
+    source_type: str = "manual"  # manual | csv | database | rest
+    connection_id: str | None = Field(default=None, foreign_key="db_connections.id")
+    config: str | None = None  # JSON config for REST/CSV/manual sources
+    schema_snapshot: str | None = None  # JSON introspection result
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class SavedQuery(SQLModel, table=True):
+    """Reusable query with request parameter bindings."""
+
+    __tablename__ = "saved_queries"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    project_id: str = Field(foreign_key="projects.id", index=True)
+    datasource_id: str | None = Field(default=None, foreign_key="datasources.id")
+    connection_id: str | None = Field(default=None, foreign_key="db_connections.id")
+    name: str
+    query_type: str = "sql"  # sql | rest
+    statement: str = Field(sa_column=Column(Text))
+    bindings: str | None = None  # JSON mapping for path/query/body/header params
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class RuntimeLog(SQLModel, table=True):
+    """Runtime event log for mock calls, deploys, webhooks, automations, imports."""
+
+    __tablename__ = "runtime_logs"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    project_id: str = Field(foreign_key="projects.id", index=True)
+    event_type: str = Field(index=True)
+    method: str | None = None
+    path: str | None = None
+    status_code: int | None = None
+    duration_ms: int | None = None
+    message: str = ""
+    metadata_json: str | None = Field(default=None, sa_column=Column("metadata", Text))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ProjectRelease(SQLModel, table=True):
+    """Published immutable project release."""
+
+    __tablename__ = "project_releases"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    project_id: str = Field(foreign_key="projects.id", index=True)
+    version: int
+    message: str = ""
+    snapshot_data: str = Field(sa_column=Column(Text))
+    is_active: bool = Field(default=False, index=True)
+    created_by: str | None = Field(default=None, foreign_key="users.id")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class Automation(SQLModel, table=True):
+    """Project automation with a trigger and ordered actions."""
+
+    __tablename__ = "automations"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    project_id: str = Field(foreign_key="projects.id", index=True)
+    name: str
+    trigger_event: str = Field(index=True)  # record.created | endpoint.called | manual | cron
+    actions: str = Field(default="[]", sa_column=Column(Text))  # JSON action list
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class AutomationRun(SQLModel, table=True):
+    """Execution log for an automation."""
+
+    __tablename__ = "automation_runs"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    automation_id: str = Field(foreign_key="automations.id", index=True)
+    project_id: str = Field(foreign_key="projects.id", index=True)
+    status: str = "pending"  # pending | success | failed
+    input_data: str | None = Field(default=None, sa_column=Column(Text))
+    output_data: str | None = Field(default=None, sa_column=Column(Text))
+    error: str | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class WebhookDelivery(SQLModel, table=True):
+    """Delivery attempt for a configured webhook."""
+
+    __tablename__ = "webhook_deliveries"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    webhook_id: str = Field(foreign_key="webhooks.id", index=True)
+    project_id: str = Field(foreign_key="projects.id", index=True)
+    event: str
+    status: str = "pending"  # pending | success | failed
+    status_code: int | None = None
+    request_body: str | None = Field(default=None, sa_column=Column(Text))
+    response_body: str | None = Field(default=None, sa_column=Column(Text))
+    error: str | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

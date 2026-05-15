@@ -487,3 +487,89 @@ export const getTableSchema = async (id: string, table: string): Promise<{ table
   const res = await apiFetch(`/api/connections/${id}/tables/${encodeURIComponent(table)}/schema`)
   return res.json()
 }
+
+// Product operations inspired by internal-tool builders
+
+export const listDatasources = async (projectId: string): Promise<any[]> => {
+  const res = await apiFetch(`/projects/${projectId}/datasources`)
+  return res.json()
+}
+
+export const createDatasource = async (projectId: string, data: any): Promise<any> => {
+  const res = await apiFetch(`/projects/${projectId}/datasources`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+export const listSavedQueries = async (projectId: string): Promise<any[]> => {
+  const res = await apiFetch(`/projects/${projectId}/queries`)
+  return res.json()
+}
+
+export const createSavedQuery = async (projectId: string, data: any): Promise<any> => {
+  const res = await apiFetch(`/projects/${projectId}/queries`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+export const runSavedQuery = async (projectId: string, queryId: string, params: Record<string, any> = {}): Promise<any> => {
+  const res = await apiFetch(`/projects/${projectId}/queries/${queryId}/run`, {
+    method: 'POST',
+    body: JSON.stringify({ params }),
+  })
+  return res.json()
+}
+
+export const listRuntimeLogs = async (projectId: string, eventType?: string): Promise<any[]> => {
+  const suffix = eventType ? `?event_type=${encodeURIComponent(eventType)}` : ''
+  const res = await apiFetch(`/projects/${projectId}/runtime-logs${suffix}`)
+  return res.json()
+}
+
+export const listReleases = async (projectId: string): Promise<any[]> => {
+  const res = await apiFetch(`/projects/${projectId}/releases`)
+  return res.json()
+}
+
+export const createRelease = async (projectId: string, message = ''): Promise<any> => {
+  const res = await apiFetch(`/projects/${projectId}/releases`, {
+    method: 'POST',
+    body: JSON.stringify({ message }),
+  })
+  return res.json()
+}
+
+export const listAutomations = async (projectId: string): Promise<any[]> => {
+  const res = await apiFetch(`/projects/${projectId}/automations`)
+  return res.json()
+}
+
+export const createAutomation = async (projectId: string, data: any): Promise<any> => {
+  const res = await apiFetch(`/projects/${projectId}/automations`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+export const importContract = async (projectId: string, data: any): Promise<any> => {
+  const res = await apiFetch(`/projects/${projectId}/imports`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+export const listDeployProviders = async (): Promise<any[]> => {
+  const res = await apiFetch('/api/platform/deploy-providers')
+  return res.json()
+}
+
+export const listPlugins = async (): Promise<any> => {
+  const res = await apiFetch('/api/platform/plugins')
+  return res.json()
+}

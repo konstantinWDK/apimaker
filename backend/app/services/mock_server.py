@@ -8,6 +8,7 @@ import math
 import re
 import traceback
 from datetime import datetime, timezone
+from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
@@ -26,6 +27,7 @@ def _get_webhook_dispatcher():
         _dispatch_webhooks = dw
     return _dispatch_webhooks
 from .project_service import project_service
+from .product_ops import create_runtime_log, dispatch_automations
 
 logger = logging.getLogger("apimaker.mock_server")
 
@@ -267,6 +269,8 @@ async def _mock_get_impl(
     include: str | None = None,
 ) -> Any:
     """Mock GET implementation with plain Python defaults."""
+    started = perf_counter()
+    full_path_for_log = f"/{path.strip('/')}"
     try:
         resolved_id = _resolve_project_id(session, project_id)
         project_cache = _mock_cache.get(resolved_id)
@@ -366,6 +370,16 @@ async def _mock_get_impl(
                     if include:
                         related = _get_related_data(session, resolved_id, ds_id, include.split(","))
                         item = {**item, "_includes": related}
+                    create_runtime_log(
+                        session,
+                        resolved_id,
+                        "endpoint.called",
+                        method="GET",
+                        path=full_path_for_log,
+                        status_code=200,
+                        duration_ms=int((perf_counter() - started) * 1000),
+                    )
+                    await dispatch_automations(session, resolved_id, "endpoint.called", {"method": "GET", "path": full_path_for_log, "record": item})
                     return item
 
             for item in store:
@@ -376,6 +390,16 @@ async def _mock_get_impl(
                         if include:
                             related = _get_related_data(session, resolved_id, ds_id, include.split(","))
                             item = {**item, "_includes": related}
+                        create_runtime_log(
+                            session,
+                            resolved_id,
+                            "endpoint.called",
+                            method="GET",
+                            path=full_path_for_log,
+                            status_code=200,
+                            duration_ms=int((perf_counter() - started) * 1000),
+                        )
+                        await dispatch_automations(session, resolved_id, "endpoint.called", {"method": "GET", "path": full_path_for_log, "record": item})
                         return item
 
             raise HTTPException(status_code=404, detail=f"No record found matching '{target_id}'")
@@ -388,12 +412,24 @@ async def _mock_get_impl(
             related = _get_related_data(session, resolved_id, ds_id, include.split(","))
             items = [{**item, "_includes": related} for item in items]
 
-        return {
+        response = {
             "data": items,
             "total": total,
             "page": page,
             "pages": math.ceil(total / limit) if total > 0 else 0,
         }
+        create_runtime_log(
+            session,
+            resolved_id,
+            "endpoint.called",
+            method="GET",
+            path=full_path_for_log,
+            status_code=200,
+            duration_ms=int((perf_counter() - started) * 1000),
+            metadata={"total": total},
+        )
+        await dispatch_automations(session, resolved_id, "endpoint.called", {"method": "GET", "path": full_path_for_log, "total": total})
+        return response
     except HTTPException:
         raise
     except Exception as e:
@@ -482,6 +518,8 @@ async def mock_post(
         _save_record(session, resolved_id, ds_id, record_id, new_item)
 
     await _get_webhook_dispatcher()(session, str(resolved_id), "create", new_item)
+    create_runtime_log(session, resolved_id, "record.created", method="POST", path=full_path, status_code=201, metadata={"record_id": record_id})
+    await dispatch_automations(session, resolved_id, "record.created", {"method": "POST", "path": full_path, "record": new_item})
     return new_item
 
 
@@ -518,6 +556,8 @@ async def mock_put(
                 store[i] = updated
                 _save_record(session, resolved_id, ds_id, item_id, updated)
                 await _get_webhook_dispatcher()(session, str(resolved_id), "update", updated)
+                create_runtime_log(session, resolved_id, "record.updated", method="PUT", path=f"/{path.strip('/')}", status_code=200, metadata={"record_id": item_id})
+                await dispatch_automations(session, resolved_id, "record.updated", {"method": "PUT", "path": f"/{path.strip('/')}", "record": updated})
                 return updated
 
     raise HTTPException(status_code=404, detail="Not found")
@@ -546,6 +586,8 @@ async def mock_delete(
                 removed = store.pop(i)
                 _delete_record(session, resolved_id, ds_id, item_id)
                 await _get_webhook_dispatcher()(session, str(resolved_id), "delete", removed)
+                create_runtime_log(session, resolved_id, "record.deleted", method="DELETE", path=f"/{path.strip('/')}", status_code=204, metadata={"record_id": item_id})
+                await dispatch_automations(session, resolved_id, "record.deleted", {"method": "DELETE", "path": f"/{path.strip('/')}", "record": removed})
                 return
 
     raise HTTPException(status_code=404, detail="Not found")

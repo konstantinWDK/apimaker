@@ -13,9 +13,10 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from ..db import get_session
-from ..db_models import Webhook as DBWebhook
+from ..db_models import Webhook as DBWebhook, WebhookDelivery
 from ..db_models import Project as DBProject
 from ..security import CurrentUser, get_current_user_from_header, require_project_access
+from ..services.product_ops import create_runtime_log, json_dumps
 
 router = APIRouter(prefix="/projects/{project_id}/webhooks", tags=["webhooks"])
 
@@ -25,6 +26,16 @@ class WebhookResponse(BaseModel):
     url: str
     events: list[str]
     is_active: bool
+    created_at: str
+
+
+class WebhookDeliveryResponse(BaseModel):
+    id: str
+    webhook_id: str
+    event: str
+    status: str
+    status_code: int | None = None
+    error: str | None = None
     created_at: str
 
 
@@ -136,6 +147,34 @@ def delete_webhook(
     session.commit()
 
 
+@router.get("/{webhook_id}/deliveries", response_model=list[WebhookDeliveryResponse])
+def list_deliveries(
+    project_id: str,
+    webhook_id: str,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(get_current_user_from_header),
+    project: DBProject = Depends(require_project_access),
+) -> list[WebhookDeliveryResponse]:
+    rows = session.exec(
+        select(WebhookDelivery)
+        .where(WebhookDelivery.project_id == project.id, WebhookDelivery.webhook_id == webhook_id)
+        .order_by(WebhookDelivery.created_at.desc())
+        .limit(100)
+    ).all()
+    return [
+        WebhookDeliveryResponse(
+            id=row.id,
+            webhook_id=row.webhook_id,
+            event=row.event,
+            status=row.status,
+            status_code=row.status_code,
+            error=row.error,
+            created_at=row.created_at.isoformat(),
+        )
+        for row in rows
+    ]
+
+
 # ─── Webhook dispatcher (called by mock server) ────────────────
 
 async def dispatch_webhooks(
@@ -163,10 +202,43 @@ async def dispatch_webhooks(
             "data": payload,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
+        delivery = WebhookDelivery(
+            webhook_id=wh.id,
+            project_id=project_id,
+            event=event,
+            status="pending",
+            request_body=json_dumps(body),
+        )
+        session.add(delivery)
+        session.commit()
 
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.post(wh.url, json=body)
+                delivery.status = "success" if 200 <= resp.status_code < 300 else "failed"
+                delivery.status_code = resp.status_code
+                delivery.response_body = resp.text[:1000]
+                session.add(delivery)
+                session.commit()
+                create_runtime_log(
+                    session,
+                    project_id,
+                    "webhook.delivered",
+                    status_code=resp.status_code,
+                    message=wh.url,
+                    metadata={"webhook_id": wh.id, "delivery_id": delivery.id, "event": event},
+                )
                 logging.info(f"Webhook {wh.id} -> {wh.url}: {resp.status_code}")
         except Exception as e:
+            delivery.status = "failed"
+            delivery.error = str(e)[:500]
+            session.add(delivery)
+            session.commit()
+            create_runtime_log(
+                session,
+                project_id,
+                "webhook.failed",
+                message=wh.url,
+                metadata={"webhook_id": wh.id, "delivery_id": delivery.id, "event": event, "error": str(e)},
+            )
             logging.warning(f"Webhook {wh.id} -> {wh.url} failed: {e}")

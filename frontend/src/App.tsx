@@ -14,6 +14,7 @@ import { SecurityPage } from './components/SecurityPage'
 import { DeployPage } from './components/DeployPage'
 import { BuilderPage } from './components/BuilderPage'
 import { SimulatorPage } from './components/SimulatorPage'
+import { ProductOpsPage } from './components/ProductOpsPage'
 import { useProjectBuilder } from './hooks/useProjectBuilder'
 import { useAuth } from './hooks/useAuth'
 import { useToast } from './components/Toast'
@@ -218,6 +219,12 @@ export function App() {
                 Despliegue
               </NavLink>
               <NavLink
+                to="/operations"
+                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+              >
+                Operaciones
+              </NavLink>
+              <NavLink
                 to="/config"
                 className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
               >
@@ -244,6 +251,7 @@ export function App() {
             <Route path="/info" element={<InfoPage />} />
             <Route path="/security" element={<SecurityPage />} />
             <Route path="/deploy" element={<DeployPage />} />
+            <Route path="/operations" element={<ProductOpsPage />} />
             <Route path="/config" element={<ConfigPage authStatus={authStatus} onLogout={performLogout} />} />
             <Route path="/docs" element={<DocsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
