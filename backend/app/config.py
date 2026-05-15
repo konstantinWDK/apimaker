@@ -30,7 +30,11 @@ class Settings(BaseSettings):
     # Database settings
     database_url: str = "sqlite:///./app/data/apimaker.db"
 
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="APIMAKER_", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=(".env", "../.env"),
+        env_prefix="APIMAKER_",
+        extra="ignore"
+    )
 
 
 @lru_cache(maxsize=1)
