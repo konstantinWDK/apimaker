@@ -166,8 +166,26 @@ if /i "%USE_DOCKER%"=="y" (
     if "%DB_TYPE%"=="postgresql" if "%NEED_DOCKER_DB%"=="true" set "PROFILES=--profile postgres"
     if "%DB_TYPE%"=="mysql" if "%NEED_DOCKER_DB%"=="true" set "PROFILES=--profile mysql"
     set "APIMAKER_DATABASE_URL=%DB_URL_DOCKER%"
-    %DOCKER_CMD% %PROFILES% up -d --build || goto fail
+    %DOCKER_CMD% !PROFILES! up -d --build || goto fail
+
+    (
+        echo @echo off
+        echo cd /d "%%~dp0"
+        echo echo Iniciando API Maker con Docker...
+        echo %DOCKER_CMD% !PROFILES! up -d
+        echo pause
+    ) > start.bat
+) else (
+    (
+        echo @echo off
+        echo cd /d "%%~dp0"
+        echo echo Iniciando API Maker...
+        echo start "API Maker Backend" cmd /c "cd backend ^&^& .venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
+        echo start "API Maker Frontend" cmd /c "cd frontend ^&^& npm run dev"
+        echo echo Servicios iniciados en nuevas ventanas.
+    ) > start.bat
 )
+echo Se ha generado 'start.bat' para iniciar la aplicacion comodamente.
 
 echo.
 echo =======================================

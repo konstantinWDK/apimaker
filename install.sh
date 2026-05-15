@@ -239,7 +239,31 @@ if [ "$USE_DOCKER" = "y" ]; then
     export APIMAKER_DATABASE_URL="$DB_URL_DOCKER"
     echo -e "${BLUE}Levantando servicios con Docker...${NC}"
     $DOCKER_CMD $PROFILES up -d --build
+
+    cat << EOF > start.sh
+#!/usr/bin/env bash
+cd "\$(dirname "\$0")"
+echo "Iniciando API Maker con Docker..."
+$DOCKER_CMD $PROFILES up -d
+EOF
+else
+    cat << 'EOF' > start.sh
+#!/usr/bin/env bash
+cd "$(dirname "$0")"
+echo -e "\033[0;32mIniciando API Maker...\033[0m"
+echo "Backend: http://localhost:8000"
+echo "Frontend: http://localhost:5173"
+echo "Presiona Ctrl+C para detener ambos."
+(cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000) &
+BACKEND_PID=$!
+(cd frontend && npm run dev) &
+FRONTEND_PID=$!
+trap "kill $BACKEND_PID $FRONTEND_PID 2>/dev/null" EXIT INT TERM
+wait
+EOF
 fi
+chmod +x start.sh
+echo -e "${CYAN}Se ha generado 'start.sh' para iniciar la aplicacion comodamente.${NC}"
 
 echo ""
 echo -e "${GREEN}=======================================${NC}"
