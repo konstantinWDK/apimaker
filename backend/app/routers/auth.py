@@ -18,7 +18,7 @@ from ..services.jwt_service import (
     hash_password,
     verify_password,
 )
-from ..security import CurrentUser, get_current_user_from_header, require_admin
+from ..security import CurrentUser, get_current_user_from_header, get_optional_current_user_from_header, require_admin
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -91,7 +91,7 @@ def login(payload: LoginRequest, session: Session = Depends(get_session)) -> Log
 def register(
     payload: RegisterRequest,
     session: Session = Depends(get_session),
-    user: CurrentUser | None = Depends(get_current_user_from_header),
+    user: CurrentUser | None = Depends(get_optional_current_user_from_header),
 ) -> dict:
     """Register a new user. First user becomes admin; subsequent users require admin auth."""
     existing_count = len(session.exec(select(User)).all())
@@ -248,6 +248,12 @@ def reset_credentials(
     user: CurrentUser = Depends(require_admin),
 ) -> None:
     """Reset admin password and username to admin/admin. Requires admin auth."""
+    from ..config import get_settings
+    if get_settings().environment != "development":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Credential reset is only available in development",
+        )
     from ..services.jwt_service import hash_password
     db_user = session.get(User, user.user_id)
     if not db_user:

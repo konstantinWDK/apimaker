@@ -14,7 +14,8 @@ from sqlmodel import Session, select
 
 from ..db import get_session
 from ..db_models import Webhook as DBWebhook
-from ..security import CurrentUser, get_current_user_from_header
+from ..db_models import Project as DBProject
+from ..security import CurrentUser, get_current_user_from_header, require_project_access
 
 router = APIRouter(prefix="/projects/{project_id}/webhooks", tags=["webhooks"])
 
@@ -43,6 +44,7 @@ def list_webhooks(
     project_id: str,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
+    _project: DBProject = Depends(require_project_access),
 ) -> list[WebhookResponse]:
     from ..services.project_service import project_service
     resolved_id = project_service.resolve_id(session, project_id)
@@ -67,6 +69,7 @@ def create_webhook(
     payload: CreateWebhookRequest,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
+    _project: DBProject = Depends(require_project_access),
 ) -> WebhookResponse:
     from ..services.project_service import project_service
     resolved_id = project_service.resolve_id(session, project_id)
@@ -94,9 +97,10 @@ def update_webhook(
     payload: UpdateWebhookRequest,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
+    project: DBProject = Depends(require_project_access),
 ) -> WebhookResponse:
     webhook = session.get(DBWebhook, webhook_id)
-    if not webhook:
+    if not webhook or webhook.project_id != project.id:
         raise HTTPException(status_code=404, detail="Webhook not found")
     if payload.url is not None:
         webhook.url = payload.url
@@ -123,9 +127,10 @@ def delete_webhook(
     webhook_id: str,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
+    project: DBProject = Depends(require_project_access),
 ) -> None:
     webhook = session.get(DBWebhook, webhook_id)
-    if not webhook:
+    if not webhook or webhook.project_id != project.id:
         raise HTTPException(status_code=404, detail="Webhook not found")
     session.delete(webhook)
     session.commit()

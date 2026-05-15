@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from sqlmodel import Session, select
 
-from ..db_models import Dataset, DatasetField, Endpoint, FieldMappingRule, Project
+from ..db_models import Dataset, DatasetField, Endpoint, FieldMappingRule, Project, User, WorkspaceMember
 
 
 
@@ -101,7 +101,21 @@ class ProjectService:
         if workspace_id:
             query = query.where(Project.workspace_id == workspace_id)
         # If no workspace filter but user is authenticated, return all (for now — can restrict later)
-        return session.exec(query).all()
+        projects = session.exec(query).all()
+        if not user_id:
+            return []
+        user = session.get(User, user_id)
+        if user and user.role == "admin":
+            return projects
+        memberships = session.exec(
+            select(WorkspaceMember).where(WorkspaceMember.user_id == user_id)
+        ).all()
+        workspace_ids = {m.workspace_id for m in memberships}
+        return [
+            project
+            for project in projects
+            if project.created_by == user_id or (project.workspace_id and project.workspace_id in workspace_ids)
+        ]
 
     def get_project(self, session: Session, project_id: str) -> Project:
         project = session.get(Project, str(project_id))

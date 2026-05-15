@@ -9,7 +9,7 @@ from sqlmodel import Session, select
 
 from .config import get_settings
 from .db import get_session
-from .db_models import User, Workspace, WorkspaceMember
+from .db_models import DbConnection, Project, User, Workspace, WorkspaceMember
 from .services.jwt_service import decode_token
 
 
@@ -59,6 +59,15 @@ def get_current_user_from_header(
     )
 
 
+def get_optional_current_user_from_header(
+    authorization: Optional[str] = Header(default=None),
+) -> CurrentUser | None:
+    """Return the current user when a Bearer token is present, otherwise None."""
+    if not authorization:
+        return None
+    return get_current_user_from_header(authorization)
+
+
 def get_current_user_from_cookie(
     token: Optional[str] = Cookie(default=None),
 ) -> CurrentUser:
@@ -103,6 +112,59 @@ def require_admin(user: CurrentUser = Depends(get_current_user_from_header)) -> 
             detail="Admin access required",
         )
     return user
+
+
+def _resolve_project(session: Session, project_id: str) -> Project:
+    project = session.get(Project, str(project_id))
+    if project is None:
+        project = session.exec(select(Project).where(Project.slug == project_id.lower())).first()
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
+
+
+def user_can_access_project(session: Session, project: Project, user: CurrentUser) -> bool:
+    """Check whether the user can access a project."""
+    if user.role == "admin":
+        return True
+    if project.created_by == user.user_id:
+        return True
+    if project.workspace_id:
+        membership = session.exec(
+            select(WorkspaceMember).where(
+                WorkspaceMember.workspace_id == project.workspace_id,
+                WorkspaceMember.user_id == user.user_id,
+            )
+        ).first()
+        return membership is not None
+    return False
+
+
+def require_project_access(
+    project_id: str,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(get_current_user_from_header),
+) -> Project:
+    """Resolve a project and require the current user to have access to it."""
+    project = _resolve_project(session, project_id)
+    if not user_can_access_project(session, project, user):
+        raise HTTPException(status_code=403, detail="Not allowed to access this project")
+    return project
+
+
+def require_connection_access(
+    connection_id: str,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(get_current_user_from_header),
+) -> DbConnection:
+    """Resolve a database connection and require access to its project."""
+    conn = session.get(DbConnection, connection_id)
+    if conn is None:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    project = _resolve_project(session, conn.project_id)
+    if not user_can_access_project(session, project, user):
+        raise HTTPException(status_code=403, detail="Not allowed to access this connection")
+    return conn
 
 
 def get_user_db(session: Session, user_id: str) -> User:

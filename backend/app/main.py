@@ -1,6 +1,7 @@
 """FastAPI entrypoint for API Maker backend."""
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -51,9 +52,12 @@ else:
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logging.error(f"Unhandled error on {request.method} {request.url.path}: {exc}", exc_info=True)
+    detail = "Internal server error"
+    if settings.environment == "development":
+        detail = f"Internal server error: {str(exc)}"
     return JSONResponse(
         status_code=500,
-        content={"detail": f"Internal server error: {str(exc)}", "error_code": "INTERNAL_ERROR"},
+        content={"detail": detail, "error_code": "INTERNAL_ERROR"},
     )
 
 
@@ -71,7 +75,6 @@ app.include_router(deploy_router.router)
 app.include_router(connections_router.router)
 
 
-@app.on_event("startup")
 def on_startup() -> None:
     """Initialize database tables on startup."""
     logging.basicConfig(level=logging.INFO)
@@ -121,6 +124,15 @@ def on_startup() -> None:
                         logging.warning(f"Migration script failed: {result.stderr}")
     except Exception as e:
         logging.warning(f"Auto-seed skipped: {e}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    on_startup()
+    yield
+
+
+app.router.lifespan_context = lifespan
 
 
 @app.get("/health", tags=["health"])

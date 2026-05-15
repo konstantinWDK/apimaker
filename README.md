@@ -1,4 +1,4 @@
-# API Maker
+﻿# API Maker
 
 Plataforma visual y open source para diseñar datasets, endpoints REST y desplegar APIs listas para producción. Incluye editor visual (React), backend en FastAPI, mock server integrado, CLI para deploy y generación de código para FastAPI/Express/NestJS.
 
@@ -144,3 +144,4 @@ cd backend
 pytest -v
 # 32 tests: health, auth, generator, migration, mock
 ```
+

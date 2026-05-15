@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import socket
 import shutil
 import subprocess
@@ -17,6 +18,7 @@ from pydantic import BaseModel
 from sqlmodel import Session
 
 from ..db import get_session
+from ..security import CurrentUser, require_admin
 from ..services.project_service import project_service
 
 logger = logging.getLogger("apimaker.deploy")
@@ -46,6 +48,21 @@ else:
 TRACKING_FILE = DEPLOY_ROOT / ".deployments.json"
 PORT_RANGE = range(8080, 8100)
 DEPLOY_IMAGE = "apimaker-deploy:latest"
+
+
+def _safe_slug(slug: str) -> str:
+    """Validate deployment slugs before using them as directory names."""
+    if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_.-]{0,120}", slug or ""):
+        raise HTTPException(status_code=400, detail="Invalid deployment slug")
+    return slug
+
+
+def _deploy_dir_for_slug(slug: str) -> Path:
+    deploy_dir = (DEPLOY_ROOT / _safe_slug(slug)).resolve()
+    root = DEPLOY_ROOT.resolve()
+    if root != deploy_dir and root not in deploy_dir.parents:
+        raise HTTPException(status_code=400, detail="Invalid deployment path")
+    return deploy_dir
 
 
 def _get_host_deploy_root() -> str:
@@ -305,10 +322,10 @@ volumes:
 
 
 @router.post("/local/stop")
-def stop_deployment(req: SlugRequest) -> DeployStatus:
+def stop_deployment(req: SlugRequest, user: CurrentUser = Depends(require_admin)) -> DeployStatus:
     """Stop a local deployment."""
-    slug = req.slug
-    deploy_dir = DEPLOY_ROOT / slug
+    slug = _safe_slug(req.slug)
+    deploy_dir = _deploy_dir_for_slug(slug)
     if not deploy_dir.exists():
         raise HTTPException(status_code=404, detail="Deployment not found")
 
@@ -329,10 +346,10 @@ def stop_deployment(req: SlugRequest) -> DeployStatus:
 
 
 @router.post("/local/start")
-def start_deployment(req: SlugRequest) -> DeployStatus:
+def start_deployment(req: SlugRequest, user: CurrentUser = Depends(require_admin)) -> DeployStatus:
     """Start a stopped deployment."""
-    slug = req.slug
-    deploy_dir = DEPLOY_ROOT / slug
+    slug = _safe_slug(req.slug)
+    deploy_dir = _deploy_dir_for_slug(slug)
     if not deploy_dir.exists():
         raise HTTPException(status_code=404, detail="Deployment not found")
     try:
@@ -352,10 +369,10 @@ def start_deployment(req: SlugRequest) -> DeployStatus:
 
 
 @router.post("/local/restart")
-def restart_deployment(req: SlugRequest) -> DeployStatus:
+def restart_deployment(req: SlugRequest, user: CurrentUser = Depends(require_admin)) -> DeployStatus:
     """Restart a deployment."""
-    slug = req.slug
-    deploy_dir = DEPLOY_ROOT / slug
+    slug = _safe_slug(req.slug)
+    deploy_dir = _deploy_dir_for_slug(slug)
     if not deploy_dir.exists():
         raise HTTPException(status_code=404, detail="Deployment not found")
     try:
@@ -391,7 +408,11 @@ class RemoteDeployRequest(BaseModel):
 
 
 @router.post("/remote")
-def deploy_remote(req: RemoteDeployRequest, session: Session = Depends(get_session)) -> DeployStatus:
+def deploy_remote(
+    req: RemoteDeployRequest,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(require_admin),
+) -> DeployStatus:
     """Deploy a project to a remote VPS via SSH + Docker."""
     import tempfile
 
@@ -400,7 +421,13 @@ def deploy_remote(req: RemoteDeployRequest, session: Session = Depends(get_sessi
     resolved = project_service.resolve_id(session, req.project_id)
     data = project_service.get_project_with_data(session, resolved)
     project = data["project"]
-    slug = project.slug or str(project.id)
+    slug = _safe_slug(project.slug or str(project.id))
+    if not re.fullmatch(r"[a-zA-Z0-9_.-]{1,64}", req.user):
+        raise HTTPException(status_code=400, detail="Invalid SSH user")
+    if not re.fullmatch(r"[a-zA-Z0-9_.:-]{1,253}", req.host):
+        raise HTTPException(status_code=400, detail="Invalid SSH host")
+    if not (1 <= req.port <= 65535 and 1 <= req.api_port <= 65535):
+        raise HTTPException(status_code=400, detail="Invalid port")
     remote_dir = f"/opt/apimaker/{slug}"
     remote_url = f"{req.user}@{req.host}"
 
@@ -426,7 +453,7 @@ def deploy_remote(req: RemoteDeployRequest, session: Session = Depends(get_sessi
         # Export project as JSON
         logs.append(" Exportando proyecto...")
         from ..routers.projects import _db_to_pydantic
-        export_data = _db_to_pydantic(project, data["datasets"], data["endpoints"])
+        export_data = _db_to_pydantic(project, data["datasets"], data["endpoints"], include_secrets=True)
         json_path = Path(tempfile.gettempdir()) / f"{slug}-project.json"
         json_path.write_text(export_data.model_dump_json(indent=2))
 
@@ -473,10 +500,10 @@ def deploy_remote(req: RemoteDeployRequest, session: Session = Depends(get_sessi
 
 
 @router.post("/local/delete")
-def delete_deployment(req: SlugRequest) -> DeployStatus:
+def delete_deployment(req: SlugRequest, user: CurrentUser = Depends(require_admin)) -> DeployStatus:
     """Stop and remove a local deployment entirely."""
-    slug = req.slug
-    deploy_dir = DEPLOY_ROOT / slug
+    slug = _safe_slug(req.slug)
+    deploy_dir = _deploy_dir_for_slug(slug)
     logs: list[str] = []
     if deploy_dir.exists():
         subprocess.run(
@@ -520,7 +547,7 @@ def _check_docker_container(slug: str) -> str:
 
 
 @router.get("/list")
-def list_deployments() -> list[dict]:
+def list_deployments(user: CurrentUser = Depends(require_admin)) -> list[dict]:
     """List all deployments with real-time Docker status."""
     tracking = _load_tracking()
     result: list[dict] = []
@@ -533,7 +560,7 @@ def list_deployments() -> list[dict]:
 
 
 @router.get("/docker-status")
-def docker_status() -> dict:
+def docker_status(user: CurrentUser = Depends(require_admin)) -> dict:
     """Check if Docker is available on this machine."""
     try:
         result = subprocess.run(
@@ -556,7 +583,7 @@ def docker_status() -> dict:
 
 
 @router.get("/local/ports")
-def list_ports() -> dict:
+def list_ports(user: CurrentUser = Depends(require_admin)) -> dict:
     """List used and available ports for local deployments."""
     used: list[int] = []
     available: list[int] = []
@@ -574,15 +601,19 @@ def list_ports() -> dict:
 
 
 @router.get("/local/check-port")
-def check_port(port: int) -> dict:
+def check_port(port: int, user: CurrentUser = Depends(require_admin)) -> dict:
     """Check if a specific port is available on the host."""
+    if not 1 <= port <= 65535:
+        raise HTTPException(status_code=400, detail="Invalid port")
     return {"port": port, "free": _port_is_free(port)}
 
 
 @router.post("/local/rebuild-image")
-def rebuild_deploy_image() -> DeployStatus:
+def rebuild_deploy_image(user: CurrentUser = Depends(require_admin)) -> DeployStatus:
     """Rebuild the local deploy Docker image."""
     logs: list[str] = []
+    if not 1 <= req.port <= 65535:
+        raise HTTPException(status_code=400, detail="Invalid port")
     logs.append(" Eliminando imagen anterior...")
     subprocess.run(["docker", "rmi", "-f", DEPLOY_IMAGE], capture_output=True, timeout=30)
     if _ensure_deploy_image(logs):
@@ -591,7 +622,11 @@ def rebuild_deploy_image() -> DeployStatus:
 
 
 @router.post("/local")
-def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session)) -> DeployStatus:
+def deploy_local(
+    req: LocalDeployRequest,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(require_admin),
+) -> DeployStatus:
     """Deploy a project locally using Docker."""
     logs: list[str] = []
 
@@ -601,8 +636,8 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
     datasets_with_fields = data["datasets"]
     endpoints = data["endpoints"]
 
-    slug = project.slug or str(project.id)
-    deploy_dir = DEPLOY_ROOT / slug
+    slug = _safe_slug(project.slug or str(project.id))
+    deploy_dir = _deploy_dir_for_slug(slug)
 
     # Check port and find available one if needed
     port, port_logs = _find_free_port(req.port)
@@ -660,7 +695,7 @@ def deploy_local(req: LocalDeployRequest, session: Session = Depends(get_session
 
     # Export project as JSON for the standalone server
     from ..routers.projects import _db_to_pydantic
-    export_data = _db_to_pydantic(project, datasets_with_fields, endpoints)
+    export_data = _db_to_pydantic(project, datasets_with_fields, endpoints, include_secrets=True)
     (deploy_dir / "project.json").write_text(
         export_data.model_dump_json(indent=2),
         encoding="utf-8",

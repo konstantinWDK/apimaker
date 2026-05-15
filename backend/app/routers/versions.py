@@ -11,7 +11,7 @@ from sqlmodel import Session, select
 
 from ..db import get_session
 from ..db_models import Project as DBProject, ProjectVersion
-from ..security import CurrentUser, get_current_user_from_header
+from ..security import CurrentUser, get_current_user_from_header, require_project_access
 from ..services.project_service import project_service
 
 router = APIRouter(prefix="/projects/{project_id}/versions", tags=["versions"])
@@ -37,6 +37,7 @@ def list_versions(
     project_id: str,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
+    _project: DBProject = Depends(require_project_access),
 ) -> list[VersionResponse]:
     resolved_id = project_service.resolve_id(session, project_id)
     versions = session.exec(
@@ -61,6 +62,7 @@ def get_version(
     version_id: str,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
+    _project: DBProject = Depends(require_project_access),
 ) -> VersionDetailResponse:
     resolved_id = project_service.resolve_id(session, project_id)
     version = session.get(ProjectVersion, version_id)
@@ -81,6 +83,7 @@ def create_version(
     payload: CreateVersionRequest,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
+    _project: DBProject = Depends(require_project_access),
 ) -> VersionResponse:
     from ..db_models import Dataset, DatasetField, Endpoint
 
@@ -121,8 +124,8 @@ def create_version(
     snapshot = {
         "project": {
             "name": project.name, "slug": project.slug, "description": project.description,
-            "auth_method": project.auth_method, "api_key": project.api_key,
-            "jwt_secret": project.jwt_secret, "rate_limit": project.rate_limit,
+            "auth_method": project.auth_method, "api_key": None,
+            "jwt_secret": None, "rate_limit": project.rate_limit,
             "target_stack": project.target_stack,
         },
         "datasets": datasets_data,
@@ -153,6 +156,7 @@ def restore_version(
     version_id: str,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
+    _project: DBProject = Depends(require_project_access),
 ) -> dict:
     from ..db_models import Dataset, DatasetField, Endpoint
 

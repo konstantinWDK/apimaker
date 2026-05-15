@@ -13,6 +13,7 @@ from alembic import command
 import logging
 
 from .config import get_settings
+from . import db_models  # noqa: F401 - register SQLModel metadata before create_all
 
 settings = get_settings()
 

@@ -11,6 +11,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.engine import URL
 from sqlmodel import Session, select
 
 from ..config import get_settings
@@ -26,7 +27,7 @@ from ..models import (
     TableSchema,
     TestConnectionResult,
 )
-from ..security import CurrentUser, get_current_user_from_header
+from ..security import CurrentUser, get_current_user_from_header, require_connection_access, require_project_access
 
 logger = logging.getLogger("apimaker.connections")
 router = APIRouter(prefix="/api/connections", tags=["connections"])
@@ -76,32 +77,31 @@ def _build_sqlalchemy_url(conn: DbConnection, password: str | None = None) -> st
             return f"sqlite:///{conn.database}"
         return "sqlite://"
 
-    pwd = password or ""
     host = conn.host or "localhost"
     port = conn.port or {"postgresql": 5432, "mysql": 3306, "mssql": 1433}.get(db_type, 5432)
     db = conn.database or ""
 
     if db_type == "postgresql":
-        return f"postgresql+psycopg2://{conn.username}:{pwd}@{host}:{port}/{db}"
+        return str(URL.create("postgresql+psycopg2", username=conn.username, password=password or "", host=host, port=port, database=db))
     elif db_type == "mysql":
-        return f"mysql+pymysql://{conn.username}:{pwd}@{host}:{port}/{db}"
+        return str(URL.create("mysql+pymysql", username=conn.username, password=password or "", host=host, port=port, database=db))
     elif db_type == "mssql":
-        return f"mssql+pymssql://{conn.username}:{pwd}@{host}:{port}/{db}"
-    return f"postgresql+psycopg2://{conn.username}:{pwd}@{host}:{port}/{db}"
+        return str(URL.create("mssql+pymssql", username=conn.username, password=password or "", host=host, port=port, database=db))
+    return str(URL.create("postgresql+psycopg2", username=conn.username, password=password or "", host=host, port=port, database=db))
 
 
 # ── CRUD Endpoints ──
 
 @router.get("/project/{project_id}", response_model=list[DbConnectionResponse])
-def list_connections(project_id: str, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header)):
-    connections = session.exec(select(DbConnection).where(DbConnection.project_id == project_id)).all()
+def list_connections(project_id: str, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header), _project=Depends(require_project_access)):
+    connections = session.exec(select(DbConnection).where(DbConnection.project_id == _project.id)).all()
     return [_db_connection_to_response(c) for c in connections]
 
 
 @router.post("/project/{project_id}", response_model=DbConnectionResponse, status_code=201)
-def create_connection(project_id: str, req: DbConnectionCreate, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header)):
+def create_connection(project_id: str, req: DbConnectionCreate, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header), _project=Depends(require_project_access)):
     conn = DbConnection(
-        project_id=project_id,
+        project_id=_project.id,
         name=req.name,
         db_type=req.db_type or "postgresql",
         host=req.host,
@@ -118,10 +118,7 @@ def create_connection(project_id: str, req: DbConnectionCreate, session: Session
 
 
 @router.put("/{connection_id}", response_model=DbConnectionResponse)
-def update_connection(connection_id: str, req: DbConnectionUpdate, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header)):
-    conn = session.get(DbConnection, connection_id)
-    if not conn:
-        raise HTTPException(status_code=404, detail="Connection not found")
+def update_connection(connection_id: str, req: DbConnectionUpdate, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header), conn: DbConnection = Depends(require_connection_access)):
     if req.name is not None:
         conn.name = req.name
     if req.db_type is not None:
@@ -146,10 +143,7 @@ def update_connection(connection_id: str, req: DbConnectionUpdate, session: Sess
 
 
 @router.delete("/{connection_id}")
-def delete_connection(connection_id: str, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header)):
-    conn = session.get(DbConnection, connection_id)
-    if not conn:
-        raise HTTPException(status_code=404, detail="Connection not found")
+def delete_connection(connection_id: str, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header), conn: DbConnection = Depends(require_connection_access)):
     session.delete(conn)
     session.commit()
     return {"ok": True}
@@ -158,10 +152,7 @@ def delete_connection(connection_id: str, session: Session = Depends(get_session
 # ── Test connection ──
 
 @router.post("/{connection_id}/test", response_model=TestConnectionResult)
-def test_connection(connection_id: str, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header)):
-    conn = session.get(DbConnection, connection_id)
-    if not conn:
-        raise HTTPException(status_code=404, detail="Connection not found")
+def test_connection(connection_id: str, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header), conn: DbConnection = Depends(require_connection_access)):
 
     password = _decrypt_password(conn.password_encrypted) if conn.password_encrypted else None
     url = _build_sqlalchemy_url(conn, password)
@@ -180,10 +171,7 @@ def test_connection(connection_id: str, session: Session = Depends(get_session),
 # ── Introspect tables ──
 
 @router.get("/{connection_id}/tables", response_model=list[TableInfo])
-def list_tables(connection_id: str, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header)):
-    conn = session.get(DbConnection, connection_id)
-    if not conn:
-        raise HTTPException(status_code=404, detail="Connection not found")
+def list_tables(connection_id: str, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header), conn: DbConnection = Depends(require_connection_access)):
 
     password = _decrypt_password(conn.password_encrypted) if conn.password_encrypted else None
     url = _build_sqlalchemy_url(conn, password)
@@ -203,10 +191,7 @@ def list_tables(connection_id: str, session: Session = Depends(get_session), use
 
 
 @router.get("/{connection_id}/tables/{table_name}/schema", response_model=TableSchema)
-def get_table_schema(connection_id: str, table_name: str, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header)):
-    conn = session.get(DbConnection, connection_id)
-    if not conn:
-        raise HTTPException(status_code=404, detail="Connection not found")
+def get_table_schema(connection_id: str, table_name: str, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header), conn: DbConnection = Depends(require_connection_access)):
 
     password = _decrypt_password(conn.password_encrypted) if conn.password_encrypted else None
     url = _build_sqlalchemy_url(conn, password)
@@ -243,10 +228,7 @@ def get_table_schema(connection_id: str, table_name: str, session: Session = Dep
 # ── Query ──
 
 @router.post("/{connection_id}/query")
-def run_query(connection_id: str, req: QueryRequest, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header)):
-    conn = session.get(DbConnection, connection_id)
-    if not conn:
-        raise HTTPException(status_code=404, detail="Connection not found")
+def run_query(connection_id: str, req: QueryRequest, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header), conn: DbConnection = Depends(require_connection_access)):
 
     sql_upper = req.sql.strip().upper()
     if not sql_upper.startswith("SELECT"):
