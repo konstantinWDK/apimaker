@@ -201,6 +201,16 @@ if "%DB_TYPE%"=="postgresql" echo Host: %PG_HOST%  Usuario: %PG_USER%  Database:
 if "%DB_TYPE%"=="mysql" echo Host: %MY_HOST%  Usuario: %MY_USER%  Database: %MY_DB%
 if "%NEED_DOCKER_DB%"=="true" echo Estado DB: contenedor Docker creado y corriendo.
 echo.
+
+if /i not "%USE_DOCKER%"=="y" (
+    echo Para arrancar la aplicacion:
+    echo Opcion 1: Ejecutar el script generado start.bat
+    echo Opcion 2: Arrancar manualmente abriendo dos consolas:
+    echo   Consola 1 ^(Backend^):  cd backend ^&^& .venv\Scripts\python.exe -m uvicorn app.main:app --reload
+    echo   Consola 2 ^(Frontend^): cd frontend ^&^& npm run dev
+    echo.
+)
+
 pause
 exit /b 0
 

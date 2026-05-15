@@ -276,3 +276,12 @@ echo -e "Base Datos:   ${CYAN}$DB_TYPE${NC}"
 if [ "$NEED_DOCKER_DB" = true ]; then
     echo -e "${CYAN}BD ejecutandose en Docker.${NC}"
 fi
+
+if [ "$USE_DOCKER" != "y" ]; then
+    echo ""
+    echo -e "${YELLOW}Para arrancar la aplicacion:${NC}"
+    echo -e "Opcion 1: Ejecutar el script generado ${BLUE}./start.sh${NC}"
+    echo -e "Opcion 2: Arrancar manualmente abriendo dos terminales:"
+    echo -e "  Terminal 1 (Backend):  ${CYAN}cd backend && source .venv/bin/activate && uvicorn app.main:app --reload${NC}"
+    echo -e "  Terminal 2 (Frontend): ${CYAN}cd frontend && npm run dev${NC}"
+fi
