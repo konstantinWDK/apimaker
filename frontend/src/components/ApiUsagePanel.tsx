@@ -121,17 +121,23 @@ export function ApiUsagePanel() {
       {
         num: 1,
         title: 'Instala API Maker',
-        desc: 'Ejecuta el instalador desde la terminal. Crea el admin, elige base de datos y carga datos demo:',
-        code: './install.sh\n\n# El Setup Wizard te guia:\n# - Usuario admin (por defecto: admin / admin)\n# - BD: SQLite (sin config) o PostgreSQL\n# - Datos demo: proyecto Pokedex',
+        desc: 'Ejecuta el instalador desde la terminal. Detectará conflictos de puertos y generará scripts de arranque personalizados:',
+        code: './install.sh\n\n# El Setup Wizard te guía:\n# - Usuario admin (por defecto: admin / admin)\n# - BD: SQLite o PostgreSQL (con gestión de puertos)\n# - Generación automática de start.sh / start.bat',
       },
       {
         num: 2,
+        title: 'Arranca la aplicación',
+        desc: 'Usa el script generado para iniciar el Backend y Frontend de forma unificada con logs profesionales:',
+        code: './start.sh\n\n# Frontend: http://localhost:5173\n# Backend:  http://localhost:8000',
+      },
+      {
+        num: 3,
         title: 'Inicia sesion',
         desc: 'Accede a http://localhost:5173 con las credenciales configuradas en el wizard:',
         code: 'Usuario: admin\nContrasena: admin',
       },
       {
-        num: 3,
+        num: 4,
         title: 'Configura tu proyecto',
         desc: 'Define nombre, descripcion y stack tecnologico:',
         fields: [
@@ -141,7 +147,7 @@ export function ApiUsagePanel() {
         ],
       },
       {
-        num: 4,
+        num: 5,
         title: 'Define el dataset',
         desc: 'Ve a la pestana "Datasets" y anade los campos de tu modelo. Puedes importar desde CSV, Excel o una BD externa:',
         table: [
@@ -155,7 +161,7 @@ export function ApiUsagePanel() {
         ],
       },
       {
-        num: 5,
+        num: 6,
         title: 'Disena los endpoints',
         desc: 'En la pestana "Endpoints" anade las rutas REST. Cada endpoint se vincula a un dataset:',
         endpoints: [
@@ -167,34 +173,34 @@ export function ApiUsagePanel() {
         ],
       },
       {
-        num: 6,
+        num: 7,
         title: 'Prueba en el Simulador',
         desc: 'En la pestana "Simulador", lanza el mock server y prueba tus endpoints con datos realistas generados automaticamente. No necesitas backend externo.',
       },
       {
-        num: 7,
+        num: 8,
         title: 'Configura Seguridad',
         desc: 'En la pestana "Seguridad" elige autenticacion (JWT, API Key), rate limiting y configura secretos. Todo se incluye en el codigo generado.',
       },
       {
-        num: 8,
+        num: 9,
         title: 'Genera la API',
         desc: 'Pulsa el boton "Guardar y lanzar API" para sincronizar con el backend y generar el bundle. Obtendras URL del sandbox, docs Redoc y share link.',
         action: { label: 'Ver ejemplos de codigo', tab: 'codigo' as UsageTab }
       },
       {
-        num: 9,
+        num: 10,
         title: 'Descarga el bundle',
         desc: 'En la pestana "API generada" encontraras el bundle .zip con codigo listo para produccion: modelos, controladores, Docker, seeds, tests y SDKs.',
         action: { label: 'Ver guia de Despliegue', tab: 'desplegar' as UsageTab }
       },
       {
-        num: 10,
+        num: 11,
         title: 'Comparte y versiona',
         desc: 'Usa el panel de Versiones para guardar snapshots del proyecto. Genera Share Links con contrasena y expiracion para compartir sin exponer el editor.',
       },
       {
-        num: 11,
+        num: 12,
         title: 'Despliega a produccion',
         desc: 'Descomprime el bundle y elige tu plataforma:',
         code: '# Docker\ncd bundle && docker compose up -d --build\n\n# Railway\nrailway up\n\n# VPS manual\npip install -r requirements.txt\nuvicorn main:app --host 0.0.0.0 --port 8000',

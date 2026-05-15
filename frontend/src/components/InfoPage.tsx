@@ -125,8 +125,8 @@ export function InfoPage() {
           <div className="info-card__icon">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#eab308" strokeWidth="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
           </div>
-          <h3 className="info-card__title">1 solo comando</h3>
-          <p className="info-card__desc">Instala todo con <code>./install.sh</code>. Setup wizard guiado, seed de datos y Docker opcional en un solo paso.</p>
+          <h3 className="info-card__title">Arranque Pro</h3>
+          <p className="info-card__desc">Instala con <code>./install.sh</code> y arranca con <code>./start.sh</code>. Gestión de puertos automática y logs unificados con un solo comando.</p>
         </div>
         <div className="info-card">
           <div className="info-card__icon">
@@ -175,8 +175,8 @@ export function InfoPage() {
           <div className="info-step">
             <span className="info-step__num">1</span>
             <div>
-              <strong>Instala en 1 comando</strong>
-              <p>Ejecuta <code>./install.sh</code> y sigue el setup wizard. Crea el admin, elige BD (SQLite o PostgreSQL) y arranca.</p>
+              <strong>Instala y arranca</strong>
+              <p>Ejecuta <code>./install.sh</code> para configurar y <code>./start.sh</code> para iniciar Backend y Frontend unificados.</p>
             </div>
           </div>
           <div className="info-step">

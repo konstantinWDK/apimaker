@@ -129,16 +129,21 @@ export function DocsPage() {
       {[
         {
           num: 1, title: 'Instala API Maker',
-          desc: 'Ejecuta el instalador desde la terminal. Crea el admin, elige base de datos y carga datos demo:',
-          code: './install.sh\n\n# El Setup Wizard te guía:\n# - Usuario admin (por defecto: admin / admin)\n# - BD: SQLite (sin config) o PostgreSQL\n# - Datos demo: proyecto Pokedex',
+          desc: 'Ejecuta el instalador desde la terminal. Detectará conflictos de puertos y generará scripts de arranque personalizados:',
+          code: './install.sh\n\n# El Setup Wizard te guía:\n# - Usuario admin (por defecto: admin / admin)\n# - BD: SQLite o PostgreSQL (con gestión de puertos)\n# - Generación automática de start.sh / start.bat',
         },
         {
-          num: 2, title: 'Inicia sesión',
+          num: 2, title: 'Arranca la aplicación',
+          desc: 'Usa el script generado para iniciar el Backend y Frontend de forma unificada con logs profesionales:',
+          code: './start.sh\n\n# Frontend: http://localhost:5173\n# Backend:  http://localhost:8000',
+        },
+        {
+          num: 3, title: 'Inicia sesión',
           desc: 'Accede a http://localhost:5173 con las credenciales que configuraste en el wizard.',
           code: 'Usuario: admin\nContraseña: admin',
         },
         {
-          num: 3, title: 'Configura tu proyecto',
+          num: 4, title: 'Configura tu proyecto',
           desc: 'Define nombre, descripción y stack tecnológico desde el panel Editor.',
           fields: [
             { label: 'Nombre', value: 'API Usuarios Banco' },
@@ -147,7 +152,7 @@ export function DocsPage() {
           ],
         },
         {
-          num: 4, title: 'Define el dataset',
+          num: 5, title: 'Define el dataset',
           desc: 'Ve a la pestaña "Datasets" y añade los campos del modelo. Puedes importar desde CSV, Excel o una BD externa:',
           table: [
             { name: 'id_cliente', type: 'integer', req: true },
@@ -160,7 +165,7 @@ export function DocsPage() {
           ],
         },
         {
-          num: 5, title: 'Diseña los endpoints',
+          num: 6, title: 'Diseña los endpoints',
           desc: 'En la pestaña "Endpoints" añade las rutas REST. Cada endpoint se vincula a un dataset:',
           endpoints: [
             { method: 'GET', path: '/clientes', summary: 'Listar todos los clientes' },
@@ -171,23 +176,23 @@ export function DocsPage() {
           ],
         },
         {
-          num: 6, title: 'Prueba en el Simulador',
+          num: 7, title: 'Prueba en el Simulador',
           desc: 'En la pestaña "Simulador", lanza el mock server y prueba tus endpoints con datos realistas generados automáticamente.',
         },
         {
-          num: 7, title: 'Configura Seguridad',
+          num: 8, title: 'Configura Seguridad',
           desc: 'Elige autenticación (JWT, API Key), rate limiting y configura secretos. Todo se incluye en el código generado.',
         },
         {
-          num: 8, title: 'Genera la API',
+          num: 9, title: 'Genera la API',
           desc: 'Pulsa "Guardar y lanzar API" para sincronizar con el backend y obtener URL del sandbox, docs Redoc y share link.',
         },
         {
-          num: 9, title: 'Descarga el bundle',
+          num: 10, title: 'Descarga el bundle',
           desc: 'En la pestaña "API generada" encontrarás el bundle .zip con código listo para producción: modelos, controladores, Docker, seeds, tests y SDKs.',
         },
         {
-          num: 10, title: 'Despliega a producción',
+          num: 11, title: 'Despliega a producción',
           desc: 'Usa el CLI, Docker o tu plataforma favorita para poner tu API en producción.',
           code: '# Docker (recomendado)\ndocker compose up -d --build\n\n# CLI Deploy\napimaker deploy proyecto.json --port 80\n\n# O manual\npip install -r requirements.txt\nuvicorn main:app --host 0.0.0.0 --port 8000',
         },
