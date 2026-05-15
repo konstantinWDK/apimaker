@@ -109,11 +109,31 @@ case "$DB_CHOICE" in
             PG_HOST="localhost"; PG_PORT="5432"; PG_USER="apimaker"; PG_DB="apimaker"
             if (echo > /dev/tcp/localhost/5432) >/dev/null 2>&1; then
                 echo -e "${YELLOW}ADVERTENCIA: El puerto 5432 ya esta en uso. Es posible que ya tengas PostgreSQL instalado localmente.${NC}"
-                read -r -p "Quieres usar otro puerto para el contenedor de Docker? [5433]: " ALT_PORT
-                PG_PORT="${ALT_PORT:-5433}"
+                echo "1) Usar otro puerto para el contenedor Docker (ej. 5433)"
+                echo "2) Usar mi base de datos PostgreSQL existente (no usar Docker)"
+                read -r -p "Elige una opcion [1]: " PORT_ACTION
+                PORT_ACTION="${PORT_ACTION:-1}"
+                if [ "$PORT_ACTION" = "2" ]; then
+                    NEED_DOCKER_DB=false
+                    read -r -p "Host [localhost]: " PG_HOST; PG_HOST="${PG_HOST:-localhost}"
+                    read -r -p "Puerto [5432]: " PG_PORT; PG_PORT="${PG_PORT:-5432}"
+                    read -r -p "Usuario [postgres]: " PG_USER; PG_USER="${PG_USER:-postgres}"
+                    read -r -s -p "Contrasena: " PG_PASS; echo ""
+                    read -r -p "Nombre BD [apimaker]: " PG_DB; PG_DB="${PG_DB:-apimaker}"
+                else
+                    read -r -p "Introduce el puerto a usar para Docker (solo numero) [5433]: " ALT_PORT
+                    ALT_PORT="${ALT_PORT:-5433}"
+                    if ! [[ "$ALT_PORT" =~ ^[0-9]+$ ]]; then
+                        echo "Puerto invalido. Usando 5433 por defecto."
+                        ALT_PORT="5433"
+                    fi
+                    PG_PORT="$ALT_PORT"
+                fi
             fi
-            PG_PASS="$(random_hex 12)"
-            echo -e "${CYAN}Se generara un contenedor PostgreSQL en el puerto $PG_PORT.${NC}"
+            if [ "$NEED_DOCKER_DB" = true ]; then
+                PG_PASS="$(random_hex 12)"
+                echo -e "${CYAN}Se generara un contenedor PostgreSQL en el puerto $PG_PORT.${NC}"
+            fi
         fi
         PG_PASS_ENC="$(urlencode "$PG_PASS")"
         DB_URL="postgresql+psycopg2://$PG_USER:$PG_PASS_ENC@$PG_HOST:$PG_PORT/$PG_DB"
@@ -137,11 +157,31 @@ case "$DB_CHOICE" in
             MY_HOST="localhost"; MY_PORT="3306"; MY_USER="apimaker"; MY_DB="apimaker"
             if (echo > /dev/tcp/localhost/3306) >/dev/null 2>&1; then
                 echo -e "${YELLOW}ADVERTENCIA: El puerto 3306 ya esta en uso. Es posible que ya tengas MySQL instalado localmente.${NC}"
-                read -r -p "Quieres usar otro puerto para el contenedor de Docker? [3307]: " ALT_PORT
-                MY_PORT="${ALT_PORT:-3307}"
+                echo "1) Usar otro puerto para el contenedor Docker (ej. 3307)"
+                echo "2) Usar mi base de datos MySQL existente (no usar Docker)"
+                read -r -p "Elige una opcion [1]: " PORT_ACTION
+                PORT_ACTION="${PORT_ACTION:-1}"
+                if [ "$PORT_ACTION" = "2" ]; then
+                    NEED_DOCKER_DB=false
+                    read -r -p "Host [localhost]: " MY_HOST; MY_HOST="${MY_HOST:-localhost}"
+                    read -r -p "Puerto [3306]: " MY_PORT; MY_PORT="${MY_PORT:-3306}"
+                    read -r -p "Usuario [root]: " MY_USER; MY_USER="${MY_USER:-root}"
+                    read -r -s -p "Contrasena: " MY_PASS; echo ""
+                    read -r -p "Nombre BD [apimaker]: " MY_DB; MY_DB="${MY_DB:-apimaker}"
+                else
+                    read -r -p "Introduce el puerto a usar para Docker (solo numero) [3307]: " ALT_PORT
+                    ALT_PORT="${ALT_PORT:-3307}"
+                    if ! [[ "$ALT_PORT" =~ ^[0-9]+$ ]]; then
+                        echo "Puerto invalido. Usando 3307 por defecto."
+                        ALT_PORT="3307"
+                    fi
+                    MY_PORT="$ALT_PORT"
+                fi
             fi
-            MY_PASS="$(random_hex 12)"
-            echo -e "${CYAN}Se generara un contenedor MySQL en el puerto $MY_PORT.${NC}"
+            if [ "$NEED_DOCKER_DB" = true ]; then
+                MY_PASS="$(random_hex 12)"
+                echo -e "${CYAN}Se generara un contenedor MySQL en el puerto $MY_PORT.${NC}"
+            fi
         fi
         MY_PASS_ENC="$(urlencode "$MY_PASS")"
         DB_URL="mysql+pymysql://$MY_USER:$MY_PASS_ENC@$MY_HOST:$MY_PORT/$MY_DB"
