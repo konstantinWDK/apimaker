@@ -8,7 +8,7 @@ echo    API Maker - Configuracion
 echo =======================================
 echo.
 
-call :require_cmd python "Python 3.11+" || goto fail
+call :resolve_python || goto fail
 call :require_cmd npm "Node.js/npm" || goto fail
 
 set "DOCKER_CMD="
@@ -22,16 +22,25 @@ if not defined DOCKER_CMD (
 echo [1/5] Instalando dependencias...
 pushd backend || goto fail
 if not exist ".venv" (
-    python -m venv .venv || goto fail
+    "%PYTHON_CMD%" -m venv .venv || goto fail
 )
-call ".venv\Scripts\activate.bat" || goto fail
-python -m pip install --upgrade pip || goto fail
-pip install -e ".[dev]" || goto fail
+set "VENV_PY=.venv\Scripts\python.exe"
+if not exist "%VENV_PY%" (
+    echo No se encontro el Python del entorno virtual: backend\%VENV_PY%
+    goto fail
+)
+"%VENV_PY%" -m pip --version >nul 2>&1
+if errorlevel 1 (
+    echo Reparando pip dentro del entorno virtual...
+    "%VENV_PY%" -m ensurepip --upgrade || goto fail
+)
+"%VENV_PY%" -m pip install --disable-pip-version-check wheel || goto fail
+"%VENV_PY%" -m pip install --disable-pip-version-check --no-build-isolation -e ".[dev]" || goto fail
 if not exist "app\data" mkdir "app\data" || goto fail
 popd
 
 pushd frontend || goto fail
-npm install || goto fail
+call npm install || goto fail
 popd
 
 echo.
@@ -230,13 +239,33 @@ for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "[uri]::Escape
 exit /b 0
 
 :random_hex
-for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "-join ((1..%~2) ^| ForEach-Object { '{0:x}' -f (Get-Random -Minimum 0 -Maximum 16) })"`) do set "%~1=%%A"
+for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "([guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString('N')).Substring(0,%~2)"`) do set "%~1=%%A"
 exit /b 0
 
 :require_cmd
 where %~1 >nul 2>&1
 if errorlevel 1 (
     echo Falta %~2 ^(%~1^). Instalalo y vuelve a ejecutar este script.
+    exit /b 1
+)
+exit /b 0
+
+:resolve_python
+set "PYTHON_CMD="
+for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "$cmd = Get-Command python -ErrorAction SilentlyContinue; if ($cmd) { $cmd.Source }"`) do set "PYTHON_CMD=%%A"
+if not defined PYTHON_CMD (
+    for /f "usebackq delims=" %%A in (`where python 2^>nul`) do (
+        if not defined PYTHON_CMD set "PYTHON_CMD=%%A"
+    )
+)
+if not defined PYTHON_CMD (
+    echo Falta Python 3.11+. Instalalo y vuelve a ejecutar este script.
+    exit /b 1
+)
+"%PYTHON_CMD%" -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)" >nul 2>&1
+if errorlevel 1 (
+    echo Se encontro Python, pero se requiere Python 3.11 o superior.
+    echo Ruta detectada: %PYTHON_CMD%
     exit /b 1
 )
 exit /b 0

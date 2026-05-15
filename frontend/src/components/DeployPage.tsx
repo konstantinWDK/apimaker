@@ -137,6 +137,41 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
     } catch (e: any) { alert(e.message) }
   }
 
+  const handleRedeploy = async (slug: string) => {
+    setDeploying(true)
+    setDeployDone(false)
+    setDeployLog([])
+    setGlobalDeployState('deploying', 'Aplicando cambios al deployment...')
+    try {
+      const pid = await saveProject()
+      if (!pid) {
+        log(' Error al guardar proyecto')
+        setGlobalDeployState('error', 'Error al guardar proyecto')
+        return
+      }
+      log(' Proyecto guardado')
+      log(' Reexportando y recreando contenedor en el mismo puerto...')
+      const res = await apiFetch('/api/deploy/local/redeploy', {
+        method: 'POST',
+        body: JSON.stringify({ slug, project_id: pid }),
+      })
+      const result = await res.json()
+      result.logs?.forEach((l: string) => log(l))
+      if (result.status !== 'running') {
+        setGlobalDeployState('error', result.message || 'Error aplicando cambios')
+        return
+      }
+      setDeployDone(true)
+      setGlobalDeployState('success', 'Cambios aplicados al deployment')
+      onDeployDone()
+    } catch (e: any) {
+      log(` ${e.message || e}`)
+      setGlobalDeployState('error', e.message || 'Error aplicando cambios')
+    } finally {
+      setDeploying(false)
+    }
+  }
+
   const handleDeploy = async () => {
     setDeploying(true); setDeployDone(false); setDeployLog([])
     const dbName = deployDbType === 'sqlite' ? 'SQLite' : deployDbType === 'postgresql' ? 'PostgreSQL' : 'MySQL'
@@ -256,8 +291,10 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                       <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#166534' }}
                         onClick={() => handleAction(dep.slug, 'start')}>Iniciar</button>
                     )}
+                    <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#4f46e5' }}
+                      onClick={() => handleRedeploy(dep.slug)} disabled={deploying}>Aplicar cambios</button>
                     <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                      onClick={() => handleAction(dep.slug, 'restart')}>Reconstruir</button>
+                      onClick={() => handleAction(dep.slug, 'restart')}>Reiniciar</button>
                     <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#dc2626' }}
                       onClick={() => handleAction(dep.slug, 'delete')}>Eliminar</button>
                   </div>

@@ -1,147 +1,244 @@
-﻿# API Maker
+# API Maker
 
-Plataforma visual y open source para diseñar datasets, endpoints REST y desplegar APIs listas para producción. Incluye editor visual (React), backend en FastAPI, mock server integrado, CLI para deploy y generación de código para FastAPI/Express/NestJS.
+API Maker es una plataforma visual y open source para disenar, probar, documentar, generar y desplegar APIs REST listas para produccion. Incluye editor React, backend FastAPI, mock server persistente, seguridad por proyecto, generacion de ZIPs para varios stacks, deploy local con Docker, redeploy rapido y herramientas tipo internal-tool builder.
 
-## Inicio rápido
+## Inicio rapido
+
+### Windows
+
+```bat
+install.bat
+```
+
+### Linux/macOS
 
 ```bash
 ./install.sh
 ```
 
-El instalador guía paso a paso: crea el entorno virtual, instala dependencias, configura administrador y base de datos (SQLite o PostgreSQL), e importa el proyecto demo.
+El instalador crea el entorno, instala dependencias, configura usuario administrador, elige base de datos y puede levantar servicios con Docker.
 
-**Windows:** `install.bat`
+Bases soportadas:
 
-Al terminar, puedes levantar la app con Docker o manualmente:
+- SQLite local
+- PostgreSQL existente
+- PostgreSQL en contenedor Docker
+- MySQL/MariaDB existente
+- MySQL en contenedor Docker
 
-```bash
-# Docker (con PostgreSQL opcional)
-docker compose up -d --build
+Si eliges una base Docker, las credenciales se guardan en `.env`.
 
-# Manual
-cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-cd frontend && npm run dev
+Al terminar, abre:
+
+```text
+http://localhost:5173
 ```
 
-Accede a **http://localhost:5173** y completa el Setup Wizard.
+## Arranque manual
 
-## Características principales
+Backend:
 
-### Editor visual
-- **Datasets** — Define esquemas con tipos, relaciones y datos de ejemplo. Importa desde CSV, Excel o bases de datos externas (PostgreSQL, MySQL, SQLite).
-- **Endpoints REST** — CRUD automático vinculado a datasets + rutas personalizadas con método, path y parámetros.
-- **Mappings** — Relaciones visuales entre campos con transformaciones (direct, cast, concat, format).
-
-### Simulador y pruebas
-- **Mock server** — Simula tu API en vivo con datos persistentes en base de datos (MockRecord). Filtros, paginación y autenticación real. Los datos sobreviven reinicios.
-- **Validación de tipos** — Los endpoints mock validan tipos de campos (integer, float, boolean, string, enum) y campos requeridos, devolviendo errores 422.
-
-### Seguridad
-- **Autenticación** — JWT con refresh tokens, API Key para machine-to-machine, o pública.
-- **Rate limiting** — Configurable por proyecto.
-- **Gestión de credenciales** — Generación y copia de API keys y JWT secrets desde la UI.
-- **Mock server protegido** — Los endpoints mock respetan la configuración de seguridad del proyecto.
-
-### CLI — Despliegue sin dependencias
-```bash
-apimaker init <slug>              # Exporta proyecto a JSON
-apimaker deploy <file.json>       # Despliega como API independiente
-apimaker serve <slug>             # Sirve proyecto desde la DB del builder
-apimaker deploy --ssh <user@host> # Despliega en VPS remoto vía SSH
-```
-El CLI está incluido en el paquete `apimaker-backend`.
-
-### Despliegue desde la UI
-- **Local (Docker)** — Despliega la API en el mismo servidor. Detección automática de puertos libres, tracking de contenedores, health checks.
-- **Remoto (SSH)** — Instrucciones paso a paso con comandos listos para copiar. Soporta autenticación por contraseña o clave SSH privada.
-
-### Gestión de APIs desplegadas
-- Lista de todas las APIs desplegadas con estado real de Docker (🟢 corriendo / 🔴 detenido / ⚫ desconocido)
-- Acciones: Abrir, Iniciar, Detener, Reconstruir, Eliminar
-- Health check desde la UI
-
-### Generación de código
-- **Stack FastAPI** (Python) — SQLAlchemy 2.0, Pydantic v2, JWT, rate limiting, Alembic.
-- **Stack Express** (Node.js) — Sequelize ORM, Swagger automático, JWT.
-- **Stack NestJS** — TypeORM, decoradores Swagger, AuthGuard.
-- Los bundles incluyen: Dockerfile, docker-compose, seeds, tests, CI/CD, SDKs.
-
-### Documentación y recursos
-- **OpenAPI 3.1** — Documentación Redoc automática en `/projects/{id}/docs`.
-- **Página de documentación** — Secciones organizadas: Visión General, Tutorial, CLI, Código, Despliegue.
-- **SDKs** — Clientes TypeScript y Python generados automáticamente.
-
-### Extras
-- **Webhooks** — Notifica URLs externas en eventos create/update/delete del mock server.
-- **Share links** — Snapshots de solo lectura con contraseña y expiración.
-- **Versionado** — Historial de snapshots del proyecto con restauración.
-- **Setup Wizard** — Configuración guiada en el primer arranque.
-
-## Estructura del proyecto
-
-```
-apimaker/
-├── backend/              # FastAPI + SQLModel + Alembic
-│   ├── app/
-│   │   ├── routers/      # auth, projects, mock, deploy, share, webhooks, versions, setup, admin, db
-│   │   ├── services/     # code_generator, mock_server, project_service, jwt_service, standalone_server
-│   │   ├── cli.py        # CLI entrypoint (deploy, serve, init)
-│   │   └── scripts/      # seed_admin, migrate_json_to_db, repair_pokedex
-│   ├── alembic/          # Migraciones (6 versiones)
-│   └── tests/            # test_health, test_auth, test_generator, test_migration, test_mock
-├── frontend/             # React 18 + Vite + Zustand + React Router
-│   └── src/components/   # 40+ componentes modulares
-├── generator/templates/  # Jinja2: fastapi, express, nest, sdk, deploy
-├── docker-compose.yml    # Dev: backend + frontend
-├── docker-compose.override.yml   # Dev: hot-reload, volumenes
-├── docker-compose.prod.yml       # Prod: con PostgreSQL
-├── install.sh / install.bat
-└── .env.example
-```
-
-## Puesta en marcha manual
-
-### Backend
 ```bash
 cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
+python -m venv .venv
+.venv/Scripts/python.exe -m pip install -e ".[dev]"   # Windows
+# o
+source .venv/bin/activate && pip install -e ".[dev]"  # Linux/macOS
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Frontend
+Frontend:
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-## Despliegue
+## Funciones principales
+
+### Builder visual
+
+- Proyectos con nombre, slug, descripcion, stack y configuracion.
+- Datasets manuales/importados con campos tipados, relaciones, enums, defaults y datos de ejemplo.
+- Endpoints CRUD y personalizados vinculados a datasets.
+- Mappings visuales entre campos.
+- Preview de payloads, ejemplos cURL y galeria de endpoints.
+- Sincronizacion con backend.
+
+### Seguridad
+
+- Login de usuarios con JWT.
+- Seguridad por proyecto:
+  - `none`: API publica
+  - `apikey`: cabecera `X-API-Key`
+  - `jwt`: cabecera `Authorization: Bearer <token>`
+- Generacion y rotacion de API keys/JWT secrets desde UI.
+- Rate limit configurable.
+- Mock server y deploy standalone respetan la seguridad configurada.
+
+### Mock server
+
+- Rutas en `/api/mock/{project_id_or_slug}/{path}`.
+- Datos persistentes en base de datos.
+- Seeds desde `sample_rows`.
+- Validacion de tipos y requeridos.
+- Filtros, paginacion y lectura por ID/campo.
+- Eventos para logs, webhooks y automations.
+
+### Operaciones
+
+API Maker incluye una seccion **Operaciones** inspirada en herramientas como Budibase:
+
+- Datasources por proyecto.
+- Saved queries.
+- Ejecucion controlada de queries SELECT.
+- Runtime logs.
+- Releases con snapshot.
+- Automations por eventos.
+- Imports OpenAPI/Postman.
+- Registro de plugins y deploy providers.
+
+### Webhooks, releases y share
+
+- Webhooks por eventos `record.created`, `record.updated`, `record.deleted`.
+- Historial de entregas de webhooks.
+- Versiones/snapshots restaurables.
+- Releases publicadas.
+- Share links de solo lectura con password y expiracion opcional.
+
+## Generacion de codigo
+
+Stacks soportados:
+
+- **FastAPI**: SQLAlchemy, Pydantic, auth, Docker, setup y tests.
+- **Express**: Sequelize, Swagger, auth y Docker.
+- **NestJS**: TypeORM, Swagger decorators, AuthGuard y Docker.
+
+Los ZIPs generados pueden incluir:
+
+- Servidor completo.
+- `README.md`.
+- `.env.example`.
+- `Dockerfile`.
+- `docker-compose.yml`.
+- `setup.sh`.
+- CI GitHub Actions.
+- Seeds (`data.json`).
+- SDK TypeScript.
+- SDK Python.
+- Configs para Render/Railway.
+
+Descarga del bundle:
+
+```text
+GET /projects/{project_id}/download
+```
+
+## Deploy
+
+### Desde la UI
+
+La pagina **Despliegue** permite:
+
+- Deploy local con Docker.
+- Usar SQLite, PostgreSQL o MySQL.
+- Crear PostgreSQL/MySQL en contenedor.
+- Ver deployments activos.
+- Iniciar, detener, reiniciar y eliminar deployments.
+- Aplicar cambios a una API ya desplegada sin cambiar de puerto.
+
+Cuando cambias endpoints, datasets, seguridad o configuracion, usa:
+
+```text
+Aplicar cambios
+```
+
+Esto guarda el proyecto, reexporta `project.json` y recrea el contenedor en el mismo puerto.
+
+### CLI
 
 ```bash
-# Desplegar localmente (Docker)
-docker compose up -d --build
-
-# Con PostgreSQL integrado
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-
-# O usando el CLI
+apimaker init <slug> -o proyecto.json
 apimaker deploy proyecto.json --port 8080
-apimaker deploy proyecto.json --ssh usuario@midominio.com --port 80
+apimaker serve <slug> --port 8081
+apimaker deploy proyecto.json --ssh usuario@host --port 80
 ```
+
+## Documentacion
+
+- App docs: ruta `/docs` del frontend.
+- Redoc por proyecto: `/projects/{project_id}/docs`.
+- OpenAPI por proyecto: `/projects/{project_id}/openapi.json`.
+- API backend: `docs/API.md`.
+- Estado funcional: `docs/PROJECT_OVERVIEW.md`.
+- Roadmap: `docs/ROADMAP.md`.
+
+## Estructura
+
+```text
+apimaker/
+|-- backend/
+|   |-- app/
+|   |   |-- routers/      # auth, projects, mock, deploy, product_ops, webhooks, versions, share
+|   |   |-- services/     # project_service, mock_server, code_generator, product_ops, jwt_service
+|   |   |-- cli.py
+|   |   `-- scripts/
+|   |-- alembic/
+|   `-- tests/
+|-- frontend/
+|   `-- src/
+|       |-- components/
+|       |-- hooks/
+|       |-- lib/
+|       `-- types/
+|-- generator/templates/
+|   |-- fastapi/
+|   |-- express/
+|   |-- nest/
+|   |-- sdk/
+|   `-- deploy/
+|-- docs/
+|-- deployments/
+|-- docker-compose.yml
+|-- install.bat / install.sh
+`-- uninstall.bat / uninstall.sh
+```
+
+## Tests
+
+Backend:
+
+```bash
+cd backend
+pytest -q
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm run lint
+```
+
+Cobertura actual:
+
+- Health/auth.
+- Migracion JSON a DB.
+- Generacion de bundles FastAPI/Express/NestJS.
+- Mock server.
+- Product operations.
+- Seguridad persistida.
+- Deploy standalone.
 
 ## Requisitos
 
 - Python 3.11+
 - Node.js 18+
-- Docker (opcional, para deploy con Docker)
+- Docker Desktop opcional, necesario para deploy local con contenedores
 
-## Tests
+## Notas importantes
 
-```bash
-cd backend
-pytest -v
-# 32 tests: health, auth, generator, migration, mock
-```
-
+- Los cambios en una API ya desplegada no se aplican solos: pulsa **Aplicar cambios** en la pagina de Deploy.
+- Si usas JWT en una API generada, necesitas enviar un token firmado con el `jwt_secret` del proyecto.
+- Las credenciales generadas por instalacion/deploy se guardan en `.env` o en el registro de deployments.

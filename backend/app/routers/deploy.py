@@ -397,6 +397,24 @@ class SlugRequest(BaseModel):
     slug: str
 
 
+class RedeployRequest(BaseModel):
+    slug: str
+    project_id: str | None = None
+
+
+def _export_project_json(session: Session, project_id: str, target_path: Path) -> tuple[Any, list[str]]:
+    """Write the latest builder project definition for a deployment."""
+    from ..routers.projects import _db_to_pydantic
+
+    resolved = project_service.resolve_id(session, project_id)
+    data = project_service.get_project_with_data(session, resolved)
+    project = data["project"]
+    export_data = _db_to_pydantic(project, data["datasets"], data["endpoints"], include_secrets=True)
+    target_path.write_text(export_data.model_dump_json(indent=2), encoding="utf-8")
+    deployed_endpoints = sorted(set(f"{ep.method} {ep.path}" for ep in data["endpoints"]))
+    return project, deployed_endpoints
+
+
 class RemoteDeployRequest(BaseModel):
     project_id: str
     host: str
@@ -524,6 +542,56 @@ def delete_deployment(req: SlugRequest, user: CurrentUser = Depends(require_admi
     return DeployStatus(status="deleted", logs=logs, message="Deployment eliminado")
 
 
+@router.post("/local/redeploy")
+def redeploy_local(
+    req: RedeployRequest,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(require_admin),
+) -> DeployStatus:
+    """Apply the latest project definition to an existing local deployment."""
+    slug = _safe_slug(req.slug)
+    deploy_dir = _deploy_dir_for_slug(slug)
+    logs: list[str] = []
+    if not deploy_dir.exists():
+        raise HTTPException(status_code=404, detail="Deployment not found")
+
+    project_ref = req.project_id or slug
+    project, deployed_endpoints = _export_project_json(session, project_ref, deploy_dir / "project.json")
+    logs.append(" Proyecto actualizado en project.json")
+
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "up", "-d", "--force-recreate", "--remove-orphans"],
+            cwd=str(deploy_dir), capture_output=True, text=True, timeout=180,
+        )
+        if result.stdout.strip():
+            logs.append(result.stdout.strip()[:500])
+        if result.returncode != 0:
+            logs.append(result.stderr.strip()[:500])
+            return DeployStatus(status="error", logs=logs, message="Error recreando deployment")
+    except subprocess.TimeoutExpired:
+        logs.append(" Timeout recreando contenedor (>3min)")
+        return DeployStatus(status="timeout", logs=logs)
+    except Exception as e:
+        logs.append(f" Error: {str(e)}")
+        return DeployStatus(status="error", logs=logs)
+
+    tracking = _load_tracking()
+    if slug in tracking:
+        tracking[slug]["name"] = project.name
+        tracking[slug]["stack"] = project.target_stack
+        tracking[slug]["status"] = "running"
+        tracking[slug]["endpoints"] = deployed_endpoints
+        tracking[slug]["deployed_at"] = str(subprocess.run(
+            ["date"], capture_output=True, text=True
+        ).stdout.strip())
+        _save_tracking(tracking)
+
+    url = tracking.get(slug, {}).get("url") if tracking else None
+    logs.append(" Cambios aplicados al deployment")
+    return DeployStatus(status="running", url=url, logs=logs, message="Redeploy completado")
+
+
 def _check_docker_container(slug: str) -> str:
     """Check if a Docker container is running for a deployment. Returns status string."""
     try:
@@ -612,8 +680,6 @@ def check_port(port: int, user: CurrentUser = Depends(require_admin)) -> dict:
 def rebuild_deploy_image(user: CurrentUser = Depends(require_admin)) -> DeployStatus:
     """Rebuild the local deploy Docker image."""
     logs: list[str] = []
-    if not 1 <= req.port <= 65535:
-        raise HTTPException(status_code=400, detail="Invalid port")
     logs.append(" Eliminando imagen anterior...")
     subprocess.run(["docker", "rmi", "-f", DEPLOY_IMAGE], capture_output=True, timeout=30)
     if _ensure_deploy_image(logs):
@@ -633,17 +699,13 @@ def deploy_local(
     resolved = project_service.resolve_id(session, req.project_id)
     data = project_service.get_project_with_data(session, resolved)
     project = data["project"]
-    datasets_with_fields = data["datasets"]
     endpoints = data["endpoints"]
 
     slug = _safe_slug(project.slug or str(project.id))
     deploy_dir = _deploy_dir_for_slug(slug)
 
-    # Check port and find available one if needed
-    port, port_logs = _find_free_port(req.port)
-    logs.extend(port_logs)
-
-    # Stop existing container for this project if redeploying
+    # Stop the existing deployment for this project before checking the port.
+    # Otherwise redeploying on the same port would be seen as a conflict.
     if deploy_dir.exists():
         logs.append(" Deteniendo contenedor anterior...")
         subprocess.run(
@@ -651,6 +713,11 @@ def deploy_local(
             cwd=str(deploy_dir), capture_output=True, timeout=30,
         )
         shutil.rmtree(deploy_dir)
+
+    # Check port and find available one if needed
+    port, port_logs = _find_free_port(req.port)
+    logs.extend(port_logs)
+
     deploy_dir.mkdir(parents=True, exist_ok=True)
     logs.append(f" Directorio: {deploy_dir}")
 
@@ -694,12 +761,7 @@ def deploy_local(
         logs.append(" Usando SQLite embebida (persistente en disco)")
 
     # Export project as JSON for the standalone server
-    from ..routers.projects import _db_to_pydantic
-    export_data = _db_to_pydantic(project, datasets_with_fields, endpoints, include_secrets=True)
-    (deploy_dir / "project.json").write_text(
-        export_data.model_dump_json(indent=2),
-        encoding="utf-8",
-    )
+    _export_project_json(session, project.id, deploy_dir / "project.json")
     logs.append(" Proyecto exportado a project.json")
 
     # Write docker-compose.yml

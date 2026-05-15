@@ -28,25 +28,48 @@ def _ensure_project_in_db(project_data: dict, db_url: str) -> str:
 
     with Session(engine) as session:
         slug = project_data.get("slug") or project_data["name"].lower().replace(" ", "-")
-        existing = session.exec(select(Project).where(Project.slug == slug)).first()
-        if existing:
-            logger.info("Project '%s' already exists, reusing", slug)
-            return existing.id
+        project = session.exec(select(Project).where(Project.slug == slug)).first()
+        if project:
+            logger.info("Project '%s' already exists, applying latest definition", slug)
+            project.name = project_data["name"]
+            project.description = project_data.get("description", "")
+            project.auth_method = project_data.get("auth_method", "none")
+            project.api_key = project_data.get("api_key")
+            project.jwt_secret = project_data.get("jwt_secret")
+            project.rate_limit = project_data.get("rate_limit")
+            project.include_data = project_data.get("include_data", True)
+            project.target_stack = project_data.get("target_stack", "fastapi")
+            project.status = "ready"
+            session.add(project)
+            project_id = project.id
 
-        project = Project(
-            name=project_data["name"],
-            slug=slug,
-            description=project_data.get("description", ""),
-            auth_method=project_data.get("auth_method", "none"),
-            target_stack=project_data.get("target_stack", "fastapi"),
-            status="ready",
-        )
-        session.add(project)
-        session.flush()
-        project_id = project.id
+            for endpoint in session.exec(select(Endpoint).where(Endpoint.project_id == project_id)).all():
+                session.delete(endpoint)
+            for dataset in session.exec(select(Dataset).where(Dataset.project_id == project_id)).all():
+                for field in session.exec(select(DatasetField).where(DatasetField.dataset_id == dataset.id)).all():
+                    session.delete(field)
+                session.delete(dataset)
+            session.flush()
+        else:
+            project = Project(
+                name=project_data["name"],
+                slug=slug,
+                description=project_data.get("description", ""),
+                auth_method=project_data.get("auth_method", "none"),
+                api_key=project_data.get("api_key"),
+                jwt_secret=project_data.get("jwt_secret"),
+                rate_limit=project_data.get("rate_limit"),
+                include_data=project_data.get("include_data", True),
+                target_stack=project_data.get("target_stack", "fastapi"),
+                status="ready",
+            )
+            session.add(project)
+            session.flush()
+            project_id = project.id
 
         for ds_data in project_data.get("datasets", []):
             dataset = Dataset(
+                id=ds_data.get("id") or uuid.uuid4().hex,
                 project_id=project_id,
                 name=ds_data["name"],
                 source_type=ds_data.get("source_type", "manual"),
@@ -65,9 +88,15 @@ def _ensure_project_in_db(project_data: dict, db_url: str) -> str:
                     enum_values=json.dumps(field["enum_values"]) if field.get("enum_values") else None,
                 ))
 
-            for row in ds_data.get("sample_rows", []):
-                record_id = row.pop("_id", uuid.uuid4().hex[:8])
-                row["_id"] = record_id
+            existing_records = session.exec(
+                select(MockRecord).where(MockRecord.project_id == project_id, MockRecord.dataset_id == dataset.id)
+            ).first()
+            if existing_records:
+                continue
+
+            for source_row in ds_data.get("sample_rows", []):
+                row = dict(source_row)
+                record_id = row.get("_id") or uuid.uuid4().hex[:8]
                 clean = {k: v for k, v in row.items() if k != "_id"}
                 session.add(MockRecord(
                     project_id=project_id,

@@ -39,6 +39,11 @@ class ProjectService:
         slug: str | None = None,
         workspace_id: str | None = None,
         created_by: str | None = None,
+        auth_method: str = "none",
+        api_key: str | None = None,
+        jwt_secret: str | None = None,
+        rate_limit: int | None = None,
+        include_data: bool = True,
     ) -> Project:
         import re
         if not slug:
@@ -53,6 +58,11 @@ class ProjectService:
             target_stack=target_stack,
             workspace_id=workspace_id,
             created_by=created_by,
+            auth_method=auth_method,
+            api_key=api_key,
+            jwt_secret=jwt_secret,
+            rate_limit=rate_limit,
+            include_data=include_data,
         )
         session.add(project)
         session.commit()
@@ -68,6 +78,11 @@ class ProjectService:
         description: str | None = None,
         target_stack: str | None = None,
         status: str | None = None,
+        auth_method: str | None = None,
+        api_key: str | None = None,
+        jwt_secret: str | None = None,
+        rate_limit: int | None = None,
+        include_data: bool | None = None,
     ) -> Project:
         project = self.get_project(session, project_id)
         if name is not None:
@@ -90,6 +105,16 @@ class ProjectService:
             project.target_stack = target_stack
         if status is not None:
             project.status = status
+        if auth_method is not None:
+            project.auth_method = auth_method
+        if api_key is not None:
+            project.api_key = api_key
+        if jwt_secret is not None:
+            project.jwt_secret = jwt_secret
+        if rate_limit is not None:
+            project.rate_limit = rate_limit
+        if include_data is not None:
+            project.include_data = include_data
         project.updated_at = datetime.now(timezone.utc)
         session.add(project)
         session.commit()

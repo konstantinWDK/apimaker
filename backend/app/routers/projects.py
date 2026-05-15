@@ -128,6 +128,7 @@ def list_projects(
             data["project"],
             datasets_with_fields=data["datasets"],
             endpoints=data["endpoints"],
+            include_secrets=True,
         ))
     return result
 
@@ -155,6 +156,11 @@ def create_project(
         target_stack=payload.target_stack,
         workspace_id=payload.workspace_id,
         created_by=user.user_id,
+        auth_method=payload.auth_method,
+        api_key=payload.api_key,
+        jwt_secret=payload.jwt_secret,
+        rate_limit=payload.rate_limit,
+        include_data=payload.include_data,
     )
     # Handle initial datasets if provided
     if payload.datasets:
@@ -183,6 +189,7 @@ def create_project(
         data["project"],
         datasets_with_fields=data["datasets"],
         endpoints=data["endpoints"],
+        include_secrets=True,
     )
 
 
@@ -199,6 +206,7 @@ def get_project(
             data["project"],
             datasets_with_fields=data["datasets"],
             endpoints=data["endpoints"],
+            include_secrets=True,
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -223,6 +231,11 @@ def update_project(
             description=payload.description,
             target_stack=payload.target_stack,
             status=payload.status,
+            auth_method=payload.auth_method,
+            api_key=payload.api_key,
+            jwt_secret=payload.jwt_secret,
+            rate_limit=payload.rate_limit,
+            include_data=payload.include_data,
         )
         
         # FORCED REFRESH of mock data if running
@@ -240,6 +253,7 @@ def update_project(
             data["project"],
             datasets_with_fields=data["datasets"],
             endpoints=data["endpoints"],
+            include_secrets=True,
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -594,6 +608,11 @@ def import_project(
         description=payload.description,
         target_stack=payload.target_stack,
         created_by=user.user_id,
+        auth_method=payload.auth_method,
+        api_key=payload.api_key,
+        jwt_secret=payload.jwt_secret,
+        rate_limit=payload.rate_limit,
+        include_data=payload.include_data,
     )
 
     for ds_data in payload.datasets:
@@ -619,4 +638,5 @@ def import_project(
         data["project"],
         datasets_with_fields=data["datasets"],
         endpoints=data["endpoints"],
+        include_secrets=True,
     )

@@ -1,4 +1,4 @@
-"""Migration script: JSON files → SQLite database."""
+"""Migration script: JSON files to SQLite database."""
 
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ def migrate(force: bool = False) -> None:
         print("  No projects.json found. Nothing to migrate.")
         return
 
-    print(f" Migrating {BACKEND_DEMO} → Database...")
+    print(f" Migrating {BACKEND_DEMO} -> Database...")
 
     # Create tables
     create_db_and_tables()
@@ -92,7 +92,7 @@ def migrate(force: bool = False) -> None:
             
             # Ensure slug exists
             if not item.get("slug"):
-                item["slug"] = item["name"].lower().replace(" ", "-").replace("é", "e").replace("á", "a")
+                item["slug"] = item["name"].lower().replace(" ", "-").replace("\u00e9", "e").replace("\u00e1", "a")
                 if "pokedex" in item["slug"]:
                     item["slug"] = "pokedex-demo"
 
@@ -133,7 +133,7 @@ def migrate(force: bool = False) -> None:
                     print(f"      Already exists, skipping.")
                     continue
 
-            print(f"  → Migrating project: {project_data.name} (Slug: {project_data.slug})")
+            print(f"  -> Migrating project: {project_data.name} (Slug: {project_data.slug})")
 
             # Insert project
             db_project = Project(
