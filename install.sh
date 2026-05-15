@@ -107,8 +107,13 @@ case "$DB_CHOICE" in
         else
             NEED_DOCKER_DB=true
             PG_HOST="localhost"; PG_PORT="5432"; PG_USER="apimaker"; PG_DB="apimaker"
+            if (echo > /dev/tcp/localhost/5432) >/dev/null 2>&1; then
+                echo -e "${YELLOW}ADVERTENCIA: El puerto 5432 ya esta en uso. Es posible que ya tengas PostgreSQL instalado localmente.${NC}"
+                read -r -p "Quieres usar otro puerto para el contenedor de Docker? [5433]: " ALT_PORT
+                PG_PORT="${ALT_PORT:-5433}"
+            fi
             PG_PASS="$(random_hex 12)"
-            echo -e "${CYAN}Se generara un contenedor PostgreSQL.${NC}"
+            echo -e "${CYAN}Se generara un contenedor PostgreSQL en el puerto $PG_PORT.${NC}"
         fi
         PG_PASS_ENC="$(urlencode "$PG_PASS")"
         DB_URL="postgresql+psycopg2://$PG_USER:$PG_PASS_ENC@$PG_HOST:$PG_PORT/$PG_DB"
@@ -130,8 +135,13 @@ case "$DB_CHOICE" in
         else
             NEED_DOCKER_DB=true
             MY_HOST="localhost"; MY_PORT="3306"; MY_USER="apimaker"; MY_DB="apimaker"
+            if (echo > /dev/tcp/localhost/3306) >/dev/null 2>&1; then
+                echo -e "${YELLOW}ADVERTENCIA: El puerto 3306 ya esta en uso. Es posible que ya tengas MySQL instalado localmente.${NC}"
+                read -r -p "Quieres usar otro puerto para el contenedor de Docker? [3307]: " ALT_PORT
+                MY_PORT="${ALT_PORT:-3307}"
+            fi
             MY_PASS="$(random_hex 12)"
-            echo -e "${CYAN}Se generara un contenedor MySQL.${NC}"
+            echo -e "${CYAN}Se generara un contenedor MySQL en el puerto $MY_PORT.${NC}"
         fi
         MY_PASS_ENC="$(urlencode "$MY_PASS")"
         DB_URL="mysql+pymysql://$MY_USER:$MY_PASS_ENC@$MY_HOST:$MY_PORT/$MY_DB"
@@ -173,6 +183,7 @@ if [ "$NEED_DOCKER_DB" = true ]; then
             echo "POSTGRES_USER=$PG_USER"
             echo "POSTGRES_PASSWORD=$PG_PASS"
             echo "POSTGRES_DB=$PG_DB"
+            echo "POSTGRES_PORT=$PG_PORT"
         } >> .env
         echo -e "${BLUE}Levantando PostgreSQL en Docker...${NC}"
         $DOCKER_CMD --profile postgres up -d postgres
@@ -184,6 +195,7 @@ if [ "$NEED_DOCKER_DB" = true ]; then
             echo "MYSQL_PASSWORD=$MY_PASS"
             echo "MYSQL_DATABASE=$MY_DB"
             echo "MYSQL_ROOT_PASSWORD=${MY_PASS}_root"
+            echo "MYSQL_PORT=$MY_PORT"
         } >> .env
         echo -e "${BLUE}Levantando MySQL en Docker...${NC}"
         $DOCKER_CMD --profile mysql up -d mysql

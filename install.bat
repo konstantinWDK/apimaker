@@ -122,6 +122,7 @@ if "%NEED_DOCKER_DB%"=="true" (
             echo POSTGRES_USER=%PG_USER%
             echo POSTGRES_PASSWORD=%PG_PASS%
             echo POSTGRES_DB=%PG_DB%
+            echo POSTGRES_PORT=%PG_PORT%
         ) >> ".env"
         echo Levantando PostgreSQL en Docker...
         %DOCKER_CMD% --profile postgres up -d postgres || goto fail
@@ -133,6 +134,7 @@ if "%NEED_DOCKER_DB%"=="true" (
             echo MYSQL_PASSWORD=%MY_PASS%
             echo MYSQL_DATABASE=%MY_DB%
             echo MYSQL_ROOT_PASSWORD=%MY_PASS%_root
+            echo MYSQL_PORT=%MY_PORT%
         ) >> ".env"
         echo Levantando MySQL en Docker...
         %DOCKER_CMD% --profile mysql up -d mysql || goto fail
@@ -199,10 +201,16 @@ if "!DB_SUB!"=="1" (
     set "NEED_DOCKER_DB=true"
     set "PG_HOST=localhost"
     set "PG_PORT=5432"
+    netstat -an | findstr ":5432" | findstr "LISTENING" >nul 2>&1
+    if not errorlevel 1 (
+        echo ADVERTENCIA: El puerto 5432 ya esta en uso. Es posible que ya tengas PostgreSQL instalado localmente.
+        set /p "PG_PORT=Quieres usar otro puerto para el contenedor de Docker? [5433]: "
+        if "!PG_PORT!"=="" set "PG_PORT=5433"
+    )
     set "PG_USER=apimaker"
     call :random_hex PG_PASS 24
     set "PG_DB=apimaker"
-    echo Se generara un contenedor PostgreSQL automaticamente.
+    echo Se generara un contenedor PostgreSQL en el puerto !PG_PORT!.
 )
 call :urlencode "!PG_PASS!" PG_PASS_ENC
 set "DB_URL=postgresql+psycopg2://!PG_USER!:!PG_PASS_ENC!@!PG_HOST!:!PG_PORT!/!PG_DB!"
@@ -224,10 +232,16 @@ if "!DB_SUB!"=="1" (
     set "NEED_DOCKER_DB=true"
     set "MY_HOST=localhost"
     set "MY_PORT=3306"
+    netstat -an | findstr ":3306" | findstr "LISTENING" >nul 2>&1
+    if not errorlevel 1 (
+        echo ADVERTENCIA: El puerto 3306 ya esta en uso. Es posible que ya tengas MySQL instalado localmente.
+        set /p "MY_PORT=Quieres usar otro puerto para el contenedor de Docker? [3307]: "
+        if "!MY_PORT!"=="" set "MY_PORT=3307"
+    )
     set "MY_USER=apimaker"
     call :random_hex MY_PASS 24
     set "MY_DB=apimaker"
-    echo Se generara un contenedor MySQL automaticamente.
+    echo Se generara un contenedor MySQL en el puerto !MY_PORT!.
 )
 call :urlencode "!MY_PASS!" MY_PASS_ENC
 set "DB_URL=mysql+pymysql://!MY_USER!:!MY_PASS_ENC!@!MY_HOST!:!MY_PORT!/!MY_DB!"
