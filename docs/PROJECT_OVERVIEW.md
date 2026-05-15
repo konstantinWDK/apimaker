@@ -111,11 +111,10 @@ Cada bundle puede incluir:
   - SQLite
   - PostgreSQL
   - MySQL/MariaDB
-- Instaladores interactivos:
-  - `install.sh`
-  - `install.bat`
-  - `uninstall.sh`
-  - `uninstall.bat`
+- Instaladores interactivos robustos:
+  - `install.sh` y `install.bat`: configuran el entorno, gestionan conflictos de puertos en Docker y generan scripts de arranque personalizados.
+  - `start.sh` y `start.bat`: arranque unificado y profesional mediante `concurrently` (logs coloreados y etiquetados del Backend y Frontend en una sola terminal).
+  - `uninstall.sh` y `uninstall.bat`: limpieza completa del entorno, bases de datos y contenedores.
 - En Windows, `install.bat` usa el Python del venv directamente, repara `pip` si falta e instala `wheel` antes del backend.
 
 ## Validacion actual

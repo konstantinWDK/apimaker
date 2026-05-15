@@ -6,17 +6,15 @@ API Maker es una plataforma visual y open source para disenar, probar, documenta
 
 ### Windows
 
-```bat
-install.bat
-```
+1. Ejecuta `install.bat`.
+2. Una vez terminada la instalacion, usa `start.bat` para arrancar la aplicacion.
 
 ### Linux/macOS
 
-```bash
-./install.sh
-```
+1. Ejecuta `./install.sh`.
+2. Una vez terminada la instalacion, usa `./start.sh` para arrancar la aplicacion.
 
-El instalador crea el entorno, instala dependencias, configura usuario administrador, elige base de datos y puede levantar servicios con Docker.
+El instalador configura el entorno, instala dependencias, crea el usuario administrador y gestiona la base de datos. Si eliges Docker, detectara automaticamente si los puertos estan ocupados y te permitira elegir puertos alternativos.
 
 Bases soportadas:
 
@@ -34,26 +32,41 @@ Al terminar, abre:
 http://localhost:5173
 ```
 
-## Arranque manual
+## Arranque de la aplicacion
 
-Backend:
+La forma mas profesional y recomendada de arrancar es usar los scripts generados durante la instalacion:
+
+- **Windows**: `start.bat`
+- **Linux/macOS**: `./start.sh`
+
+Estos scripts utilizan `concurrently` para unificar los logs del Backend y Frontend en una sola terminal con colores y prefijos.
+
+### Arranque manual (Desarrollo)
+
+Si prefieres arrancar cada servicio por separado:
+
+**Backend:**
 
 ```bash
 cd backend
-python -m venv .venv
-.venv/Scripts/python.exe -m pip install -e ".[dev]"   # Windows
-# o
-source .venv/bin/activate && pip install -e ".[dev]"  # Linux/macOS
+source .venv/bin/activate && pip install -e ".[dev]"
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Frontend:
+**Frontend:**
 
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+
+## Desinstalacion
+
+Para restaurar el proyecto al estado inicial, eliminando bases de datos, contenedores y entornos virtuales:
+
+- **Windows**: `uninstall.bat`
+- **Linux/macOS**: `./uninstall.sh`
 
 ## Funciones principales
 
