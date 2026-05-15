@@ -203,39 +203,21 @@ if "!DB_SUB!"=="1" (
     set "PG_PORT=5432"
     netstat -an | findstr ":5432" | findstr "LISTENING" >nul 2>&1
     if not errorlevel 1 (
-        echo ADVERTENCIA: El puerto 5432 ya esta en uso. Es posible que ya tengas PostgreSQL instalado localmente.
-        echo 1^^) Usar otro puerto para el contenedor Docker (ej. 5433^^)
-        echo 2^^) Usar mi base de datos PostgreSQL existente (no usar Docker^^)
-        set /p "PORT_ACTION=Elige una opcion [1]: "
-        if "!PORT_ACTION!"=="" set "PORT_ACTION=1"
-        if "!PORT_ACTION!"=="2" (
-            set "NEED_DOCKER_DB=false"
-            set /p "PG_HOST=Host [localhost]: "
-            if "!PG_HOST!"=="" set "PG_HOST=localhost"
-            set /p "PG_PORT=Puerto [5432]: "
-            if "!PG_PORT!"=="" set "PG_PORT=5432"
-            set /p "PG_USER=Usuario [postgres]: "
-            if "!PG_USER!"=="" set "PG_USER=postgres"
-            set /p "PG_PASS=Contrasena: "
-            set /p "PG_DB=Nombre BD [apimaker]: "
-            if "!PG_DB!"=="" set "PG_DB=apimaker"
-        ) else (
-            set /p "ALT_PORT=Introduce el puerto a usar para Docker (solo numero) [5433]: "
-            if "!ALT_PORT!"=="" set "ALT_PORT=5433"
-            echo !ALT_PORT!| findstr /r "^[0-9][0-9]*$" >nul
-            if errorlevel 1 (
-                echo Puerto invalido. Usando 5433 por defecto.
-                set "ALT_PORT=5433"
-            )
-            set "PG_PORT=!ALT_PORT!"
+        echo ADVERTENCIA: El puerto 5432 ya esta en uso.
+        echo Para crear la nueva base de datos en Docker necesitamos usar otro puerto.
+        set /p "ALT_PORT=Introduce el puerto a usar [5433]: "
+        if "!ALT_PORT!"=="" set "ALT_PORT=5433"
+        echo !ALT_PORT!| findstr /r "^[0-9][0-9]*$" >nul
+        if errorlevel 1 (
+            echo Puerto invalido. Usando 5433 por defecto.
+            set "ALT_PORT=5433"
         )
+        set "PG_PORT=!ALT_PORT!"
     )
-    if "!NEED_DOCKER_DB!"=="true" (
-        set "PG_USER=apimaker"
-        call :random_hex PG_PASS 24
-        set "PG_DB=apimaker"
-        echo Se generara un contenedor PostgreSQL en el puerto !PG_PORT!.
-    )
+    set "PG_USER=apimaker"
+    call :random_hex PG_PASS 24
+    set "PG_DB=apimaker"
+    echo Se generara un contenedor PostgreSQL en el puerto !PG_PORT!.
 )
 call :urlencode "!PG_PASS!" PG_PASS_ENC
 set "DB_URL=postgresql+psycopg2://!PG_USER!:!PG_PASS_ENC!@!PG_HOST!:!PG_PORT!/!PG_DB!"
@@ -259,39 +241,21 @@ if "!DB_SUB!"=="1" (
     set "MY_PORT=3306"
     netstat -an | findstr ":3306" | findstr "LISTENING" >nul 2>&1
     if not errorlevel 1 (
-        echo ADVERTENCIA: El puerto 3306 ya esta en uso. Es posible que ya tengas MySQL instalado localmente.
-        echo 1^^) Usar otro puerto para el contenedor Docker (ej. 3307^^)
-        echo 2^^) Usar mi base de datos MySQL existente (no usar Docker^^)
-        set /p "PORT_ACTION=Elige una opcion [1]: "
-        if "!PORT_ACTION!"=="" set "PORT_ACTION=1"
-        if "!PORT_ACTION!"=="2" (
-            set "NEED_DOCKER_DB=false"
-            set /p "MY_HOST=Host [localhost]: "
-            if "!MY_HOST!"=="" set "MY_HOST=localhost"
-            set /p "MY_PORT=Puerto [3306]: "
-            if "!MY_PORT!"=="" set "MY_PORT=3306"
-            set /p "MY_USER=Usuario [root]: "
-            if "!MY_USER!"=="" set "MY_USER=root"
-            set /p "MY_PASS=Contrasena: "
-            set /p "MY_DB=Nombre BD [apimaker]: "
-            if "!MY_DB!"=="" set "MY_DB=apimaker"
-        ) else (
-            set /p "ALT_PORT=Introduce el puerto a usar para Docker (solo numero) [3307]: "
-            if "!ALT_PORT!"=="" set "ALT_PORT=3307"
-            echo !ALT_PORT!| findstr /r "^[0-9][0-9]*$" >nul
-            if errorlevel 1 (
-                echo Puerto invalido. Usando 3307 por defecto.
-                set "ALT_PORT=3307"
-            )
-            set "MY_PORT=!ALT_PORT!"
+        echo ADVERTENCIA: El puerto 3306 ya esta en uso.
+        echo Para crear la nueva base de datos en Docker necesitamos usar otro puerto.
+        set /p "ALT_PORT=Introduce el puerto a usar [3307]: "
+        if "!ALT_PORT!"=="" set "ALT_PORT=3307"
+        echo !ALT_PORT!| findstr /r "^[0-9][0-9]*$" >nul
+        if errorlevel 1 (
+            echo Puerto invalido. Usando 3307 por defecto.
+            set "ALT_PORT=3307"
         )
+        set "MY_PORT=!ALT_PORT!"
     )
-    if "!NEED_DOCKER_DB!"=="true" (
-        set "MY_USER=apimaker"
-        call :random_hex MY_PASS 24
-        set "MY_DB=apimaker"
-        echo Se generara un contenedor MySQL en el puerto !MY_PORT!.
-    )
+    set "MY_USER=apimaker"
+    call :random_hex MY_PASS 24
+    set "MY_DB=apimaker"
+    echo Se generara un contenedor MySQL en el puerto !MY_PORT!.
 )
 call :urlencode "!MY_PASS!" MY_PASS_ENC
 set "DB_URL=mysql+pymysql://!MY_USER!:!MY_PASS_ENC!@!MY_HOST!:!MY_PORT!/!MY_DB!"
