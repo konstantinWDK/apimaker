@@ -30,6 +30,8 @@ interface BuilderState {
   loadProjects: (projects: ProjectDraft[]) => void
   refreshProjects: () => Promise<void>
   saveProject: () => Promise<string | null>
+  isSyncing: boolean
+  setIsSyncing: (val: boolean) => void
   isGenerating: boolean
   setIsGenerating: (val: boolean) => void
   globalDeployState: 'idle' | 'deploying' | 'success' | 'error'
@@ -412,6 +414,8 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
   mockRunning: false,
   mockLoading: false,
   mockError: null,
+  isSyncing: false,
+  setIsSyncing: (val) => set({ isSyncing: val }),
   isGenerating: false,
   setIsGenerating: (val) => set({ isGenerating: val }),
   globalDeployState: 'idle',
@@ -707,7 +711,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       return null
     }
 
-    set({ isGenerating: true })
+    set({ isSyncing: true })
     try {
       let effectiveId = project.remoteId
       let currentProject = { ...project }
@@ -797,7 +801,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       fireToast(msg, 'error')
       return null
     } finally {
-      set({ isGenerating: false })
+      set({ isSyncing: false })
     }
   },
 }))

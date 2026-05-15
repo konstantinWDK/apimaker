@@ -15,6 +15,7 @@ interface Props {
   mockError: string | null
   onStartMock: () => void
   onStopMock: () => void
+  isSyncing?: boolean
 }
 
 const formatDate = (value?: string) => {
@@ -24,7 +25,7 @@ const formatDate = (value?: string) => {
   return date.toLocaleDateString()
 }
 
-export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, onDelete, onSync, mockRunning, mockLoading, mockError, onStartMock, onStopMock }: Props) {
+export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, onDelete, onSync, mockRunning, mockLoading, mockError, onStartMock, onStopMock, isSyncing }: Props) {
   const [backendStatus, setBackendStatus] = useState<'online' | 'offline' | 'checking'>('checking')
   const [dbType, setDbType] = useState<string | null>(null)
   const [dockerAvail, setDockerAvail] = useState<{ available: boolean; version?: string; containers_running?: number } | null>(null)
@@ -294,10 +295,15 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
                 className="btn primary btn-small btn-full"
                 onClick={onSync}
               >
-                {project.remoteId ? 'Actualizar en backend' : 'Sincronizar con backend'}
+            {project.remoteId ? 'Actualizar en backend' : 'Sincronizar con backend'}
               </button>
             </div>
-            {project.remoteId && (
+            {isSyncing && (
+              <p className="sidebar__description" style={{ color: '#6366f1', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span className="sidebar__mock-dot checking" /> Sincronizando cambios...
+              </p>
+            )}
+            {project.remoteId && !isSyncing && (
               <p className="success-text" style={{ fontSize: '0.75rem', marginTop: '0.5rem' }}>
                 Proyecto sincronizado con el backend
               </p>

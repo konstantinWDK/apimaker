@@ -41,6 +41,7 @@ export function App() {
     refreshProjects,
     projects,
     saveProject,
+    isSyncing,
     globalDeployState,
     globalDeployStatus,
     setGlobalDeployState,
@@ -165,6 +166,7 @@ export function App() {
             onStopMock={stopMock}
             onSwitchProject={replaceProject}
             onSync={saveProject}
+            isSyncing={isSyncing}
             onDelete={async (id: string) => {
               const p = projects.find(p => p.id === id)
               const name = p?.name || 'este proyecto'
@@ -245,17 +247,19 @@ export function App() {
             </a>
           </div>
 
-          <Routes>
-            <Route path="/" element={<BuilderPage />} />
-            <Route path="/simulator" element={<SimulatorPage />} />
-            <Route path="/info" element={<InfoPage />} />
-            <Route path="/security" element={<SecurityPage />} />
-            <Route path="/deploy" element={<DeployPage />} />
-            <Route path="/operations" element={<ProductOpsPage />} />
-            <Route path="/config" element={<ConfigPage authStatus={authStatus} onLogout={performLogout} />} />
-            <Route path="/docs" element={<DocsPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          <div key={location.key} className="page-enter">
+            <Routes>
+              <Route path="/" element={<BuilderPage />} />
+              <Route path="/simulator" element={<SimulatorPage />} />
+              <Route path="/info" element={<InfoPage />} />
+              <Route path="/security" element={<SecurityPage />} />
+              <Route path="/deploy" element={<DeployPage />} />
+              <Route path="/operations" element={<ProductOpsPage />} />
+              <Route path="/config" element={<ConfigPage authStatus={authStatus} onLogout={performLogout} />} />
+              <Route path="/docs" element={<DocsPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </div>
         </div>
       </div>
 

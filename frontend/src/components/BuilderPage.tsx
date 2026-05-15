@@ -140,6 +140,19 @@ export function BuilderPage() {
     }
   }, [project.name])
 
+  // AUTO-SAVE: Automatically sync project with backend on changes (debounced)
+  useEffect(() => {
+    // We only auto-save if the project is already synced (has remoteId)
+    // to avoid creating multiple draft projects.
+    if (!project.remoteId) return
+
+    const timer = setTimeout(() => {
+      saveProject()
+    }, 3000)
+
+    return () => clearTimeout(timer)
+  }, [project.datasets, project.endpoints, project.name, project.description, project.authMethod])
+
   useEffect(() => {
     const pid = project.slug || project.remoteId
     if (!pid) return
@@ -475,8 +488,10 @@ export function BuilderPage() {
             ¡API actualizada con éxito!
           </div>
         )}
-        <button type="button" className="fab" onClick={handleGenerate} disabled={isGenerating}>
-          {isGenerating ? (
+        <button type="button" className="fab" onClick={handleGenerate} disabled={isGenerating || isSyncing}>
+          {isSyncing ? (
+            <span className="fab__loading">Sincronizando...</span>
+          ) : isGenerating ? (
             <span className="fab__loading">Procesando...</span>
           ) : (
             <>
