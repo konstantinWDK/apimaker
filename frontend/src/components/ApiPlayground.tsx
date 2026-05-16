@@ -72,7 +72,18 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
   const [activeTab, setActiveTab] = useState<'params' | 'headers' | 'body'>('params')
   const [bodyError, setBodyError] = useState<string | null>(null)
 
+  const authKey = project.authMethod === 'apikey' ? 'X-API-Key' : project.authMethod === 'jwt' ? 'Authorization' : null
+  const authVal = project.authMethod === 'apikey' ? (project.apiKey || '') : project.authMethod === 'jwt' ? 'Bearer <token>' : ''
+
   const urlInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!authKey) return
+    setHeaders(prev => {
+      if (prev.some(h => h.key === authKey)) return prev
+      return [{ key: authKey, value: authVal, enabled: true }, ...prev]
+    })
+  }, [project.id])
 
   useEffect(() => {
     if (endpoints.length > 0) {
@@ -260,33 +271,11 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
             {activeTab === 'headers' && (
               <div className="pg__kv-editor">
                 {project.authMethod !== 'none' && (
-                  <div className="pg__kv-row">
-                    <input className="pg__kv-check" type="checkbox" checked
-                      onChange={e => {
-                        const key = project.authMethod === 'apikey' ? 'X-API-Key' : 'Authorization'
-                        const val = project.authMethod === 'apikey' ? (project.apiKey || '') : 'Bearer <token>'
-                        if (!e.target.checked) {
-                          setHeaders(prev => prev.filter(h => h.key !== key))
-                        } else if (!headers.some(h => h.key === key)) {
-                          setHeaders(prev => [...prev, { key, value: val, enabled: true }])
-                        }
-                      }} />
-                    <input className="pg__kv-input" placeholder="Header name"
-                      value={project.authMethod === 'apikey' ? 'X-API-Key' : 'Authorization'} readOnly
-                      style={{ color: '#6366f1', fontWeight: 600, background: '#f8fafc' }} />
-                    <input className="pg__kv-input" placeholder="Header value"
-                      value={project.authMethod === 'apikey' ? (project.apiKey || '') : 'Bearer <token>'} readOnly
-                      style={{ color: '#6366f1', background: '#f8fafc', fontFamily: 'monospace' }} />
-                    <button className="pg__kv-remove" onClick={() => {
-                      const key = project.authMethod === 'apikey' ? 'X-API-Key' : 'Authorization'
-                      setHeaders(prev => prev.filter(h => h.key !== key))
-                    }}>&times;</button>
-                  </div>
+                  <p className="pg__auth-hint">
+                    Este proyecto tiene autenticación configurada. El header se añadió automáticamente. Puedeseditarlo o desactivarlo.
+                  </p>
                 )}
-                {headers.filter(h => !(
-                  (project.authMethod === 'apikey' && h.key === 'X-API-Key') ||
-                  (project.authMethod === 'jwt' && h.key === 'Authorization')
-                )).map((h, i) => (
+                {headers.map((h, i) => (
                   <div key={i} className="pg__kv-row">
                     <input
                       className="pg__kv-check"
@@ -479,6 +468,10 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
         .pg__kv-add {
           border: none; background: none; color: #6366f1; font-size: 0.75rem; font-weight: 600;
           cursor: pointer; padding: 0.2rem 0; text-align: left; align-self: flex-start;
+        }
+        .pg__auth-hint {
+          font-size: 0.72rem; color: #6366f1; background: #eef2ff; padding: 0.35rem 0.5rem;
+          border-radius: 4px; margin: 0 0 0.35rem; border: 1px solid #c7d2fe;
         }
 
 
