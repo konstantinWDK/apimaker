@@ -111,12 +111,6 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
       const requestHeaders: Record<string, string> = {}
       headers.filter(h => h.enabled && h.key.trim()).forEach(h => { requestHeaders[h.key] = h.value })
 
-      if (project.authMethod === 'apikey' && project.apiKey) {
-        requestHeaders['X-API-Key'] = project.apiKey
-      } else if (project.authMethod === 'jwt') {
-        requestHeaders['Authorization'] = 'Bearer sim-token'
-      }
-
       const opts: RequestInit = { method: targetMethod, headers: requestHeaders }
       if (targetMethod !== 'GET' && targetMethod !== 'DELETE' && targetBody) opts.body = targetBody
 
