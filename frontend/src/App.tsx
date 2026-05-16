@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Routes, Route, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom'
+import { LayoutDashboard, Play, Shield, Settings, Rocket, Database, TestTube, BookOpen, Info } from 'lucide-react'
 
 import { SetupWizard } from './components/SetupWizard'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 import { LoginScreen } from './components/LoginScreen'
 import { ProjectSidebar } from './components/ProjectSidebar'
@@ -16,10 +18,9 @@ import { BuilderPage } from './components/BuilderPage'
 import { SimulatorPage } from './components/SimulatorPage'
 import { ProductOpsPage } from './components/ProductOpsPage'
 import { TestsPage } from './components/TestsPage'
-import { useProjectBuilder } from './hooks/useProjectBuilder'
+import { useProjectBuilder, createDefaultProject } from './hooks/useProjectBuilder'
 import { useAuth } from './hooks/useAuth'
 import { useToast } from './components/Toast'
-import type { ProjectDraft } from './types/schemas'
 import { readBackendConfig } from './lib/backendConfig'
 import { apiFetch } from './lib/api'
 
@@ -50,21 +51,49 @@ export function App() {
 
   const navigate = useNavigate()
 
-  if (isShareView) {
-    return <ShareView />
-  }
+  useEffect(() => {
+    if (!isAuthenticated) return
+    refreshProjects()
+  }, [refreshProjects, isAuthenticated])
 
-  if (needsSetup) {
-    return <SetupWizard onComplete={() => setNeedsSetup(false)} />
-  }
+  useEffect(() => {
+    let cancelled = false
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 5000)
 
-  if (!isAuthenticated) {
-    return <LoginScreen onLogin={login} error={authError ?? undefined} />
-  }
+    const checkSetup = async () => {
+      try {
+        const res = await fetch(`${readBackendConfig().baseUrl?.replace(/\/$/, '')}/setup/status`, {
+          signal: controller.signal,
+        })
+        clearTimeout(timeout)
+        if (cancelled) return
+        if (res.ok) {
+          const data = await res.json()
+          setNeedsSetup(!data.is_configured)
+        } else {
+          setNeedsSetup(false)
+        }
+      } catch {
+        clearTimeout(timeout)
+        if (!cancelled) setNeedsSetup(false)
+      }
+    }
 
-  const performLogout = () => {
-    logout()
-  }
+    const safetyTimeout = setTimeout(() => {
+      if (!cancelled && needsSetup === null) {
+        setNeedsSetup(false)
+      }
+    }, 7000)
+
+    checkSetup()
+    return () => {
+      cancelled = true
+      controller.abort()
+      clearTimeout(safetyTimeout)
+      clearTimeout(timeout)
+    }
+  }, [])
 
   const handleGenerate = useCallback(async () => {
     const effectiveProjectId = await saveProject()
@@ -73,26 +102,7 @@ export function App() {
     }
   }, [saveProject, toast])
 
-  useEffect(() => {
-    refreshProjects()
-  }, [refreshProjects])
-
-  useEffect(() => {
-    const checkSetup = async () => {
-      try {
-        const res = await fetch(`${readBackendConfig().baseUrl?.replace(/\/$/, '')}/setup/status`)
-        if (res.ok) {
-          const data = await res.json()
-          setNeedsSetup(!data.is_configured)
-        }
-      } catch {
-        // Fallback or ignore
-      }
-    }
-    checkSetup()
-  }, [])
-
-  // Polling for mock status and initial auto-start
+  const prevRemoteIdRef = useRef<string | undefined>()
   useEffect(() => {
     if (!project.remoteId || !isAuthenticated) return
     let cancelled = false
@@ -112,8 +122,13 @@ export function App() {
       }
     }
 
+    if (prevRemoteIdRef.current && prevRemoteIdRef.current !== project.remoteId) {
+      apiFetch(`/projects/${prevRemoteIdRef.current}/mock/stop`, { method: 'POST' }).catch(() => {})
+    }
+    prevRemoteIdRef.current = project.remoteId
+
     checkAndStart()
-    const interval = setInterval(checkMockStatus, 10000) // Poll every 10s
+    const interval = setInterval(checkMockStatus, 10000)
 
     return () => {
       cancelled = true
@@ -121,6 +136,31 @@ export function App() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.remoteId, isAuthenticated])
+
+  if (isShareView) {
+    return <ShareView />
+  }
+
+  if (needsSetup === null) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-spinner" />
+        <p className="muted-text">Conectando con el servidor...</p>
+      </div>
+    )
+  }
+
+  if (needsSetup) {
+    return <SetupWizard onComplete={() => setNeedsSetup(false)} />
+  }
+
+  if (!isAuthenticated) {
+    return <LoginScreen onLogin={login} error={authError ?? undefined} />
+  }
+
+  const performLogout = () => {
+    logout()
+  }
 
   return (
     <div className="shell">
@@ -137,35 +177,7 @@ export function App() {
             projects={projects}
             onSave={handleGenerate}
             onCreate={() => {
-              const id = crypto.randomUUID()
-              const draft: ProjectDraft = {
-                id,
-                name: 'Nueva API',
-                description: 'Diseña tu API declarando datos y endpoints',
-                authMethod: 'none',
-                targetStack: 'fastapi',
-                endpoints: [
-                  {
-                    id: crypto.randomUUID(),
-                    name: 'Listar registros',
-                    method: 'GET',
-                    path: '/records',
-                    summary: 'Obtiene la lista de elementos del dataset'
-                  }
-                ],
-                datasets: [{
-                  id: crypto.randomUUID(),
-                  name: 'Dataset principal',
-                  sourceType: 'manual',
-                  fields: [
-                    { id: crypto.randomUUID(), name: 'nombre', type: 'string', required: true, description: 'Nombre del elemento' }
-                  ],
-                  sampleRows: [
-                    { nombre: 'Ejemplo 1' }
-                  ]
-                }]
-              }
-              replaceProject(draft)
+              replaceProject(createDefaultProject())
             }}
             mockRunning={mockRunning}
             mockLoading={mockLoading}
@@ -201,6 +213,7 @@ export function App() {
                 end
                 className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
               >
+                <LayoutDashboard size={16} />
                 Editor
               </NavLink>
 
@@ -208,72 +221,82 @@ export function App() {
                 to="/simulator"
                 className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
               >
+                <Play size={16} />
                 Simulador
-              </NavLink>
-              <NavLink
-                to="/info"
-                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-              >
-                Información
-              </NavLink>
-              <NavLink
-                to="/security"
-                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-              >
-                Seguridad
               </NavLink>
               <NavLink
                 to="/deploy"
                 className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
               >
+                <Rocket size={16} />
                 Despliegue
               </NavLink>
               <NavLink
-                to="/operations"
+                to="/security"
                 className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
               >
-                Operaciones
+                <Shield size={16} />
+                Seguridad
               </NavLink>
               <NavLink
                 to="/config"
                 className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
               >
-                Configuración
+                <Settings size={16} />
+                Config
+              </NavLink>
+              <NavLink
+                to="/operations"
+                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+              >
+                <Database size={16} />
+                Operaciones
               </NavLink>
               <NavLink
                 to="/tests"
                 className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
               >
+                <TestTube size={16} />
                 Tests
               </NavLink>
               <NavLink
                 to="/docs"
                 className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
               >
-                Documentación
+                <BookOpen size={16} />
+                Docs
+              </NavLink>
+              <NavLink
+                to="/info"
+                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+              >
+                <Info size={16} />
+                Info
               </NavLink>
             </div>
             <a className="github-button" href="https://github.com/" target="_blank" rel="noreferrer">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
                 <path d="M12 .5a12 12 0 00-3.79 23.4c.6.1.82-.26.82-.58v-2.02c-3.34.72-4.05-1.61-4.05-1.61-.55-1.4-1.34-1.78-1.34-1.78-1.09-.74.08-.72.08-.72 1.2.08 1.83 1.24 1.83 1.24 1.08 1.85 2.83 1.32 3.52 1 .11-.8.42-1.32.76-1.62-2.66-.3-5.46-1.34-5.46-5.96 0-1.32.47-2.4 1.24-3.24-.12-.3-.54-1.5.12-3.12 0 0 1-.32 3.3 1.23a11.4 11.4 0 016 0c2.31-1.55 3.3-1.23 3.3-1.23.66 1.62.24 2.82.12 3.12.77.84 1.24 1.92 1.24 3.24 0 4.64-2.8 5.66-5.47 5.96.42.36.81 1.06.81 2.14v3.17c0 .32.21.7.82.58A12 12 0 0012 .5z" />
               </svg>
-              GitHub
+              <span>GitHub</span>
             </a>
           </div>
 
           <div key={location.key} className="page-enter">
-            <Routes>
-              <Route path="/" element={<BuilderPage />} />
-              <Route path="/simulator" element={<SimulatorPage />} />
-              <Route path="/info" element={<InfoPage />} />
-              <Route path="/security" element={<SecurityPage />} />
-              <Route path="/deploy" element={<DeployPage />} />
-              <Route path="/operations" element={<ProductOpsPage />} />
-              <Route path="/config" element={<ConfigPage authStatus={authStatus} onLogout={performLogout} />} />
-              <Route path="/docs" element={<DocsPage />} />
-              <Route path="/tests" element={<TestsPage />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+            <ErrorBoundary>
+              <Routes>
+                <Route path="/" element={<BuilderPage />} />
+                <Route path="/simulator" element={<SimulatorPage />} />
+                <Route path="/info" element={<InfoPage />} />
+                <Route path="/security" element={<SecurityPage />} />
+                <Route path="/deploy" element={<DeployPage />} />
+                <Route path="/operations" element={<ProductOpsPage />} />
+                <Route path="/config" element={<ConfigPage authStatus={authStatus} onLogout={performLogout} />} />
+                <Route path="/docs" element={<DocsPage />} />
+                <Route path="/tests" element={<TestsPage />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </ErrorBoundary>
           </div>
         </div>
       </div>

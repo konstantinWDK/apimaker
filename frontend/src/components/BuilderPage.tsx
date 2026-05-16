@@ -101,14 +101,13 @@ export function BuilderPage() {
         return
       }
 
-      const shareId = crypto.randomUUID().slice(0, 6)
       const generationResult: GenerationResult = {
         message: 'API generada con éxito',
         retentionNotice: 'Pulsa "Descargar bundle (.zip)" en la API generada para obtener el código.',
         apiUrl: `${localBaseUrl}/api/mock/${effectiveProjectId}${endpoints[0]?.path ?? '/records'}`,
         docsUrl: `${backendBaseUrl}/projects/${effectiveProjectId}/docs`,
         endpoints,
-        shareUrl: `${window.location.origin}/share/${shareId}/${slugify(project.name)}`,
+        shareUrl: `${window.location.origin}/share/${effectiveProjectId}/${slugify(project.name)}`,
         projectName: project.name,
         stack: project.targetStack,
       }
@@ -141,18 +140,8 @@ export function BuilderPage() {
     }
   }, [project.name])
 
-  // AUTO-SAVE: Automatically sync project with backend on changes (debounced)
-  useEffect(() => {
-    // We only auto-save if the project is already synced (has remoteId)
-    // to avoid creating multiple draft projects.
-    if (!project.remoteId) return
-
-    const timer = setTimeout(() => {
-      saveProject()
-    }, 3000)
-
-    return () => clearTimeout(timer)
-  }, [project.datasets, project.endpoints, project.name, project.description, project.authMethod])
+  // AUTO-SAVE is handled by useProjectBuilder's internal 1s debounce queue.
+  // Auto-save is triggered per-field via updateProject/upsertDataset/upsertEndpoint.
 
   useEffect(() => {
     const pid = project.slug || project.remoteId

@@ -1,15 +1,22 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { useProjectBuilder, api } from './useProjectBuilder'
+import { useProjectBuilder } from './useProjectBuilder'
+import * as api from '../lib/api'
 
-// Since 'api' is now exported from the same file as useProjectBuilder,
-// we can spy on its methods directly.
-// Note: Vitest's vi.mock for the same file can be tricky, 
-// so we'll use vi.spyOn on the exported api object.
+vi.mock('../lib/api', () => ({
+  fetchRemoteProjects: vi.fn(),
+  createProjectFromDraft: vi.fn(),
+  updateProject: vi.fn(),
+  syncDataset: vi.fn(),
+  syncEndpoints: vi.fn(),
+  startMockServer: vi.fn(),
+  stopMockServer: vi.fn(),
+  getMockStatus: vi.fn(),
+  deleteRemoteProject: vi.fn(),
+}))
 
 describe('useProjectBuilder store', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    // Reset state
     useProjectBuilder.setState({
       project: {
         id: 'initial-id',
@@ -31,11 +38,8 @@ describe('useProjectBuilder store', () => {
   })
 
   it('should update mockRunning status when checkMockStatus is called', async () => {
-    // Setup spy
-    const getMockStatusSpy = vi.spyOn(api, 'getMockStatus')
-    getMockStatusSpy.mockResolvedValue('running')
+    vi.mocked(api.getMockStatus).mockResolvedValue('running')
     
-    // Set project
     useProjectBuilder.setState({ 
       project: { 
         ...useProjectBuilder.getState().project, 
@@ -43,17 +47,14 @@ describe('useProjectBuilder store', () => {
       } 
     })
     
-    // Execute
     await useProjectBuilder.getState().checkMockStatus()
     
-    // Verify
-    expect(getMockStatusSpy).toHaveBeenCalledWith('test-project')
+    expect(api.getMockStatus).toHaveBeenCalledWith('test-project')
     expect(useProjectBuilder.getState().mockRunning).toBe(true)
   })
 
   it('should set mockRunning to false if API fails', async () => {
-    const getMockStatusSpy = vi.spyOn(api, 'getMockStatus')
-    getMockStatusSpy.mockRejectedValue(new Error('API Down'))
+    vi.mocked(api.getMockStatus).mockRejectedValue(new Error('API Down'))
     
     useProjectBuilder.setState({ 
       project: { 

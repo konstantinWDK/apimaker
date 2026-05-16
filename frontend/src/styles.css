@@ -196,7 +196,7 @@ body {
   border: none;
   background: transparent;
   border-radius: 8px;
-  padding: 0.5rem 1rem;
+  padding: 0.5rem 0.75rem;
   font-weight: 500;
   font-size: 0.85rem;
   cursor: pointer;
@@ -204,6 +204,7 @@ body {
   color: #64748b;
   display: inline-flex;
   align-items: center;
+  gap: 0.4rem;
   transition: all 0.15s ease;
 }
 
@@ -1148,6 +1149,29 @@ input[type='password'] {
   justify-content: center;
   background: linear-gradient(135deg, #0f172a, #1e293b);
   padding: 1.5rem;
+}
+
+.loading-screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(99, 102, 241, 0.2);
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .login-card {
@@ -5072,6 +5096,34 @@ input[type='password'] {
 @keyframes slideUpFade {
   from { opacity: 0; transform: translate(-50%, 1rem); }
   to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.error-boundary {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.error-boundary__content {
+  text-align: center;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.error-boundary__detail {
+  background: #fef2f2;
+  color: #dc2626;
+  padding: 1rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  width: 100%;
+  overflow-x: auto;
+  text-align: left;
 }
 
 .global-deploy-spinner {

@@ -2,7 +2,17 @@ import { create } from 'zustand'
 
 import type { ApiEndpoint, DatasetMeta, ProjectDraft } from '../types/schemas'
 import { fireToast } from '../components/Toast'
-import { readBackendConfig } from '../lib/backendConfig'
+import {
+  fetchRemoteProjects,
+  createProjectFromDraft,
+  updateProject as updateRemoteProject,
+  syncDataset as syncDatasetRemote,
+  syncEndpoints as syncEndpointsRemote,
+  startMockServer,
+  stopMockServer,
+  getMockStatus as getMockServerStatus,
+  deleteRemoteProject,
+} from '../lib/api'
 
 interface BuilderState {
   project: ProjectDraft
@@ -43,7 +53,7 @@ const STORAGE_KEY = 'apimaker-project'
 export const PROJECTS_STORAGE_KEY = 'apimaker-projects'
 const createId = () => crypto.randomUUID()
 
-const createDefaultProject = (): ProjectDraft => {
+export const createDefaultProject = (): ProjectDraft => {
   const id = createId()
   return {
     id,
@@ -92,271 +102,7 @@ const sanitizeDataset = (dataset?: DatasetMeta): DatasetMeta | undefined => {
 }
 
 // ─── API helpers ────────────────────────────────────────────────
-const getBaseUrl = (): string => {
-  const { baseUrl } = readBackendConfig()
-  return baseUrl.replace(/\/$/, '')
-}
-
-const getAuthHeaders = (): HeadersInit => {
-  const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
-  const headers: HeadersInit = { 'Content-Type': 'application/json' }
-  if (token) headers['Authorization'] = `Bearer ${token}`
-  return headers
-}
-
-export const api = {
-  async listProjects(workspaceId?: string): Promise<ProjectDraft[]> {
-    const url = workspaceId
-      ? `${getBaseUrl()}/projects?workspace_id=${workspaceId}`
-      : `${getBaseUrl()}/projects`
-    const res = await fetch(url)
-    if (!res.ok) return []
-    const data = await res.json()
-    return data.map((p: any) => ({
-      id: p.id,
-      name: p.name,
-      slug: p.slug,
-      description: p.description || '',
-      authMethod: p.auth_method || 'none',
-      apiKey: p.api_key || '',
-      jwtSecret: p.jwt_secret || '',
-      rateLimit: p.rate_limit || 0,
-      targetStack: p.target_stack || 'fastapi',
-      includeData: p.include_data !== false,
-      endpoints: (p.endpoints || []).map((ep: any) => ({
-        id: ep.id,
-        name: ep.name,
-        method: ep.method,
-        path: ep.path,
-        summary: ep.summary || '',
-        operationType: ep.operation_type || 'custom',
-      })),
-      datasets: p.datasets ? p.datasets.map((d: any) => sanitizeDataset({
-        id: d.id,
-        name: d.name,
-        sourceType: d.source_type,
-        fields: (d.fields || []).map((f: any) => ({
-          id: f.id || createId(),
-          name: f.name,
-          type: f.type,
-          required: f.required ?? true,
-          description: f.description,
-          isPrimaryKey: f.is_primary_key ?? false,
-          defaultValue: f.default_value,
-          fakerCategory: f.faker_category,
-          enum: f.enum_values || undefined,
-          references: f.references || undefined,
-        })),
-        sampleRows: d.sample_rows || [],
-        savedRequests: d.saved_requests || [],
-      })) : (p.dataset ? [sanitizeDataset({
-        id: p.dataset.id,
-        name: p.dataset.name,
-        sourceType: p.dataset.source_type,
-        fields: (p.dataset.fields || []).map((f: any) => ({
-          id: f.id || createId(),
-          name: f.name,
-          type: f.type,
-          required: f.required ?? true,
-          description: f.description,
-          isPrimaryKey: f.is_primary_key ?? false,
-          defaultValue: f.default_value,
-          fakerCategory: f.faker_category,
-          enum: f.enum_values || undefined,
-          references: f.references || undefined,
-        })),
-        sampleRows: p.dataset.sample_rows || [],
-        savedRequests: p.dataset.saved_requests || [],
-      })!] : []),
-      remoteId: p.slug || p.id,
-      workspaceId: p.workspace_id,
-    }))
-  },
-
-  async createProject(draft: ProjectDraft): Promise<ProjectDraft | null> {
-    const body: any = {
-      name: draft.name,
-      slug: draft.slug,
-      description: draft.description,
-      auth_method: draft.authMethod || 'none',
-      api_key: draft.apiKey,
-      jwt_secret: draft.jwtSecret,
-      rate_limit: draft.rateLimit,
-      target_stack: draft.targetStack,
-      include_data: draft.includeData !== false,
-      workspace_id: (draft as any).workspace_id,
-    }
-    if (draft.datasets && draft.datasets.length > 0) {
-      body.datasets = draft.datasets.map(ds => ({
-        id: ds.id,
-        name: ds.name,
-        source_type: ds.sourceType || 'manual',
-        fields: (ds.fields || []).map(f => ({
-          name: f.name,
-          type: f.type,
-          required: f.required ?? true,
-          description: f.description,
-          is_primary_key: f.isPrimaryKey ?? false,
-          default_value: f.defaultValue,
-          faker_category: f.fakerCategory,
-          enum_values: f.enum || null,
-          references: f.references || null,
-        })),
-        sample_rows: ds.sampleRows || [],
-        saved_requests: ds.savedRequests || [],
-      }))
-    }
-    const res = await fetch(`${getBaseUrl()}/projects`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(body),
-    })
-    if (!res.ok) {
-      const errorText = await res.text()
-      console.error('[createProject] Backend error:', res.status, errorText)
-      return null
-    }
-    const data = await res.json()
-    return {
-      id: data.id,
-      name: data.name,
-      description: data.description || '',
-      authMethod: data.auth_method || 'none',
-      apiKey: data.api_key || '',
-      jwtSecret: data.jwt_secret || '',
-      rateLimit: data.rate_limit || 0,
-      targetStack: data.target_stack || 'fastapi',
-      includeData: data.include_data !== false,
-      endpoints: (data.endpoints || []).map((ep: any) => ({
-        id: ep.id,
-        name: ep.name,
-        method: ep.method,
-        path: ep.path,
-        summary: ep.summary || '',
-        operationType: ep.operation_type || 'custom',
-      })),
-      datasets: (data.datasets || []).map((d: any) => ({
-        id: d.id,
-        name: d.name,
-        sourceType: d.source_type,
-        fields: (d.fields || []).map((f: any) => ({
-          id: f.id || createId(),
-          name: f.name,
-          type: f.type,
-          required: f.required ?? true,
-          description: f.description,
-          isPrimaryKey: f.is_primary_key ?? false,
-          defaultValue: f.default_value,
-          fakerCategory: f.faker_category,
-          enum: f.enum_values || undefined,
-          references: f.references || undefined,
-        })),
-        sampleRows: d.sample_rows || [],
-        savedRequests: d.saved_requests || [],
-      })),
-      remoteId: data.slug || data.id,
-    }
-  },
-
-  async updateProject(id: string, updates: { name?: string; slug?: string; description?: string; auth_method?: string; api_key?: string; jwt_secret?: string; rate_limit?: number; target_stack?: string; include_data?: boolean }): Promise<boolean> {
-    const res = await fetch(`${getBaseUrl()}/projects/${id}`, {
-      method: 'PATCH',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(updates),
-    })
-    return res.ok
-  },
-
-  async syncDataset(projectId: string, dataset: DatasetMeta): Promise<boolean> {
-    const res = await fetch(`${getBaseUrl()}/projects/${projectId}/dataset`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({
-        id: dataset.id,
-        name: dataset.name,
-        source_type: dataset.sourceType,
-        fields: (dataset.fields || []).map(f => ({
-          name: f.name,
-          type: f.type,
-          required: f.required ?? true,
-          description: f.description,
-          is_primary_key: f.isPrimaryKey ?? false,
-          default_value: f.defaultValue,
-          faker_category: f.fakerCategory,
-          enum_values: f.enum || null,
-          references: f.references || null,
-        })),
-        sample_rows: dataset.sampleRows,
-        saved_requests: dataset.savedRequests,
-      }),
-    })
-    return res.ok
-  },
-
-  async syncEndpoints(projectId: string, endpoints: ApiEndpoint[]): Promise<boolean> {
-    const res = await fetch(`${getBaseUrl()}/projects/${projectId}/endpoints`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({
-        endpoints: endpoints.map(ep => ({
-          id: ep.id,
-          name: ep.name,
-          method: ep.method,
-          path: ep.path,
-          summary: ep.summary,
-          operation_type: ep.operationType || 'custom',
-          target_dataset_id: ep.targetDatasetId,
-        })),
-      }),
-    })
-    return res.ok
-  },
-
-  async startMock(projectId: string): Promise<{ ok: boolean; msg?: string }> {
-    const res = await fetch(`${getBaseUrl()}/projects/${projectId}/mock/start`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-    })
-    if (!res.ok) {
-      const err = await res.text()
-      if (err.includes('not found') || err.includes('404')) {
-        return { ok: false, msg: 'Proyecto no encontrado. Sincroniza el proyecto primero.' }
-      }
-      if (err.includes('401') || err.includes('403')) {
-        return { ok: false, msg: 'No tienes permisos. Inicia sesión.' }
-      }
-      return { ok: false, msg: err }
-    }
-    return { ok: true }
-  },
-
-  async stopMock(projectId: string): Promise<boolean> {
-    const res = await fetch(`${getBaseUrl()}/projects/${projectId}/mock/stop`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-    })
-    return res.ok
-  },
-
-  async getMockStatus(projectId: string): Promise<'running' | 'stopped'> {
-    try {
-      const res = await fetch(`${getBaseUrl()}/projects/${projectId}/mock/status`)
-      if (!res.ok) return 'stopped'
-      const data = await res.json()
-      return data.status === 'running' ? 'running' : 'stopped'
-    } catch {
-      return 'stopped'
-    }
-  },
-
-  async deleteProject(projectId: string): Promise<boolean> {
-    const res = await fetch(`${getBaseUrl()}/projects/${projectId}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-    })
-    return res.ok
-  },
-}
+// All API calls now come from lib/api.ts — no duplication.
 
 // ─── Debounced save queue ──────────────────────────────────────
 let saveTimeout: ReturnType<typeof setTimeout> | null = null
@@ -450,7 +196,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
           if (payload.targetStack !== undefined) changes.target_stack = payload.targetStack
           if (payload.includeData !== undefined) changes.include_data = payload.includeData
           if (Object.keys(changes).length > 0) {
-            await api.updateProject(saveId, changes)
+            await updateRemoteProject(saveId, changes)
           }
         })
       }
@@ -471,7 +217,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       if (nextProject.remoteId) {
         const saveId = nextProject.remoteId
         queueSave(async () => {
-          await api.syncDataset(saveId, dataset)
+          await syncDatasetRemote(saveId, dataset)
         })
       }
       return { project: nextProject, projects: nextProjects }
@@ -503,7 +249,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       if (nextProject.remoteId) {
         const saveId = nextProject.remoteId
         queueSave(async () => {
-          await api.syncEndpoints(saveId, nextEndpoints)
+          await syncEndpointsRemote(saveId, nextEndpoints)
         })
       }
       return { project: nextProject, projects: nextProjects }
@@ -521,7 +267,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       // Queue API save
       const saveId = nextProject.remoteId || nextProject.id
       queueSave(async () => {
-        await api.syncEndpoints(saveId, nextEndpoints)
+        await syncEndpointsRemote(saveId, nextEndpoints)
       })
       return { project: nextProject, projects: nextProjects }
     }),
@@ -573,7 +319,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       const saveProject = async () => {
         if (snapshot.remoteId) {
           // Already exists, update
-          await api.updateProject(snapshot.remoteId, {
+          await updateRemoteProject(snapshot.remoteId, {
             name: snapshot.name,
             description: snapshot.description,
             target_stack: snapshot.targetStack,
@@ -581,15 +327,15 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
           // Sync dataset and endpoints
           if (snapshot.datasets && snapshot.datasets.length > 0) {
             for (const ds of snapshot.datasets) {
-              await api.syncDataset(snapshot.remoteId, ds)
+              await syncDatasetRemote(snapshot.remoteId, ds)
             }
           }
           if (snapshot.endpoints.length > 0) {
-            await api.syncEndpoints(snapshot.remoteId, snapshot.endpoints)
+            await syncEndpointsRemote(snapshot.remoteId, snapshot.endpoints)
           }
         } else {
           // Create new project in DB
-          const created = await api.createProject(snapshot)
+          const created = await createProjectFromDraft(snapshot)
           if (created) {
             // Update the project with the server-assigned ID
             persist(created, state.selectedDatasetId)
@@ -650,7 +396,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
     }),
 
   refreshProjects: async () => {
-    const projects = await api.listProjects()
+    const projects = await fetchRemoteProjects()
     get().loadProjects(projects)
   },
 
@@ -661,7 +407,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       return
     }
     set({ mockLoading: true, mockError: null })
-    const result = await api.startMock(project.remoteId)
+    const result = await startMockServer(project.remoteId)
     set({ mockLoading: false })
     if (!result.ok) {
       set({ mockRunning: false, mockError: result.msg || 'Error desconocido' })
@@ -674,7 +420,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
     const project = get().project
     if (!project.remoteId) return
     set({ mockLoading: true })
-    const ok = await api.stopMock(project.remoteId)
+    const ok = await stopMockServer(project.remoteId)
     set({ mockLoading: false, mockRunning: !ok, mockError: null })
   },
 
@@ -682,7 +428,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
     const project = get().project
     if (!project.remoteId && !project.id) return
     try {
-      const status = await api.getMockStatus(project.remoteId || project.id)
+      const status = await getMockServerStatus(project.remoteId || project.id)
       set({ mockRunning: status === 'running' })
     } catch {
       set({ mockRunning: false })
@@ -693,7 +439,11 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
     // First try to delete from DB (requires remoteId)
     const project = get().projects.find(p => p.id === id)
     if (project && (project.remoteId || project.id)) {
-      await api.deleteProject(project.remoteId || project.id)
+      try {
+        await deleteRemoteProject(project.remoteId || project.id)
+      } catch {
+        // Ignore backend errors during local deletion
+      }
     }
     // Also clear from localStorage if it's the current project
     const state = get()
@@ -721,11 +471,11 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       let currentProject = { ...project }
 
       if (!effectiveId) {
-        let created = await api.createProject(currentProject)
+        let created = await createProjectFromDraft(currentProject)
         
         if (!created && currentProject.slug) {
           // If creation failed (probably due to unique slug), try to link to existing project
-          const all = await api.listProjects()
+          const all = await fetchRemoteProjects()
           const existing = all.find(p => p.slug === currentProject.slug)
           if (existing) {
             created = existing as any
@@ -741,7 +491,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
           throw new Error('Error al sincronizar el proyecto con el servidor')
         }
       } else {
-        const updated = await api.updateProject(effectiveId, {
+        const updated = await updateRemoteProject(effectiveId, {
           name: currentProject.name,
           slug: currentProject.slug,
           description: currentProject.description,
@@ -754,7 +504,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
         })
         if (!updated) {
           // Project might have been deleted on backend; try to find by slug or recreate
-          const all = await api.listProjects()
+          const all = await fetchRemoteProjects()
           const existing = all.find(p => p.slug === currentProject.slug)
           if (existing) {
             effectiveId = existing.slug || existing.id
@@ -762,7 +512,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
             set({ project: currentProject })
             persist(currentProject, get().selectedDatasetId)
           } else {
-            let created = await api.createProject(currentProject)
+            let created = await createProjectFromDraft(currentProject)
             if (created) {
               effectiveId = created.slug || created.id
               currentProject = { ...currentProject, id: created.id, remoteId: effectiveId }
@@ -779,11 +529,11 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       if (effectiveId) {
         if (currentProject.datasets.length > 0) {
           for (const ds of currentProject.datasets) {
-            await api.syncDataset(effectiveId, ds)
+            await syncDatasetRemote(effectiveId, ds)
           }
         }
         if (currentProject.endpoints.length > 0) {
-          await api.syncEndpoints(effectiveId, currentProject.endpoints)
+          await syncEndpointsRemote(effectiveId, currentProject.endpoints)
         }
         
         // Update remoteId in state if slug changed

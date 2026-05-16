@@ -177,39 +177,112 @@ export const syncProjectWithBackend = async (project: ProjectDraft): Promise<Syn
 /**
  * Fetch all projects from the backend.
  */
-export const fetchRemoteProjects = async (): Promise<ProjectDraft[]> => {
+/**
+ * Map a backend project response to ProjectDraft.
+ */
+const mapProjectResponse = (item: any): ProjectDraft => ({
+  id: item.id,
+  remoteId: item.slug || item.id,
+  slug: item.slug,
+  name: item.name,
+  description: item.description || '',
+  authMethod: item.auth_method || 'none',
+  apiKey: item.api_key || '',
+  jwtSecret: item.jwt_secret || '',
+  rateLimit: item.rate_limit || 0,
+  targetStack: item.target_stack || 'fastapi',
+  includeData: item.include_data !== false,
+  datasets: (item.datasets || []).map((d: any) => ({
+    id: d.id,
+    name: d.name,
+    sourceType: d.source_type || 'manual',
+    fields: (d.fields || []).map((f: any) => ({
+      id: f.id || crypto.randomUUID(),
+      name: f.name,
+      type: f.type,
+      required: f.required ?? true,
+      description: f.description,
+      isPrimaryKey: f.is_primary_key ?? false,
+      defaultValue: f.default_value,
+      fakerCategory: f.faker_category,
+      enum: f.enum_values || undefined,
+      references: f.references || undefined,
+    })),
+    sampleRows: d.sample_rows || [],
+    savedRequests: d.saved_requests || [],
+  })),
+  endpoints: (item.endpoints || []).map((ep: any) => ({
+    id: ep.id,
+    name: ep.name,
+    method: ep.method,
+    path: ep.path,
+    summary: ep.summary || '',
+    operationType: ep.operation_type || 'custom',
+    targetDatasetId: ep.target_dataset_id,
+  })),
+  updatedAt: item.updated_at,
+  workspaceId: item.workspace_id,
+})
+
+export const fetchRemoteProjects = async (workspaceId?: string): Promise<ProjectDraft[]> => {
   const baseUrl = ensureBaseUrl()
-  const response = await fetch(`${baseUrl}/projects`)
-  const data = (await handleResponse(response)) as any[]
-  return data.map((item) => ({
-    id: item.id,
-    remoteId: item.id,
-    slug: item.slug,
-    name: item.name,
-    description: item.description,
-    authMethod: (item.auth_method as any) || 'none',
-    targetStack: item.target_stack,
-      datasets: (item.datasets || []).map((ds: any) => ({
-        id: ds.id,
-        name: ds.name,
-        sourceType: ds.source_type,
-        fields: (ds.fields || []).map((f: any) => ({
-          id: f.id || crypto.randomUUID(),
-          name: f.name,
-          type: f.type,
-          required: f.required ?? true,
-          description: f.description,
-          isPrimaryKey: f.is_primary_key ?? false,
-          defaultValue: f.default_value,
-          fakerCategory: f.faker_category,
-          enum: f.enum_values || undefined,
-          references: f.references || undefined,
-        })),
-        sampleRows: ds.sample_rows || [],
+  const url = workspaceId ? `${baseUrl}/projects?workspace_id=${workspaceId}` : `${baseUrl}/projects`
+  const response = await fetch(url)
+  if (!response.ok) return []
+  const data = await response.json()
+  return (data || []).map(mapProjectResponse)
+}
+
+/**
+ * Create a new project on the backend with full data.
+ */
+export const createProjectFromDraft = async (draft: ProjectDraft): Promise<ProjectDraft | null> => {
+  const baseUrl = ensureBaseUrl()
+  const headers = buildHeaders()
+  const body: any = {
+    name: draft.name,
+    slug: draft.slug,
+    description: draft.description,
+    auth_method: draft.authMethod || 'none',
+    api_key: draft.apiKey,
+    jwt_secret: draft.jwtSecret,
+    rate_limit: draft.rateLimit,
+    target_stack: draft.targetStack,
+    include_data: draft.includeData !== false,
+    workspace_id: (draft as any).workspace_id,
+  }
+  if (draft.datasets && draft.datasets.length > 0) {
+    body.datasets = draft.datasets.map(ds => ({
+      id: ds.id,
+      name: ds.name,
+      source_type: ds.sourceType || 'manual',
+      fields: (ds.fields || []).map(f => ({
+        name: f.name,
+        type: f.type,
+        required: f.required ?? true,
+        description: f.description,
+        is_primary_key: f.isPrimaryKey ?? false,
+        default_value: f.defaultValue,
+        faker_category: f.fakerCategory,
+        enum_values: f.enum || null,
+        references: f.references || null,
       })),
-    endpoints: item.endpoints || [],
-    updatedAt: item.updated_at,
-  }))
+      sample_rows: ds.sampleRows || [],
+      saved_requests: ds.savedRequests || [],
+    }))
+  }
+  const response = await fetch(`${baseUrl}/projects`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error('[createProjectFromDraft] Backend error:', response.status, errorText)
+    return null
+  }
+  const data = await response.json()
+  return mapProjectResponse(data)
 }
 
 /**
@@ -313,23 +386,134 @@ export const fetchRemoteProject = async (projectId: string): Promise<ProjectDraf
 /**
  * Start mock server for a project.
  */
-export const startMockServer = async (projectId: string): Promise<any> => {
+export const startMockServer = async (projectId: string): Promise<{ ok: boolean; msg?: string }> => {
   const baseUrl = ensureBaseUrl()
   const headers = buildHeaders()
   const response = await fetch(`${baseUrl}/projects/${projectId}/mock/start`, {
     method: 'POST',
     headers,
   })
-  return handleResponse(response)
+  if (!response.ok) {
+    const err = await response.text()
+    if (err.includes('not found') || err.includes('404')) {
+      return { ok: false, msg: 'Proyecto no encontrado. Sincroniza el proyecto primero.' }
+    }
+    if (err.includes('401') || err.includes('403')) {
+      return { ok: false, msg: 'No tienes permisos. Inicia sesión.' }
+    }
+    return { ok: false, msg: err }
+  }
+  return { ok: true }
+}
+
+/**
+ * Stop mock server for a project.
+ */
+export const stopMockServer = async (projectId: string): Promise<boolean> => {
+  const baseUrl = ensureBaseUrl()
+  const headers = buildHeaders()
+  const response = await fetch(`${baseUrl}/projects/${projectId}/mock/stop`, {
+    method: 'POST',
+    headers,
+  })
+  return response.ok
 }
 
 /**
  * Get mock server status.
  */
-export const getMockStatus = async (projectId: string): Promise<any> => {
+export const getMockStatus = async (projectId: string): Promise<'running' | 'stopped'> => {
   const baseUrl = ensureBaseUrl()
-  const response = await fetch(`${baseUrl}/projects/${projectId}/mock/status`)
-  return handleResponse(response)
+  try {
+    const response = await fetch(`${baseUrl}/projects/${projectId}/mock/status`)
+    if (!response.ok) return 'stopped'
+    const data = await response.json()
+    return data.status === 'running' ? 'running' : 'stopped'
+  } catch {
+    return 'stopped'
+  }
+}
+
+/**
+ * Update a project's metadata on the backend.
+ */
+export const updateProject = async (
+  id: string,
+  updates: {
+    name?: string
+    slug?: string
+    description?: string
+    auth_method?: string
+    api_key?: string
+    jwt_secret?: string
+    rate_limit?: number
+    target_stack?: string
+    include_data?: boolean
+  },
+): Promise<boolean> => {
+  const baseUrl = ensureBaseUrl()
+  const headers = buildHeaders()
+  const response = await fetch(`${baseUrl}/projects/${id}`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify(updates),
+  })
+  return response.ok
+}
+
+/**
+ * Sync a single dataset to the backend.
+ */
+export const syncDataset = async (projectId: string, dataset: ProjectDraft['datasets'][0]): Promise<boolean> => {
+  const baseUrl = ensureBaseUrl()
+  const headers = buildHeaders()
+  const response = await fetch(`${baseUrl}/projects/${projectId}/dataset`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      id: dataset.id,
+      name: dataset.name,
+      source_type: dataset.sourceType,
+      fields: (dataset.fields || []).map(f => ({
+        name: f.name,
+        type: f.type,
+        required: f.required ?? true,
+        description: f.description,
+        is_primary_key: f.isPrimaryKey ?? false,
+        default_value: f.defaultValue,
+        faker_category: f.fakerCategory,
+        enum_values: f.enum || null,
+        references: f.references || null,
+      })),
+      sample_rows: dataset.sampleRows,
+      saved_requests: dataset.savedRequests,
+    }),
+  })
+  return response.ok
+}
+
+/**
+ * Sync all endpoints for a project to the backend.
+ */
+export const syncEndpoints = async (projectId: string, endpoints: ProjectDraft['endpoints']): Promise<boolean> => {
+  const baseUrl = ensureBaseUrl()
+  const headers = buildHeaders()
+  const response = await fetch(`${baseUrl}/projects/${projectId}/endpoints`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      endpoints: endpoints.map(ep => ({
+        id: ep.id,
+        name: ep.name,
+        method: ep.method,
+        path: ep.path,
+        summary: ep.summary,
+        operation_type: ep.operationType || 'custom',
+        target_dataset_id: ep.targetDatasetId,
+      })),
+    }),
+  })
+  return response.ok
 }
 
 /**

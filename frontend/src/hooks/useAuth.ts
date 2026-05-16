@@ -4,7 +4,6 @@ import { readBackendConfig } from '../lib/backendConfig'
 
 const TOKEN_STORAGE_KEY = 'apimaker-jwt-token'
 const USER_STORAGE_KEY = 'apimaker-jwt-user'
-const CREDS_STORAGE_KEY = 'apimaker-creds'
 
 const buildUrl = (path: string) => {
   const config = readBackendConfig()
@@ -112,8 +111,6 @@ export function useAuth() {
       if (typeof window !== 'undefined') {
         window.sessionStorage.setItem(TOKEN_STORAGE_KEY, data.access_token)
         window.sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user))
-        // Store credentials for auto-login
-        window.sessionStorage.setItem(CREDS_STORAGE_KEY, JSON.stringify({ username, password }))
       }
       setCurrentUser(data.user)
       setStatus({ username: data.user.username, mustChange: false })
@@ -165,11 +162,5 @@ export function useAuth() {
     authStatus: status,
     currentUser,
     getToken: () => readToken(),
-    getStoredCreds: () => {
-      if (typeof window === 'undefined') return null
-      const raw = window.sessionStorage.getItem(CREDS_STORAGE_KEY)
-      if (!raw) return null
-      try { return JSON.parse(raw) } catch { return null }
-    },
   }
 }

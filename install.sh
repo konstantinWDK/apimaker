@@ -239,38 +239,7 @@ if [ "$USE_DOCKER" = "y" ]; then
     export APIMAKER_DATABASE_URL="$DB_URL_DOCKER"
     echo -e "${BLUE}Levantando servicios con Docker...${NC}"
     $DOCKER_CMD $PROFILES up -d --build
-
-    cat << EOF > start.sh
-#!/usr/bin/env bash
-cd "\$(dirname "\$0")"
-echo "Iniciando API Maker con Docker..."
-$DOCKER_CMD $PROFILES up -d
-EOF
-    cat << EOF > start.bat
-@echo off
-cd /d "%~dp0"
-echo Iniciando API Maker con Docker...
-$DOCKER_CMD $PROFILES up -d
-pause
-EOF
-else
-    cat << 'EOF' > start.sh
-#!/usr/bin/env bash
-cd "$(dirname "$0")"
-echo -e "\033[0;32mIniciando API Maker...\033[0m"
-npx concurrently -n "Backend,Frontend" -c "blue,green" \
-    "cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000" \
-    "cd frontend && npm run dev"
-EOF
-    cat << 'EOF' > start.bat
-@echo off
-cd /d "%~dp0"
-echo Iniciando API Maker...
-npx concurrently -n "Backend,Frontend" -c "blue,green" "cd backend && .venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000" "cd frontend && npm run dev"
-EOF
 fi
-chmod +x start.sh
-echo -e "${CYAN}Se han generado 'start.sh' y 'start.bat' para iniciar la aplicacion comodamente.${NC}"
 
 echo ""
 echo -e "${GREEN}=======================================${NC}"
@@ -286,9 +255,7 @@ fi
 
 if [ "$USE_DOCKER" != "y" ]; then
     echo ""
-    echo -e "${YELLOW}Para arrancar la aplicacion:${NC}"
-    echo -e "Opcion 1: Ejecutar el script generado ${BLUE}./start.sh${NC}"
-    echo -e "Opcion 2: Arrancar manualmente abriendo dos terminales:"
-    echo -e "  Terminal 1 (Backend):  ${CYAN}cd backend && source .venv/bin/activate && uvicorn app.main:app --reload${NC}"
+    echo -e "${YELLOW}Para arrancar la aplicacion, abre dos terminales:${NC}"
+    echo -e "  Terminal 1 (Backend):  ${CYAN}cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000${NC}"
     echo -e "  Terminal 2 (Frontend): ${CYAN}cd frontend && npm run dev${NC}"
 fi
