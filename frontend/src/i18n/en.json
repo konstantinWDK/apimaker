@@ -1359,5 +1359,6 @@
   "monitor.last15min": "Last 15 min",
   "monitor.lastHour": "Last hour",
   "monitor.last6hours": "Last 6 hours",
-  "monitor.last24hours": "Last 24 hours"
+  "monitor.last24hours": "Last 24 hours",
+  "monitor.consoleLog": "Request Log"
 }

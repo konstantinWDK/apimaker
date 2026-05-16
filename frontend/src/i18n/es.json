@@ -1360,5 +1360,6 @@
   "monitor.last15min": "Últimos 15 min",
   "monitor.lastHour": "Última hora",
   "monitor.last6hours": "Últimas 6 horas",
-  "monitor.last24hours": "Últimas 24 horas"
+  "monitor.last24hours": "Últimas 24 horas",
+  "monitor.consoleLog": "Registro de Peticiones"
 }
