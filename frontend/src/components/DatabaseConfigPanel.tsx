@@ -32,7 +32,10 @@ export function DatabaseConfigPanel() {
       .finally(() => setLoading(false))
   }, [])
 
-  const isPg = info?.type === 'postgresql'
+  const dbType = info?.type || ''
+  const isPg = dbType === 'postgresql'
+  const isMySql = dbType === 'mysql'
+  const dbLabel = isPg ? 'PostgreSQL' : isMySql ? 'MySQL' : 'SQLite'
 
   if (loading) {
     return <p className="muted-text" style={{ fontSize: '0.85rem' }}>Cargando información de la base de datos...</p>
@@ -48,6 +51,12 @@ export function DatabaseConfigPanel() {
               <path d="M3 5V19A9 3 0 0 0 21 19V5" />
               <path d="M3 12A9 3 0 0 0 21 12" />
             </svg>
+          ) : isMySql ? (
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" />
+              <path d="M9 3v18" />
+              <path d="M3 9h18" />
+            </svg>
           ) : (
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 7V4h16v3" />
@@ -58,14 +67,14 @@ export function DatabaseConfigPanel() {
         </div>
         <div className="db-info-body">
           <div className="db-info-title">
-            <span className={`db-badge ${isPg ? 'pg' : 'sqlite'}`}>
-              {isPg ? 'PostgreSQL' : 'SQLite'}
+            <span className={`db-badge ${isPg ? 'pg' : isMySql ? 'mysql' : 'sqlite'}`}>
+              {dbLabel}
             </span>
-            <span className="db-env">{info?.type === 'postgresql' ? 'Producción' : 'Desarrollo'}</span>
+            <span className="db-env">{isPg || isMySql ? 'Producción' : 'Desarrollo'}</span>
           </div>
           <table className="db-info-table">
             <tbody>
-              <tr><td>Tipo</td><td>{info?.type || '—'}</td></tr>
+              <tr><td>Tipo</td><td>{dbLabel}</td></tr>
               <tr><td>Host</td><td>{info?.host || '—'}</td></tr>
               <tr><td>Base de datos</td><td>{info?.database || '—'}</td></tr>
               <tr><td>Usuario</td><td>{info?.username || '—'}</td></tr>
@@ -121,6 +130,7 @@ export function DatabaseConfigPanel() {
           letter-spacing: 0.03em;
         }
         .db-badge.pg { background: #dbeafe; color: #1e40af; }
+        .db-badge.mysql { background: #fef3c7; color: #92400e; }
         .db-badge.sqlite { background: #f1f5f9; color: #475569; }
         .db-env {
           font-size: 0.72rem;
