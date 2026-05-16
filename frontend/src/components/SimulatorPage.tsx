@@ -104,37 +104,37 @@ export function SimulatorPage() {
         }
         .simulator-page__eyebrow {
           margin: 0; font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
-          letter-spacing: 0.1em; color: #6366f1;
+          letter-spacing: 0.1em; color: var(--accent-indigo);
         }
         .simulator-page__title {
-          margin: 0 0 0.5rem; font-size: 1.3rem; font-weight: 700; color: #0f172a;
+          margin: 0 0 0.5rem; font-size: 1.3rem; font-weight: 700; color: var(--text-primary);
         }
-        .simulator-page__title span { color: #6366f1; }
+        .simulator-page__title span { color: var(--accent-indigo); }
         .simulator-page__dataset-select { display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-start; }
         .simulator-page__dataset-label {
-          font-size: 0.7rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;
+          font-size: 0.7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;
         }
         .simulator-page__dataset-dropdown {
-          padding: 0.35rem 0.6rem; border: 1px solid #e2e8f0; border-radius: 6px;
-          font-size: 0.8rem; background: #fff; cursor: pointer; min-width: 240px;
+          padding: 0.35rem 0.6rem; border: 1px solid var(--border-color); border-radius: 6px;
+          font-size: 0.8rem; background: var(--bg-secondary); cursor: pointer; min-width: 240px;
           outline: none;
         }
-        .simulator-page__dataset-dropdown:focus { border-color: #6366f1; }
+        .simulator-page__dataset-dropdown:focus { border-color: var(--accent-indigo); }
         .sim-deployments { display: flex; flex-direction: column; gap: 0.35rem; }
         .sim-deployments__label {
-          font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8;
+          font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-light);
         }
         .sim-deployments__list { display: flex; gap: 0.5rem; flex-wrap: wrap; }
         .sim-deployments__item {
           display: flex; align-items: center; gap: 0.5rem;
-          padding: 0.4rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px;
-          background: #fff; cursor: pointer; font-size: 0.8rem; font-weight: 600; color: #334155;
+          padding: 0.4rem 0.75rem; border: 1px solid var(--border-color); border-radius: 8px;
+          background: var(--bg-secondary); cursor: pointer; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);
           transition: all 0.12s;
         }
-        .sim-deployments__item:hover { border-color: #6366f1; color: #4f46e5; }
-        .sim-deployments__item.active { border-color: #6366f1; background: #eef2ff; color: #4f46e5; }
+        .sim-deployments__item:hover { border-color: var(--accent-indigo); color: var(--accent-indigo); }
+        .sim-deployments__item.active { border-color: var(--accent-indigo); background: var(--bg-hover); color: var(--accent-indigo); }
         .sim-deployments__stack {
-          font-size: 0.65rem; font-weight: 500; color: #94a3b8; text-transform: uppercase;
+          font-size: 0.65rem; font-weight: 500; color: var(--text-light); text-transform: uppercase;
         }
       `}</style>
     </div>

@@ -13,6 +13,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session
@@ -592,14 +594,13 @@ def redeploy_local(
         tracking[slug]["status"] = "running"
         tracking[slug]["auth_method"] = project.auth_method or "none"
         tracking[slug]["endpoints"] = deployed_endpoints
-        tracking[slug]["deployed_at"] = str(subprocess.run(
-            ["date"], capture_output=True, text=True
-        ).stdout.strip())
+        tracking[slug]["deployed_at"] = datetime.now(timezone.utc).astimezone().isoformat()
         _save_tracking(tracking)
 
     url = tracking.get(slug, {}).get("url") if tracking else None
     logs.append(" Changes applied to deployment")
     return DeployStatus(status="running", url=url, logs=logs, message="Redeploy completed")
+
 
 
 def _check_docker_container(slug: str) -> str:
@@ -855,9 +856,7 @@ def deploy_local(
         "auth_method": project.auth_method or "none",
         "endpoints": deployed_endpoints,
         "db_type": "postgresql" if include_postgres_container else ("mysql" if include_mysql_container else req.db_type),
-        "deployed_at": str(subprocess.run(
-            ["date"], capture_output=True, text=True
-        ).stdout.strip()),
+        "deployed_at": datetime.now(timezone.utc).astimezone().isoformat(),
     }
     if include_postgres_container:
         tracking[slug]["db_credentials"] = {

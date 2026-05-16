@@ -266,7 +266,7 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
                     <button className="pg__kv-remove" onClick={() => removeQueryParam(i)}>&times;</button>
                   </div>
                 ))}
-                <button className="pg__kv-add" onClick={addQueryParam}>+ {t('playground.addParam')}</button>
+                <button className="pg__kv-add" onClick={addQueryParam}>{t('playground.addParam')}</button>
               </div>
             )}
 
@@ -487,18 +487,18 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
         .pg__body-textarea:disabled { opacity: 0.5; background: #f1f5f9; cursor: not-allowed; }
         .pg__body-error { font-size: 0.72rem; color: #dc2626; margin-top: 0.25rem; }
 
-        .pg__response { flex: 1; display: flex; flex-direction: column; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; min-height: 200px; }
+        .pg__response { flex: 1; display: flex; flex-direction: column; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; min-height: 200px; }
         .pg__response-bar {
           display: flex; align-items: center; gap: 1rem; padding: 0.4rem 0.75rem;
-          background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 0.75rem;
+          background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); font-size: 0.75rem;
         }
         .pg__response-status { font-weight: 700; font-size: 0.8rem; }
-        .pg__response-status.ok { color: #166534; } .pg__response-status.err { color: #991b1b; }
-        .pg__response-time, .pg__response-size { color: #64748b; font-family: monospace; font-size: 0.72rem; }
+        .pg__response-status.ok { color: var(--accent-green); } .pg__response-status.err { color: var(--accent-red); }
+        .pg__response-time, .pg__response-size { color: var(--text-muted); font-family: monospace; font-size: 0.72rem; }
         .pg__response-body {
           flex: 1; margin: 0; padding: 0.75rem; font-family: monospace; font-size: 0.75rem;
           line-height: 1.5; overflow: auto; white-space: pre-wrap; word-break: break-all;
-          color: #334155; background: #fff;
+          color: var(--text-primary); background: var(--bg-secondary);
         }
         .pg__response-empty {
           flex: 1; display: flex; align-items: center; justify-content: center;

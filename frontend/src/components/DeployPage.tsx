@@ -276,7 +276,7 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
             {deployments.map((dep: any) => (
               <div key={dep.slug} style={{
                 padding: '0.75rem 1rem',
-                border: '1px solid #e2e8f0', borderRadius: '8px', background: '#fff',
+                border: '1px solid var(--border-color)', borderRadius: '8px', background: 'var(--bg-secondary)',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                   <span style={{ width: 10, height: 10, borderRadius: '50%', background: statusColor(dep.docker_status), flexShrink: 0 }} />
@@ -428,8 +428,8 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                     flex: 1,
                     padding: '0.8rem 0.5rem',
                     borderRadius: '12px',
-                    border: `2px solid ${deployDbType === opt.id ? '#6366f1' : 'rgba(148, 163, 184, 0.2)'}`,
-                    background: deployDbType === opt.id ? '#f5f7ff' : '#fff',
+                    border: `2px solid ${deployDbType === opt.id ? 'var(--accent-indigo)' : 'var(--border-color)'}`,
+                    background: deployDbType === opt.id ? 'var(--bg-hover)' : 'var(--bg-secondary)',
                     cursor: 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
@@ -476,10 +476,10 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                       <input className="field" value={deployPgDb} onChange={e => setDeployPgDb(e.target.value)} placeholder="api_deploy" /></label>
                   </div>
                 ) : (
-                  <div style={{ padding: '0.75rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '0.82rem', color: '#166534' }}>
+                  <div style={{ padding: '0.75rem', background: 'var(--bg-hover)', border: '1px solid var(--accent-green)', borderRadius: '8px', fontSize: '0.82rem', color: 'var(--text-primary)' }}>
                     <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}> {t('deploy.newPgContainerTitle')}</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.2rem 0.75rem', fontSize: '0.78rem' }}>
-                      <span style={{ color: '#4b5563' }}>{t('deploy.port')}:</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>{t('deploy.port')}:</span>
                       <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
                         <input className="field" type="number" value={containerPgPort} onChange={e => setContainerPgPort(e.target.value)} placeholder="5432"
                           style={{ width: '90px', fontSize: '0.78rem', padding: '0.2rem 0.4rem' }} />
@@ -533,10 +533,10 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                       <input className="field" value={deployMySqlDb} onChange={e => setDeployMySqlDb(e.target.value)} placeholder="api_deploy" /></label>
                   </div>
                 ) : (
-                  <div style={{ padding: '0.75rem', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', fontSize: '0.82rem', color: '#0369a1' }}>
+                  <div style={{ padding: '0.75rem', background: 'var(--bg-hover)', border: '1px solid var(--accent-sky)', borderRadius: '8px', fontSize: '0.82rem', color: 'var(--text-primary)' }}>
                     <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}> {t('deploy.newMySqlContainerTitle')}</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.2rem 0.75rem', fontSize: '0.78rem' }}>
-                      <span style={{ color: '#4b5563' }}>{t('deploy.port')}:</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>{t('deploy.port')}:</span>
                       <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
                         <input className="field" type="number" value={containerMySqlPort} onChange={e => setContainerMySqlPort(e.target.value)} placeholder="3306"
                           style={{ width: '90px', fontSize: '0.78rem', padding: '0.2rem 0.4rem' }} />
