@@ -28,8 +28,10 @@ export function SecurityPage() {
   const [copied, setCopied] = useState('')
 
   const baseUrl = readBackendConfig().baseUrl?.replace(/\/$/, '') || 'http://localhost:8000'
-  const projectPrefix = project.slug || project.id
-  const mockUrl = `${baseUrl}/api/mock/${projectPrefix}/pokemon`
+  const projectPrefix = project.remoteId || project.slug || project.id
+  const firstEndpoint = project.endpoints[0]
+  const endpointPath = firstEndpoint?.path || '/'
+  const mockUrl = `${baseUrl}/api/mock/${projectPrefix}${endpointPath}`
 
   const handleChange = (field: string, value: unknown) => {
     updateProject({ [field]: value } as Partial<ProjectDraft>)
@@ -79,6 +81,10 @@ export function SecurityPage() {
           <p className="info-hero__subtitle">
             Configura la autenticación, genera credenciales y prueba la seguridad de tu API.
           </p>
+          <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+            Proyecto: <strong style={{ color: '#e2e8f0' }}>{project.name || 'Sin nombre'}</strong>
+            {projectPrefix && <span style={{ marginLeft: '0.5rem' }}>— ID: <code style={{ color: '#94a3b8' }}>{projectPrefix}</code></span>}
+          </p>
         </div>
       </div>
 
@@ -86,6 +92,9 @@ export function SecurityPage() {
         {/* Auth Method */}
         <div className="info-card" style={{ gridColumn: '1 / -1' }}>
           <h3 className="info-card__title" style={{ marginBottom: '0.75rem' }}>Método de Autenticación</h3>
+          <p className="muted-text" style={{ fontSize: '0.82rem', marginBottom: '1rem' }}>
+            Define cómo se autenticarán los clientes al consumir tu API <strong>{project.name}</strong>.
+          </p>
           <div className="form-grid">
             <label className="form-field">
               <span className="label">Tipo</span>
@@ -161,6 +170,26 @@ export function SecurityPage() {
           <p className="muted-text" style={{ fontSize: '0.82rem', marginBottom: '0.75rem' }}>
             Envía una petición de prueba al mock server con la configuración actual.
           </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            <div className="form-field" style={{ margin: 0 }}>
+              <span className="label">Proyecto</span>
+              <span style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{project.name || '—'}</span>
+            </div>
+            <div className="form-field" style={{ margin: 0 }}>
+              <span className="label">Endpoint de prueba</span>
+              <span style={{ fontFamily: 'monospace', fontSize: '0.82rem', wordBreak: 'break-all' }}>{mockUrl}</span>
+            </div>
+            <div className="form-field" style={{ margin: 0 }}>
+              <span className="label">Método de auth</span>
+              <span style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                {project.authMethod === 'apikey' ? 'API Key (X-API-Key)' :
+                 project.authMethod === 'jwt' ? 'JWT (Bearer Token)' :
+                 project.authMethod === 'basic' ? 'Basic Auth' : 'Ninguno (público)'}
+              </span>
+            </div>
+          </div>
+
           <div className="docs-code" style={{ fontSize: '0.75rem', padding: '0.5rem 0.75rem', marginBottom: '0.75rem', wordBreak: 'break-all' }}>
             {project.authMethod === 'apikey' && project.apiKey
               ? `curl -H "X-API-Key: ${project.apiKey}" ${mockUrl}`
