@@ -506,6 +506,7 @@ def deploy_remote(
         tracking[f"{slug}-remote"] = {
             "name": project.name, "host": req.host, "port": req.api_port,
             "url": url, "stack": project.target_stack, "status": "running",
+            "auth_method": project.auth_method or "none",
         }
         _save_tracking(tracking)
 
@@ -588,6 +589,7 @@ def redeploy_local(
         tracking[slug]["name"] = project.name
         tracking[slug]["stack"] = project.target_stack
         tracking[slug]["status"] = "running"
+        tracking[slug]["auth_method"] = project.auth_method or "none"
         tracking[slug]["endpoints"] = deployed_endpoints
         tracking[slug]["deployed_at"] = str(subprocess.run(
             ["date"], capture_output=True, text=True
@@ -849,6 +851,7 @@ def deploy_local(
         "url": f"http://localhost:{port}/api",
         "stack": project.target_stack,
         "status": "running",
+        "auth_method": project.auth_method or "none",
         "endpoints": deployed_endpoints,
         "db_type": "postgresql" if include_postgres_container else ("mysql" if include_mysql_container else req.db_type),
         "deployed_at": str(subprocess.run(

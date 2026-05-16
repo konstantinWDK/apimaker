@@ -282,6 +282,26 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                     <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
                       {dep.url} · {dep.stack} · {statusLabel(dep.docker_status)}
                     </div>
+                    {dep.auth_method && (
+                      <div style={{ marginTop: '0.25rem', display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                        {dep.auth_method === 'apikey' ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', fontWeight: 600, color: '#166534', background: '#dcfce7', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            Seguro: API Key
+                          </span>
+                        ) : dep.auth_method === 'jwt' ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', fontWeight: 600, color: '#166534', background: '#dcfce7', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            Seguro: JWT
+                          </span>
+                        ) : (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            Público
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                     <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
                       {dep.docker_status === 'running' ? (
