@@ -9,7 +9,7 @@ import sys
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -142,6 +142,7 @@ def create_app_for_project(
 ) -> FastAPI:
     """Create a standalone FastAPI app that serves a single project's mock API."""
     from .db import engine
+    from .db_models import Project
     from .services.mock_server import (
         _mock_get_impl as mock_get,
         _resolve_project_id,
@@ -150,7 +151,7 @@ def create_app_for_project(
         mock_put,
         start_mock_server_fn,
     )
-    from sqlmodel import Session
+    from sqlmodel import Session, select
 
     app = FastAPI(title=title or f"API Maker - {project_id}")
 
@@ -167,6 +168,31 @@ def create_app_for_project(
             resolved = _resolve_project_id(session, project_id)
             start_mock_server_fn(session, resolved)
 
+    async def _check_auth(request: Request):
+        """Verify auth headers based on the project's configured auth method."""
+        with Session(engine) as session:
+            resolved = _resolve_project_id(session, project_id)
+            project = session.get(Project, resolved)
+            if not project:
+                raise HTTPException(status_code=404, detail="Project not found")
+            if project.auth_method == "apikey":
+                api_key = request.headers.get("X-API-Key")
+                if not api_key or api_key != project.api_key:
+                    raise HTTPException(status_code=401, detail="Invalid or missing API Key")
+            elif project.auth_method == "jwt":
+                auth_header = request.headers.get("Authorization")
+                if not auth_header or not auth_header.startswith("Bearer "):
+                    raise HTTPException(status_code=401, detail="Missing or invalid Bearer Token")
+                token = auth_header.split(" ", 1)[1] if " " in auth_header else ""
+                if project.jwt_secret:
+                    from .services.jwt_service import decode_token
+                    try:
+                        decode_token(token, secret=project.jwt_secret)
+                    except HTTPException:
+                        raise
+                    except Exception:
+                        raise HTTPException(status_code=401, detail="Invalid or expired JWT token")
+
     HANDLERS = {
         "GET": mock_get,
         "POST": mock_post,
@@ -176,6 +202,7 @@ def create_app_for_project(
 
     @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
     async def handle_all(path: str, request: Request):
+        await _check_auth(request)
         method = request.method.upper()
         handler = HANDLERS.get(method)
         if not handler:

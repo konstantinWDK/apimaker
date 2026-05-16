@@ -564,6 +564,8 @@ def redeploy_local(
     project, deployed_endpoints = _export_project_json(session, project_ref, deploy_dir / "project.json")
     logs.append(" Proyecto actualizado en project.json")
 
+    _ensure_deploy_image(logs)
+
     try:
         result = subprocess.run(
             ["docker", "compose", "up", "-d", "--force-recreate", "--remove-orphans"],
