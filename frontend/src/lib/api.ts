@@ -226,8 +226,9 @@ const mapProjectResponse = (item: any): ProjectDraft => ({
 
 export const fetchRemoteProjects = async (workspaceId?: string): Promise<ProjectDraft[]> => {
   const baseUrl = ensureBaseUrl()
+  const headers = buildHeaders()
   const url = workspaceId ? `${baseUrl}/projects?workspace_id=${workspaceId}` : `${baseUrl}/projects`
-  const response = await fetch(url)
+  const response = await fetch(url, { headers })
   if (!response.ok) return []
   const data = await response.json()
   return (data || []).map(mapProjectResponse)
@@ -350,7 +351,8 @@ export const deleteRemoteProject = async (projectId: string): Promise<void> => {
  */
 export const fetchRemoteProject = async (projectId: string): Promise<ProjectDraft> => {
   const baseUrl = ensureBaseUrl()
-  const response = await fetch(`${baseUrl}/projects/${projectId}`)
+  const headers = buildHeaders()
+  const response = await fetch(`${baseUrl}/projects/${projectId}`, { headers })
   const data = await handleResponse(response)
   return {
     id: data.project.id,
