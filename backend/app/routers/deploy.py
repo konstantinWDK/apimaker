@@ -9,7 +9,7 @@ import re
 import socket
 import shutil
 import subprocess
-import uuid
+
 from pathlib import Path
 from typing import Any
 
@@ -56,6 +56,11 @@ def _safe_slug(slug: str) -> str:
         raise HTTPException(status_code=400, detail="Invalid deployment slug")
     return slug
 
+
+def _deploy_password_for_slug(slug: str) -> str:
+    """Derive a stable DB password from the deployment slug."""
+    import hashlib
+    return hashlib.sha256(slug.encode()).hexdigest()[:16]
 
 def _deploy_dir_for_slug(slug: str) -> Path:
     deploy_dir = (DEPLOY_ROOT / _safe_slug(slug)).resolve()
@@ -732,7 +737,7 @@ def deploy_local(
         if req.deploy_postgres_mode == "new_container":
             include_postgres_container = True
             container_pg_user = req.db_user or "apimaker"
-            container_pg_pass = req.db_password or uuid.uuid4().hex[:16]
+            container_pg_pass = req.db_password or _deploy_password_for_slug(slug)
             container_pg_db = req.db_name or "api_deploy"
             logs.append(f" Nuevo contenedor PostgreSQL: usuario={container_pg_user}, bd={container_pg_db}")
             deploy_db_url = ""
@@ -746,7 +751,7 @@ def deploy_local(
         if req.deploy_mysql_mode == "new_container":
             include_mysql_container = True
             container_mysql_user = req.db_user or "apimaker"
-            container_mysql_pass = req.db_password or uuid.uuid4().hex[:16]
+            container_mysql_pass = req.db_password or _deploy_password_for_slug(slug)
             container_mysql_db = req.db_name or "api_deploy"
             logs.append(f" Nuevo contenedor MySQL: usuario={container_mysql_user}, bd={container_mysql_db}")
             deploy_db_url = ""
