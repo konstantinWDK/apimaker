@@ -66,7 +66,6 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
   const [headers, setHeaders] = useState<Array<{ key: string; value: string; enabled: boolean }>>([
     { key: 'Content-Type', value: 'application/json', enabled: true },
   ])
-  const [useAuthHeader, setUseAuthHeader] = useState(false)
   const [response, setResponse] = useState<ApiResponse | null>(null)
   const [history, setHistory] = useState<ApiResponse[]>([])
   const [loading, setLoading] = useState(false)
@@ -111,14 +110,6 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
     try {
       const requestHeaders: Record<string, string> = {}
       headers.filter(h => h.enabled && h.key.trim()).forEach(h => { requestHeaders[h.key] = h.value })
-
-      if (useAuthHeader) {
-        if (project.authMethod === 'apikey' && project.apiKey) {
-          requestHeaders['X-API-Key'] = project.apiKey
-        } else if (project.authMethod === 'jwt') {
-          requestHeaders['Authorization'] = 'Bearer <token>'
-        }
-      }
 
       const opts: RequestInit = { method: targetMethod, headers: requestHeaders }
       if (targetMethod !== 'GET' && targetMethod !== 'DELETE' && targetBody) opts.body = targetBody
@@ -269,15 +260,33 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
             {activeTab === 'headers' && (
               <div className="pg__kv-editor">
                 {project.authMethod !== 'none' && (
-                  <label className="pg__auth-toggle">
-                    <input type="checkbox" checked={useAuthHeader} onChange={e => setUseAuthHeader(e.target.checked)} />
-                    <span className="pg__auth-toggle-label">
-                      {project.authMethod === 'apikey' ? 'X-API-Key' : 'Authorization'} 
-                      <code>{project.authMethod === 'apikey' ? project.apiKey?.slice(0, 16) + '…' : 'Bearer <token>'}</code>
-                    </span>
-                  </label>
+                  <div className="pg__kv-row">
+                    <input className="pg__kv-check" type="checkbox" checked
+                      onChange={e => {
+                        const key = project.authMethod === 'apikey' ? 'X-API-Key' : 'Authorization'
+                        const val = project.authMethod === 'apikey' ? (project.apiKey || '') : 'Bearer <token>'
+                        if (!e.target.checked) {
+                          setHeaders(prev => prev.filter(h => h.key !== key))
+                        } else if (!headers.some(h => h.key === key)) {
+                          setHeaders(prev => [...prev, { key, value: val, enabled: true }])
+                        }
+                      }} />
+                    <input className="pg__kv-input" placeholder="Header name"
+                      value={project.authMethod === 'apikey' ? 'X-API-Key' : 'Authorization'} readOnly
+                      style={{ color: '#6366f1', fontWeight: 600, background: '#f8fafc' }} />
+                    <input className="pg__kv-input" placeholder="Header value"
+                      value={project.authMethod === 'apikey' ? (project.apiKey || '') : 'Bearer <token>'} readOnly
+                      style={{ color: '#6366f1', background: '#f8fafc', fontFamily: 'monospace' }} />
+                    <button className="pg__kv-remove" onClick={() => {
+                      const key = project.authMethod === 'apikey' ? 'X-API-Key' : 'Authorization'
+                      setHeaders(prev => prev.filter(h => h.key !== key))
+                    }}>&times;</button>
+                  </div>
                 )}
-                {headers.map((h, i) => (
+                {headers.filter(h => !(
+                  (project.authMethod === 'apikey' && h.key === 'X-API-Key') ||
+                  (project.authMethod === 'jwt' && h.key === 'Authorization')
+                )).map((h, i) => (
                   <div key={i} className="pg__kv-row">
                     <input
                       className="pg__kv-check"
@@ -471,16 +480,7 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
           border: none; background: none; color: #6366f1; font-size: 0.75rem; font-weight: 600;
           cursor: pointer; padding: 0.2rem 0; text-align: left; align-self: flex-start;
         }
-        .pg__auth-toggle {
-          display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem;
-          margin-bottom: 0.35rem; background: #f8fafc; border: 1px solid #e2e8f0;
-          border-radius: 6px; cursor: pointer; font-size: 0.78rem; user-select: none;
-        }
-        .pg__auth-toggle input { accent-color: #6366f1; cursor: pointer; }
-        .pg__auth-toggle-label { color: #475569; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
-        .pg__auth-toggle-label code {
-          font-size: 0.72rem; background: #e2e8f0; padding: 0.1rem 0.35rem; border-radius: 3px; color: #1e293b;
-        }
+
 
         .pg__body-editor { padding: 0.5rem 0; }
         .pg__body-textarea {
