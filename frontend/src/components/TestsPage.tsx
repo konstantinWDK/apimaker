@@ -70,14 +70,29 @@ export function TestsPage() {
       newResults[3] = { name: 'Respuesta de Endpoints (Smoke Test)', status: 'running' }
       setResults([...newResults])
       try {
-        // Check if mock endpoints respond
-        const testRes = await fetch(`${baseUrl}/projects/${project.remoteId || project.id}/mock/status`)
-        newResults[3] = { 
-          name: 'Respuesta de Endpoints (Smoke Test)', 
-          status: testRes.ok ? 'passed' : 'failed',
-          message: testRes.ok ? 'El endpoint de estado responde correctamente' : 'El mock server devolvió un error 500'
+        const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
+        const headers: Record<string, string> = {}
+        if (token) headers['Authorization'] = `Bearer ${token}`
+        const projectId = project.remoteId || project.slug || project.id
+        const firstEp = project.endpoints[0]
+        if (firstEp) {
+          const testRes = await fetch(`${baseUrl}/api/mock/${projectId}${firstEp.path}`, { headers })
+          const body = testRes.ok ? '' : await testRes.text().catch(() => '')
+          newResults[3] = { 
+            name: 'Respuesta de Endpoints (Smoke Test)', 
+            status: testRes.ok ? 'passed' : 'failed',
+            message: testRes.ok
+              ? `El endpoint ${firstEp.method} ${firstEp.path} respondió con ${testRes.status}`
+              : `Error ${testRes.status} en ${firstEp.method} ${firstEp.path}${body ? ': ' + body.slice(0, 200) : ''}`
+          }
+        } else {
+          newResults[3] = {
+            name: 'Respuesta de Endpoints (Smoke Test)',
+            status: 'failed',
+            message: 'No hay endpoints definidos en el proyecto'
+          }
         }
-      } catch {
+      } catch (e) {
         newResults[3] = { name: 'Respuesta de Endpoints (Smoke Test)', status: 'failed', message: 'Error de red al contactar el mock' }
       }
     } else {
