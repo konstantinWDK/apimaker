@@ -181,17 +181,18 @@ def _find_free_port(preferred: int) -> tuple[int, list[str]]:
     raise HTTPException(status_code=409, detail="No hay puertos disponibles en el rango 8080-8099")
 
 
-def _ensure_deploy_image(logs: list[str]) -> bool:
+def _ensure_deploy_image(logs: list[str], force: bool = False) -> bool:
     """Build the deploy Docker image locally if it doesn't exist."""
-    try:
-        result = subprocess.run(
-            ["docker", "image", "inspect", DEPLOY_IMAGE],
-            capture_output=True, timeout=10,
-        )
-        if result.returncode == 0:
-            return True
-    except Exception:
-        pass
+    if not force:
+        try:
+            result = subprocess.run(
+                ["docker", "image", "inspect", DEPLOY_IMAGE],
+                capture_output=True, timeout=10,
+            )
+            if result.returncode == 0:
+                return True
+        except Exception:
+            pass
 
     logs.append(f" Construyendo imagen local {DEPLOY_IMAGE}...")
     try:
@@ -565,7 +566,7 @@ def redeploy_local(
     project, deployed_endpoints = _export_project_json(session, project_ref, deploy_dir / "project.json")
     logs.append(" Proyecto actualizado en project.json")
 
-    _ensure_deploy_image(logs)
+    _ensure_deploy_image(logs, force=True)
 
     try:
         result = subprocess.run(
