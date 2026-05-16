@@ -45,9 +45,13 @@ def _ensure_project_in_db(project_data: dict, db_url: str) -> str:
 
             for endpoint in session.exec(select(Endpoint).where(Endpoint.project_id == project_id)).all():
                 session.delete(endpoint)
+            for record in session.exec(select(MockRecord).where(MockRecord.project_id == project_id)).all():
+                session.delete(record)
+            session.flush()
             for dataset in session.exec(select(Dataset).where(Dataset.project_id == project_id)).all():
                 for field in session.exec(select(DatasetField).where(DatasetField.dataset_id == dataset.id)).all():
                     session.delete(field)
+                session.flush()
                 session.delete(dataset)
             session.flush()
         else:
