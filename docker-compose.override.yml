@@ -1,7 +1,5 @@
 # Development overrides for docker-compose.yml
 # Enables hot-reload and local volume mounts
-version: '3.8'
-
 services:
   backend:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
