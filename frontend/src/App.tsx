@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Routes, Route, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { LayoutDashboard, Play, Shield, Settings, Rocket, Database, TestTube, BookOpen, Info } from 'lucide-react'
+import { LayoutDashboard, Play, Shield, Settings, Rocket, Database, TestTube, BookOpen, Info, Activity } from 'lucide-react'
 
 import { SetupWizard } from './components/SetupWizard'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -19,6 +19,7 @@ import { BuilderPage } from './components/BuilderPage'
 import { SimulatorPage } from './components/SimulatorPage'
 import { ProductOpsPage } from './components/ProductOpsPage'
 import { TestsPage } from './components/TestsPage'
+import { MonitorPage } from './components/MonitorPage'
 import { LanguageSwitcher } from './components/LanguageSwitcher'
 import { ThemeToggle } from './components/ThemeToggle'
 import { useProjectBuilder, createDefaultProject } from './hooks/useProjectBuilder'
@@ -251,6 +252,13 @@ export function App() {
                 {t('nav.operations')}
               </NavLink>
               <NavLink
+                to="/monitor"
+                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+              >
+                <Activity size={16} />
+                {t('nav.monitor')}
+              </NavLink>
+              <NavLink
                 to="/tests"
                 className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
               >
@@ -291,6 +299,7 @@ export function App() {
                 <Route path="/security" element={<SecurityPage />} />
                 <Route path="/deploy" element={<DeployPage />} />
                 <Route path="/operations" element={<ProductOpsPage />} />
+                <Route path="/monitor" element={<MonitorPage />} />
                 <Route path="/config" element={<ConfigPage authStatus={authStatus} onLogout={performLogout} />} />
                 <Route path="/docs" element={<DocsPage />} />
                 <Route path="/tests" element={<TestsPage />} />

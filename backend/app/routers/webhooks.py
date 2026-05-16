@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import logging
+import socket
+import urllib.parse
 from datetime import datetime, timezone
 from typing import Literal
 
@@ -50,6 +53,48 @@ class UpdateWebhookRequest(BaseModel):
     is_active: bool | None = None
 
 
+def _validate_webhook_url(url: str) -> bool:
+    """Validate webhook URL to prevent SSRF attacks.
+
+    Only allows HTTPS (or HTTP to localhost in dev mode).
+    Blocks private/internal IP ranges.
+    """
+    parsed = urllib.parse.urlparse(url)
+    if not parsed.netloc:
+        raise HTTPException(status_code=422, detail="Invalid webhook URL: no hostname")
+
+    scheme = parsed.scheme
+    if scheme == "https":
+        pass
+    elif scheme == "http":
+        from ..config import get_settings
+        settings = get_settings()
+        if settings.environment != "development":
+            raise HTTPException(status_code=422, detail="Only HTTPS URLs are allowed for webhooks")
+        host = parsed.hostname or ""
+        if host not in ("localhost", "127.0.0.1", "::1"):
+            raise HTTPException(status_code=422, detail="HTTP webhook URLs are only allowed for localhost in development mode")
+    else:
+        raise HTTPException(status_code=422, detail="Only HTTPS URLs are allowed for webhooks")
+
+    hostname = parsed.hostname or ""
+    try:
+        ips = socket.getaddrinfo(hostname, None)
+    except socket.gaierror:
+        raise HTTPException(status_code=422, detail=f"Could not resolve webhook host: {hostname}")
+
+    for _, _, _, _, addr in ips:
+        ip_str = addr[0]
+        try:
+            ip = ipaddress.ip_address(ip_str)
+        except ValueError:
+            continue
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast:
+            raise HTTPException(status_code=422, detail=f"Webhook URL points to a private/internal IP: {ip_str}")
+
+    return True
+
+
 @router.get("", response_model=list[WebhookResponse])
 def list_webhooks(
     project_id: str,
@@ -84,6 +129,7 @@ def create_webhook(
 ) -> WebhookResponse:
     from ..services.project_service import project_service
     resolved_id = project_service.resolve_id(session, project_id)
+    _validate_webhook_url(payload.url)
     webhook = DBWebhook(
         project_id=str(resolved_id),
         url=payload.url,
@@ -114,6 +160,7 @@ def update_webhook(
     if not webhook or webhook.project_id != project.id:
         raise HTTPException(status_code=404, detail="Webhook not found")
     if payload.url is not None:
+        _validate_webhook_url(payload.url)
         webhook.url = payload.url
     if payload.events is not None:
         webhook.events = json.dumps(payload.events)

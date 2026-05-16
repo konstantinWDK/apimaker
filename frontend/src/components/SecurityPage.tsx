@@ -6,20 +6,16 @@ import type { ProjectDraft } from '../types/schemas'
 
 function generateKey(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-  const parts: string[] = []
-  for (let i = 0; i < 4; i++) {
-    let s = ''
-    for (let j = 0; j < 8; j++) s += chars[Math.floor(Math.random() * chars.length)]
-    parts.push(s)
-  }
-  return parts.join('-')
+  const array = new Uint8Array(32)
+  crypto.getRandomValues(array)
+  return Array.from(array, byte => chars[byte % chars.length]).join('')
 }
 
 function generateJwtSecret(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()'
-  let s = ''
-  for (let i = 0; i < 48; i++) s += chars[Math.floor(Math.random() * chars.length)]
-  return s
+  const array = new Uint8Array(48)
+  crypto.getRandomValues(array)
+  return Array.from(array, byte => chars[byte % chars.length]).join('')
 }
 
 export function SecurityPage() {

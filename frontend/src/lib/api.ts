@@ -598,6 +598,7 @@ export const getShareSnapshot = async (
   password?: string,
 ): Promise<any> => {
   const baseUrl = ensureBaseUrl()
+  // TODO: Move password to POST body instead of URL query param (security: credentials in URLs can be leaked via server logs / referrer headers)
   const params = new URLSearchParams()
   if (password) params.set('password', password)
   const response = await fetch(`${baseUrl}/share/${snapshotId}/${slug}?${params}`)

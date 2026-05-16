@@ -35,21 +35,21 @@ router = APIRouter(prefix="/api/connections", tags=["connections"])
 # ── Password encryption ──
 
 def _fernet_key_from_secret(secret: str) -> bytes:
-    """Derive a 32-byte Fernet-compatible key from the app's JWT secret."""
+    """Derive a 32-byte Fernet-compatible key from the encryption key."""
     digest = hashlib.sha256(secret.encode()).digest()
     return base64.urlsafe_b64encode(digest)
 
 
 def _encrypt_password(plain: str) -> str:
     from cryptography.fernet import Fernet
-    key = _fernet_key_from_secret(get_settings().jwt_secret_key)
+    key = _fernet_key_from_secret(get_settings().encryption_key)
     f = Fernet(key)
     return f.encrypt(plain.encode()).decode()
 
 
 def _decrypt_password(encrypted: str) -> str:
     from cryptography.fernet import Fernet
-    key = _fernet_key_from_secret(get_settings().jwt_secret_key)
+    key = _fernet_key_from_secret(get_settings().encryption_key)
     f = Fernet(key)
     return f.decrypt(encrypted.encode()).decode()
 

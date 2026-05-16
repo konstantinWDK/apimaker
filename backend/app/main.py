@@ -16,26 +16,20 @@ from .routers import versions as versions_router
 from .routers import deploy as deploy_router
 from .routers import connections as connections_router
 from .routers import product_ops as product_ops_router
+from .routers import monitor as monitor_router
 from .services.mock_server import router as mock_api_router
 
 
 settings = get_settings()
 
-# SECURITY: Crash if using default JWT secret in production
-_DEFAULT_JWT_SECRET = "doapi-dev-secret-key-change-this-in-prod"
-if settings.environment == "production" and settings.jwt_secret_key == _DEFAULT_JWT_SECRET:
-    raise RuntimeError(
-        "SECURITY ERROR: APIMAKER_JWT_SECRET_KEY must be set in production. "
-        "Generate a secure key with: python -c 'import secrets; print(secrets.token_hex(32))'"
-    )
-
 app = FastAPI(title=settings.project_name)
 
-# In development, allow all CORS origins
+# Allow specific origins from settings
 if settings.environment == "development":
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=settings.allow_origins,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -76,6 +70,7 @@ app.include_router(deploy_router.router)
 app.include_router(connections_router.router)
 app.include_router(product_ops_router.router)
 app.include_router(product_ops_router.system_router)
+app.include_router(monitor_router.router)
 
 
 def on_startup() -> None:

@@ -46,7 +46,11 @@ def test_project_security_settings_are_saved_and_mock_enforces_apikey() -> None:
     assert created.status_code == 201
     project_id = created.json()["id"]
     assert created.json()["auth_method"] == "apikey"
-    assert created.json()["api_key"] == "secret-key"
+    # Secrets are not returned in API responses for security
+    with Session(engine) as session:
+        db_project = session.get(Project, project_id)
+        assert db_project is not None
+        assert db_project.api_key == "secret-key"
 
     dataset = client.post(
         f"/projects/{project_id}/dataset",
@@ -91,7 +95,7 @@ def test_project_security_settings_are_saved_and_mock_enforces_apikey() -> None:
     )
     assert patched.status_code == 200
     assert patched.json()["auth_method"] == "jwt"
-    assert patched.json()["jwt_secret"] == "jwt-secret"
+    # Secrets are not returned in API responses for security
     assert patched.json()["rate_limit"] == 25
 
     with Session(engine) as session:

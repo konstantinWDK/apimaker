@@ -128,7 +128,6 @@ def list_projects(
             data["project"],
             datasets_with_fields=data["datasets"],
             endpoints=data["endpoints"],
-            include_secrets=True,
         ))
     return result
 
@@ -189,7 +188,6 @@ def create_project(
         data["project"],
         datasets_with_fields=data["datasets"],
         endpoints=data["endpoints"],
-        include_secrets=True,
     )
 
 
@@ -206,7 +204,6 @@ def get_project(
             data["project"],
             datasets_with_fields=data["datasets"],
             endpoints=data["endpoints"],
-            include_secrets=True,
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -253,7 +250,6 @@ def update_project(
             data["project"],
             datasets_with_fields=data["datasets"],
             endpoints=data["endpoints"],
-            include_secrets=True,
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -453,6 +449,8 @@ def generate_artifacts(
 def project_openapi(
     project_id: str,
     session: Session = Depends(get_session),
+    user: CurrentUser = Depends(get_current_user_from_header),
+    _project: DBProject = Depends(require_project_access),
 ) -> dict:
     try:
         resolved_id = project_service.resolve_id(session, project_id)
@@ -638,5 +636,4 @@ def import_project(
         data["project"],
         datasets_with_fields=data["datasets"],
         endpoints=data["endpoints"],
-        include_secrets=True,
     )

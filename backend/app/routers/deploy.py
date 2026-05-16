@@ -6,8 +6,10 @@ import json
 import logging
 import os
 import re
+import shlex
 import socket
 import shutil
+import stat
 import subprocess
 
 from pathlib import Path
@@ -60,7 +62,11 @@ def _safe_slug(slug: str) -> str:
 
 
 def _deploy_password_for_slug(slug: str) -> str:
-    """Derive a stable DB password from the deployment slug."""
+    """Derive a stable DB password from the deployment slug.
+
+    WARNING: This is a deterministic password derived from the slug.
+    For better security, use secrets.token_hex(16) to generate a random password.
+    """
     import hashlib
     return hashlib.sha256(slug.encode()).hexdigest()[:16]
 
@@ -465,16 +471,17 @@ def deploy_remote(
 
     key_file = None
     if req.ssh_key:
-        key_file = tempfile.NamedTemporaryFile(mode="w", suffix=".key", delete=False)
+        key_file = tempfile.NamedTemporaryFile(mode="w", suffix=".key", delete=True)
         key_file.write(req.ssh_key)
-        key_file.close()
+        key_file.flush()
+        os.chmod(key_file.name, 0o600)
         ssh_base.extend(["-i", key_file.name])
         scp_base.extend(["-i", key_file.name])
 
     try:
         # Create remote directory
         logs.append(" Creating remote directory...")
-        subprocess.run(ssh_base + [f"mkdir -p {remote_dir}"], capture_output=True, text=True, timeout=15)
+        subprocess.run(ssh_base + [f"mkdir -p {shlex.quote(remote_dir)}"], capture_output=True, text=True, timeout=15)
 
         # Export project as JSON
         logs.append(" Exporting project...")
@@ -484,15 +491,15 @@ def deploy_remote(
         json_path.write_text(export_data.model_dump_json(indent=2))
 
         logs.append(" Uploading project.json to server...")
-        subprocess.run(scp_base + [str(json_path), f"{remote_url}:{remote_dir}/project.json"], capture_output=True, text=True, timeout=30)
+        subprocess.run(scp_base + [str(json_path), f"{shlex.quote(remote_url)}:{shlex.quote(remote_dir)}/project.json"], capture_output=True, text=True, timeout=30)
         json_path.unlink(missing_ok=True)
 
         # Deploy via SSH using the CLI on the remote server
         logs.append(" Deploying on remote server...")
         deploy_cmd = (
-            f"cd {remote_dir} && "
+            f"cd {shlex.quote(remote_dir)} && "
             f"pip install doapi-backend -q --no-cache-dir && "
-            f"doapi deploy project.json --port {req.api_port}"
+            f"doapi deploy project.json --port {shlex.quote(str(req.api_port))}"
         )
         result = subprocess.run(ssh_base + [deploy_cmd], capture_output=True, text=True, timeout=300)
         if result.stdout.strip():
@@ -523,7 +530,7 @@ def deploy_remote(
         return DeployStatus(status="error", logs=logs)
     finally:
         if key_file:
-            Path(key_file.name).unlink(missing_ok=True)
+            key_file.close()
 
 
 @router.post("/local/delete")

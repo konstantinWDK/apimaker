@@ -6,8 +6,10 @@ from datetime import datetime, timezone
 
 from sqlmodel import Session, select
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from ..db import get_session
 from ..db_models import User, Workspace, WorkspaceMember
@@ -22,6 +24,7 @@ from ..security import CurrentUser, get_current_user_from_header, get_optional_c
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+limiter = Limiter(key_func=get_remote_address)
 
 
 class WorkspaceResponse(BaseModel):
@@ -70,7 +73,8 @@ class ChangePasswordRequest(BaseModel):
 
 
 @router.post("/login", response_model=LoginResponse)
-def login(payload: LoginRequest, session: Session = Depends(get_session)) -> LoginResponse:
+@limiter.limit("10/minute")
+def login(request: Request, payload: LoginRequest, session: Session = Depends(get_session)) -> LoginResponse:
     """Authenticate with username/password and return JWT tokens."""
     user = session.exec(select(User).where(User.username == payload.username)).first()
     if not user or not verify_password(payload.password, user.password_hash):
@@ -88,7 +92,9 @@ def login(payload: LoginRequest, session: Session = Depends(get_session)) -> Log
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/hour")
 def register(
+    request: Request,
     payload: RegisterRequest,
     session: Session = Depends(get_session),
     user: CurrentUser | None = Depends(get_optional_current_user_from_header),
@@ -132,7 +138,8 @@ def register(
 
 
 @router.post("/refresh", response_model=RefreshResponse)
-def refresh(payload: RefreshRequest) -> RefreshResponse:
+@limiter.limit("20/minute")
+def refresh(request: Request, payload: RefreshRequest) -> RefreshResponse:
     """Exchange a refresh token for new access + refresh tokens."""
     try:
         token_data = decode_token(payload.refresh_token)

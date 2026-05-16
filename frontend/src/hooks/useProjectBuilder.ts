@@ -142,10 +142,11 @@ const loadFromStorage = (): { project: ProjectDraft; selectedDatasetId: string |
   }
 }
 
-// Persist helper
+// Persist helper — strips sensitive fields before writing to localStorage
 const persist = (project: ProjectDraft, selectedDatasetId: string | null) => {
   if (typeof window !== 'undefined') {
-    const data = { ...project, selectedDatasetId }
+    const { apiKey, jwtSecret, ...safe } = project
+    const data = { ...safe, selectedDatasetId }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   }
 }
