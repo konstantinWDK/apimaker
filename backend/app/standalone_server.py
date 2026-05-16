@@ -13,7 +13,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-logger = logging.getLogger("apimaker.standalone")
+logger = logging.getLogger("doapi.standalone")
 
 
 def _ensure_project_in_db(project_data: dict, db_url: str) -> str:
@@ -157,7 +157,7 @@ def create_app_for_project(
     )
     from sqlmodel import Session, select
 
-    app = FastAPI(title=title or f"API Maker - {project_id}")
+    app = FastAPI(title=title or f"DoApi - {project_id}")
 
     app.add_middleware(
         CORSMiddleware,
@@ -281,9 +281,9 @@ def serve_project_from_db(
         app = create_app_for_project(project.id, title=project.name)
 
         print(f"\n{'='*50}")
-        print(f"   '{project.name}' como API independiente")
+        print(f"   '{project.name}' as standalone API")
         print(f"   http://{host}:{port}/api")
-        print(f"   Puerto separado del builder (puerto 8000)")
+        print(f"   Separate port from builder (port 8000)")
         print(f"{'='*50}\n")
 
         uvicorn.run(app, host=host, port=port)

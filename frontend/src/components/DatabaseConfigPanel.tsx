@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { readBackendConfig } from '../lib/backendConfig'
 
 interface AdminConfig {
@@ -13,10 +14,11 @@ interface AdminConfig {
 }
 
 export function DatabaseConfigPanel() {
+  const { t } = useTranslation()
   const [info, setInfo] = useState<AdminConfig['current_database_info'] | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
+  const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('doapi-jwt-token') : null
   const { baseUrl: backendBaseUrl } = readBackendConfig()
 
   useEffect(() => {
@@ -38,7 +40,7 @@ export function DatabaseConfigPanel() {
   const dbLabel = isPg ? 'PostgreSQL' : isMySql ? 'MySQL' : 'SQLite'
 
   if (loading) {
-    return <p className="muted-text" style={{ fontSize: '0.85rem' }}>Cargando información de la base de datos...</p>
+    return <p className="muted-text" style={{ fontSize: '0.85rem' }}>{t('dbConfig.loading')}</p>
   }
 
   return (
@@ -70,22 +72,22 @@ export function DatabaseConfigPanel() {
             <span className={`db-badge ${isPg ? 'pg' : isMySql ? 'mysql' : 'sqlite'}`}>
               {dbLabel}
             </span>
-            <span className="db-env">{isPg || isMySql ? 'Producción' : 'Desarrollo'}</span>
+            <span className="db-env">{isPg || isMySql ? t('dbConfig.production') : t('dbConfig.development')}</span>
           </div>
           <table className="db-info-table">
             <tbody>
-              <tr><td>Tipo</td><td>{dbLabel}</td></tr>
-              <tr><td>Host</td><td>{info?.host || '—'}</td></tr>
-              <tr><td>Base de datos</td><td>{info?.database || '—'}</td></tr>
-              <tr><td>Usuario</td><td>{info?.username || '—'}</td></tr>
-              <tr><td>URL</td><td className="url">{info?.url || '—'}</td></tr>
+              <tr><td>{t('dbConfig.type')}</td><td>{dbLabel}</td></tr>
+              <tr><td>{t('dbConfig.host')}</td><td>{info?.host || '—'}</td></tr>
+              <tr><td>{t('dbConfig.database')}</td><td>{info?.database || '—'}</td></tr>
+              <tr><td>{t('dbConfig.username')}</td><td>{info?.username || '—'}</td></tr>
+              <tr><td>{t('dbConfig.url')}</td><td className="url">{info?.url || '—'}</td></tr>
             </tbody>
           </table>
         </div>
       </div>
 
       <p className="muted-text" style={{ fontSize: '0.78rem', marginTop: '0.75rem' }}>
-        Esta base de datos se configuró durante la instalación. Para cambiarla, ejecuta el instalador de nuevo o modifica el archivo <code>.env</code> manualmente.
+        {t('dbConfig.note')}
       </p>
 
       <style>{`

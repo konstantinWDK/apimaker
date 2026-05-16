@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useProjectBuilder } from '../hooks/useProjectBuilder'
 import { apiFetch } from '../lib/api'
 
 export function DeployPage() {
+  const { t } = useTranslation()
   const { project, saveProject, updateProject } = useProjectBuilder()
   const [activeTab, setActiveTab] = useState<'desplegar' | 'cli'>('desplegar')
   const [allDeployments, setAllDeployments] = useState<any[]>([])
@@ -27,19 +29,19 @@ export function DeployPage() {
     <div className="info-page">
       <div className="info-hero">
         <div className="info-hero__content">
-          <h1 className="info-hero__title">Despliegue</h1>
+          <h1 className="info-hero__title">{t('deploy.title')}</h1>
           <p className="info-hero__subtitle">
-            Gestiona tus APIs desplegadas y despliega nuevas.
+            {t('deploy.subtitle')}
           </p>
         </div>
       </div>
 
       <div className="docs-tabs" style={{ marginBottom: '1.5rem' }}>
         <button className={`docs-tab ${activeTab === 'desplegar' ? 'docs-tab--active' : ''}`} onClick={() => setActiveTab('desplegar')}>
-          <span className="docs-tab__icon">▲</span> Gestionar despliegues
+          <span className="docs-tab__icon">▲</span> {t('deploy.tabManage')}
         </button>
         <button className={`docs-tab ${activeTab === 'cli' ? 'docs-tab--active' : ''}`} onClick={() => setActiveTab('cli')}>
-          <span className="docs-tab__icon">⌘</span> CLI / Terminal
+          <span className="docs-tab__icon">⌘</span> {t('deploy.tabCli')}
         </button>
       </div>
 
@@ -68,6 +70,7 @@ function generatePassword() {
 }
 
 function DeployManager({ project, saveProject, updateProject, deployments, loading, onDeployDone }: any) {
+  const { t } = useTranslation()
   const setGlobalDeployState = useProjectBuilder(s => s.setGlobalDeployState)
   const [deployType, setDeployType] = useState<'local' | 'remote'>('local')
   const [localPort, setLocalPort] = useState('8080')
@@ -78,7 +81,7 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
   const [deployPgUser, setDeployPgUser] = useState('postgres')
   const [deployPgPass, setDeployPgPass] = useState('')
   const [deployPgDb, setDeployPgDb] = useState('api_deploy')
-  const [containerPgUser] = useState('apimaker')
+  const [containerPgUser] = useState('doapi')
   const [containerPgPass] = useState(generatePassword)
   const [containerPgDb] = useState('api_deploy')
   const [containerPgPort, setContainerPgPort] = useState('5432')
@@ -89,7 +92,7 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
   const [deployMySqlUser, setDeployMySqlUser] = useState('root')
   const [deployMySqlPass, setDeployMySqlPass] = useState('')
   const [deployMySqlDb, setDeployMySqlDb] = useState('api_deploy')
-  const [containerMySqlUser] = useState('apimaker')
+  const [containerMySqlUser] = useState('doapi')
   const [containerMySqlPass] = useState(generatePassword)
   const [containerMySqlDb] = useState('api_deploy')
   const [containerMySqlPort, setContainerMySqlPort] = useState('3306')
@@ -124,7 +127,7 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
   const log = useCallback((msg: string) => setDeployLog((prev: string[]) => [...prev, msg]), [])
 
   const handleAction = async (slug: string, action: 'stop' | 'delete' | 'restart' | 'start') => {
-    if (action === 'delete' && !window.confirm('¿Eliminar deployment?\n\nSe detendrá el contenedor, se borrará la imagen Docker, los archivos y el registro.\nLos datos de la BD se perderán.')) return
+    if (action === 'delete' && !window.confirm(t('deploy.confirmDelete'))) return
     try {
       const endpoint = action === 'restart' ? 'restart' : action
       const res = await apiFetch(`/api/deploy/local/${endpoint}`, {
@@ -141,16 +144,16 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
     setDeploying(true)
     setDeployDone(false)
     setDeployLog([])
-    setGlobalDeployState('deploying', 'Aplicando cambios al deployment...')
+    setGlobalDeployState('deploying', t('deploy.applyingChanges'))
     try {
       const pid = await saveProject()
       if (!pid) {
-        log(' Error al guardar proyecto')
-        setGlobalDeployState('error', 'Error al guardar proyecto')
+        log(t('deploy.errSave'))
+        setGlobalDeployState('error', t('deploy.errSave'))
         return
       }
-      log(' Proyecto guardado')
-      log(' Reexportando y recreando contenedor en el mismo puerto...')
+      log(t('deploy.logSaved'))
+      log(t('deploy.logReexport'))
       const res = await apiFetch('/api/deploy/local/redeploy', {
         method: 'POST',
         body: JSON.stringify({ slug, project_id: pid }),
@@ -158,15 +161,15 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
       const result = await res.json()
       result.logs?.forEach((l: string) => log(l))
       if (result.status !== 'running') {
-        setGlobalDeployState('error', result.message || 'Error aplicando cambios')
+        setGlobalDeployState('error', result.message || t('deploy.errApplyChanges'))
         return
       }
       setDeployDone(true)
-      setGlobalDeployState('success', 'Cambios aplicados al deployment')
+      setGlobalDeployState('success', t('deploy.changesApplied'))
       onDeployDone()
     } catch (e: any) {
       log(` ${e.message || e}`)
-      setGlobalDeployState('error', e.message || 'Error aplicando cambios')
+      setGlobalDeployState('error', e.message || t('deploy.errApplyChanges'))
     } finally {
       setDeploying(false)
     }
@@ -175,16 +178,16 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
   const handleDeploy = async () => {
     setDeploying(true); setDeployDone(false); setDeployLog([])
     const dbName = deployDbType === 'sqlite' ? 'SQLite' : deployDbType === 'postgresql' ? 'PostgreSQL' : 'MySQL'
-    setGlobalDeployState('deploying', `Desplegando API en ${dbName}...`)
+    setGlobalDeployState('deploying', t('deploy.deployingApi').replace('{dbName}', dbName))
     let finalStatus: 'success' | 'error' = 'error'
-    let finalMsg = 'Error en el despliegue'
+    let finalMsg = t('deploy.errDeploy')
     try {
       const pid = await saveProject()
-      if (!pid) { log(' Error al guardar proyecto'); setDeploying(false); setGlobalDeployState('error', 'Error al guardar proyecto'); return }
-      log(` Proyecto guardado`)
+      if (!pid) { log(t('deploy.errSave')); setDeploying(false); setGlobalDeployState('error', t('deploy.errSave')); return }
+      log(t('deploy.logSaved'))
 
       if (deployType === 'local') {
-        log(` Desplegando local en puerto ${localPort}...`)
+        log(t('deploy.logDeployingLocal').replace('{port}', localPort))
         const deployBody: any = { project_id: pid, port: parseInt(localPort, 10), db_type: deployDbType }
         if (deployDbType === 'postgresql') {
           deployBody.deploy_postgres_mode = deployPgMode
@@ -226,48 +229,48 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
           setDeployDone(true)
           onDeployDone()
           finalStatus = 'success'
-          finalMsg = 'API Desplegada con éxito'
+          finalMsg = t('deploy.successDeploy')
         } else if (result.status === 'no_docker') {
-          log(' Docker no disponible. Sigue instrucciones manuales.')
-          finalMsg = 'Docker no disponible'
+          log(t('deploy.logNoDocker'))
+          finalMsg = t('deploy.errNoDocker')
         } else {
-          finalMsg = 'Error al construir o levantar contenedor'
+          finalMsg = t('deploy.errContainerBuild')
         }
       } else {
-        log(' Exportando proyecto...')
+        log(t('deploy.logExporting'))
         const exportRes = await apiFetch(`/projects/${pid}/export`)
         const projectData = await exportRes.json()
-        log(` "${projectData.name}" exportado`)
+        log(t('deploy.logExported').replace('{name}', projectData.name))
         const sshCmd = sshAuthType === 'key' && sshKey.trim() ? `ssh -i ~/.ssh/deploy_key -p ${sshPort} ${sshUser}@${sshHost}` : `ssh ${sshUser}@${sshHost} -p ${sshPort}`
         const scpCmd = sshAuthType === 'key' && sshKey.trim() ? `scp -P ${sshPort} -i ~/.ssh/deploy_key proyecto.json ${sshUser}@${sshHost}:/tmp/` : `scp -P ${sshPort} proyecto.json ${sshUser}@${sshHost}:/tmp/`
-        log(` Despliegue manual:`)
-        log(`   1. apimaker init ${project.slug || project.id} -o proyecto.json`)
+        log(t('deploy.logManual'))
+        log(`   1. doapi init ${project.slug || project.id} -o proyecto.json`)
         log(`   2. ${scpCmd}`)
         log(`   3. ${sshCmd}`)
-        log(`   4. apimaker deploy /tmp/proyecto.json --port ${apiPort}`)
+        log(`   4. doapi deploy /tmp/proyecto.json --port ${apiPort}`)
         setDeployDone(true)
         finalStatus = 'success'
-        finalMsg = 'Instrucciones generadas'
+        finalMsg = t('deploy.instructionsGenerated')
       }
-    } catch (e: any) { log(` ${e.message || e}`); finalMsg = e.message || 'Error desconocido' }
+    } catch (e: any) { log(` ${e.message || e}`); finalMsg = e.message || t('deploy.unknownError') }
     setDeploying(false)
     setGlobalDeployState(finalStatus, finalMsg)
   }
 
   const statusColor = (s: string) => s === 'running' ? '#22c55e' : s === 'stopped' ? '#ef4444' : '#94a3b8'
-  const statusLabel = (s: string) => s === 'running' ? 'Corriendo' : s === 'stopped' ? 'Detenido' : 'Desconocido'
+  const statusLabel = (s: string) => s === 'running' ? t('deploy.statusRunning') : s === 'stopped' ? t('deploy.statusStopped') : t('deploy.statusUnknown')
 
   return (
     <div>
       {/* Deployments list */}
       <div className="info-card" style={{ marginBottom: '1rem' }}>
         <h3 className="info-card__title" style={{ marginBottom: '0.75rem' }}>
-          APIs desplegadas ({loading ? '...' : deployments.length})
+          {t('deploy.deployedApis')} ({loading ? '...' : deployments.length})
         </h3>
         {loading ? (
-          <p className="muted-text">Cargando despliegues...</p>
+          <p className="muted-text">{t('deploy.loading')}</p>
         ) : deployments.length === 0 ? (
-          <p className="muted-text">No hay APIs desplegadas aún. Usa el formulario de abajo para desplegar una.</p>
+          <p className="muted-text">{t('deploy.noDeployments')}</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {deployments.map((dep: any) => (
@@ -287,17 +290,17 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                         {dep.auth_method === 'apikey' ? (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', fontWeight: 600, color: '#166534', background: '#dcfce7', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                            Seguro: API Key
+                            {t('deploy.secureApiKey')}
                           </span>
                         ) : dep.auth_method === 'jwt' ? (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', fontWeight: 600, color: '#166534', background: '#dcfce7', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                            Seguro: JWT
+                            {t('deploy.secureJwt')}
                           </span>
                         ) : (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                            Público
+                            {t('deploy.public')}
                           </span>
                         )}
                       </div>
@@ -306,37 +309,37 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                     <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
                       {dep.docker_status === 'running' ? (
                       <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#dc2626' }}
-                        onClick={() => handleAction(dep.slug, 'stop')}>Detener</button>
+                        onClick={() => handleAction(dep.slug, 'stop')}>{t('deploy.stop')}</button>
                     ) : (
                       <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#166534' }}
-                        onClick={() => handleAction(dep.slug, 'start')}>Iniciar</button>
+                        onClick={() => handleAction(dep.slug, 'start')}>{t('deploy.start')}</button>
                     )}
                     <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#4f46e5' }}
-                      onClick={() => handleRedeploy(dep.slug)} disabled={deploying}>Aplicar cambios</button>
+                      onClick={() => handleRedeploy(dep.slug)} disabled={deploying}>{t('deploy.applyChanges')}</button>
                     <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                      onClick={() => handleAction(dep.slug, 'restart')}>Reiniciar</button>
+                      onClick={() => handleAction(dep.slug, 'restart')}>{t('deploy.restart')}</button>
                     <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#dc2626' }}
-                      onClick={() => handleAction(dep.slug, 'delete')}>Eliminar</button>
+                      onClick={() => handleAction(dep.slug, 'delete')}>{t('deploy.delete')}</button>
                   </div>
                 </div>
                 {dep.db_credentials && (
                   <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
                     <div style={{ color: '#047857', marginBottom: '0.3rem', fontWeight: 600 }}> PostgreSQL</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.1rem 0.6rem', color: '#374151', alignItems: 'center' }}>
-                      <span>Usuario:</span>
+                      <span>{t('deploy.user')}:</span>
                       <span style={{ fontFamily: 'monospace' }}>{dep.db_credentials.user}</span>
-                      <span>Contraseña:</span>
+                      <span>{t('deploy.password')}:</span>
                       <PasswordDisplay value={dep.db_credentials.password} />
-                      <span>Base de datos:</span>
+                      <span>{t('deploy.database')}:</span>
                       <span style={{ fontFamily: 'monospace' }}>{dep.db_credentials.database}</span>
-                      <span>Host:</span>
+                      <span>{t('deploy.host')}:</span>
                       <span style={{ fontFamily: 'monospace' }}>{dep.db_credentials.host}:{dep.db_credentials.port}</span>
                     </div>
                   </div>
                 )}
                 {dep.endpoints && dep.endpoints.length > 0 && (
                   <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9', fontSize: '0.78rem' }}>
-                    <div style={{ color: '#64748b', marginBottom: '0.3rem' }}>Ejemplos:</div>
+                    <div style={{ color: '#64748b', marginBottom: '0.3rem' }}>{t('deploy.examples')}:</div>
                     {dep.endpoints.filter((ep: string) => ep.startsWith('GET')).slice(0, 2).map((ep: string) => {
                       const [, ...pathParts] = ep.split(' ')
                       const path = pathParts.join(' ')
@@ -356,15 +359,15 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
 
       {/* Deploy form */}
       <div className="info-card">
-        <h3 className="info-card__title" style={{ marginBottom: '0.75rem' }}>Nuevo despliegue</h3>
+        <h3 className="info-card__title" style={{ marginBottom: '0.75rem' }}>{t('deploy.newDeploy')}</h3>
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem', cursor: 'pointer' }}>
             <input type="radio" name="dt" checked={deployType === 'local'} onChange={() => setDeployType('local')} />
-             Local (Docker)
+             {t('deploy.localDocker')}
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem', cursor: 'pointer' }}>
             <input type="radio" name="dt" checked={deployType === 'remote'} onChange={() => setDeployType('remote')} />
-             Remoto (SSH)
+             {t('deploy.remoteSsh')}
           </label>
         </div>
 
@@ -375,48 +378,48 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
               width: 10, height: 10, borderRadius: '50%', display: 'inline-block', flexShrink: 0,
               background: dockerAvail === null ? '#94a3b8' : dockerAvail?.available ? '#22c55e' : '#ef4444',
             }} />
-            {dockerAvail === null ? 'Verificando Docker...' : dockerAvail?.available
-              ? `Docker disponible (v${dockerAvail.version}, ${dockerAvail.containers_running} contenedores activos)`
-              : `Docker no disponible - ${dockerAvail?.error || 'desconocido'}`}
+            {dockerAvail === null ? t('deploy.verifyingDocker') : dockerAvail?.available
+              ? t('deploy.dockerAvailable').replace('{version}', dockerAvail.version).replace('{count}', dockerAvail.containers_running)
+              : t('deploy.dockerNotAvailable').replace('{error}', dockerAvail?.error || t('deploy.unknown'))}
             {dockerAvail?.available && (
               <button type="button" className="btn ghost" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
                 onClick={async () => {
-                  log(' Reconstruyendo imagen Docker local...')
+                  log(t('deploy.logRebuildImage'))
                   try {
                     const res = await apiFetch('/api/deploy/local/rebuild-image', { method: 'POST' })
                     const data = await res.json()
                     data.logs?.forEach((l: string) => log(l))
                   } catch (e: any) { log(` ${e.message}`) }
                 }}>
-                Reconstruir imagen
+                {t('deploy.rebuildImage')}
               </button>
             )}
           </div>
           <p className="muted-text" style={{ fontSize: '0.82rem', marginBottom: '0.75rem' }}>
-            Despliega en el mismo servidor (requiere Docker). Si el puerto está ocupado, se asigna el siguiente disponible.
+            {t('deploy.localDesc')}
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
             <label className="form-field" style={{ margin: 0 }}>
-              <span className="label">Puerto API</span>
+              <span className="label">{t('deploy.apiPort')}</span>
               <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
                 <input className="field" type="number" value={localPort} onChange={e => setLocalPort(e.target.value)} placeholder="8080"
                   style={{ width: '100px' }} />
                 <button type="button" className="btn ghost" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
                   onClick={() => checkPort(localPort, 'api')}>
-                  {portStatus.api === 'checking' ? '...' : portStatus.api === 'free' ? '✓ Libre' : portStatus.api === 'busy' ? '✗ Ocupado' : 'Comprobar'}
+                  {portStatus.api === 'checking' ? '...' : portStatus.api === 'free' ? t('deploy.free') : portStatus.api === 'busy' ? t('deploy.busy') : t('deploy.check')}
                 </button>
               </div>
             </label>
           </div>
           <div style={{ marginTop: '0.75rem' }}>
             <span className="label" style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '0.4rem' }}>
-              Base de datos de la API desplegada
+              {t('deploy.deployDb')}
             </span>
             <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '1rem' }}>
               {[
-                { id: 'sqlite', label: 'SQLite', meta: 'Embebida' },
-                { id: 'postgresql', label: 'PostgreSQL', meta: 'Externa/Docker' },
-                { id: 'mysql', label: 'MySQL', meta: 'Externa/Docker' },
+                { id: 'sqlite', label: 'SQLite', meta: t('deploy.embedded') },
+                { id: 'postgresql', label: 'PostgreSQL', meta: t('deploy.externalDocker') },
+                { id: 'mysql', label: 'MySQL', meta: t('deploy.externalDocker') },
               ].map(opt => (
                 <button
                   key={opt.id}
@@ -445,51 +448,51 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
                   <label style={{ fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                     <input type="radio" name="pgmode" checked={deployPgMode === 'existing'} onChange={() => setDeployPgMode('existing')} />
-                    Conectar a PostgreSQL existente
+                    {t('deploy.connectExistingPg')}
                   </label>
                   <label style={{ fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                     <input type="radio" name="pgmode" checked={deployPgMode === 'new_container'} onChange={() => setDeployPgMode('new_container')} />
-                    Nuevo contenedor PostgreSQL
+                    {t('deploy.newPgContainer')}
                   </label>
                 </div>
                 {deployPgMode === 'existing' ? (
                   <div className="form-grid" style={{ gap: '0.4rem' }}>
-                    <label className="form-field"><span className="label">Host</span>
+                    <label className="form-field"><span className="label">{t('deploy.host')}</span>
                       <input className="field" value={deployPgHost} onChange={e => setDeployPgHost(e.target.value)} placeholder="localhost" /></label>
-                    <label className="form-field"><span className="label">Puerto</span>
+                    <label className="form-field"><span className="label">{t('deploy.port')}</span>
                       <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
                         <input className="field" value={deployPgPort} onChange={e => setDeployPgPort(e.target.value)} placeholder="5432"
                           style={{ width: '90px' }} />
                         <button type="button" className="btn ghost" style={{ fontSize: '0.65rem', padding: '0.15rem 0.4rem' }}
                           onClick={() => checkPort(deployPgPort, 'pg-existing')}>
-                          {portStatus['pg-existing'] === 'checking' ? '...' : portStatus['pg-existing'] === 'free' ? '✓ Libre' : portStatus['pg-existing'] === 'busy' ? '✗ Ocupado' : 'Comprobar'}
+                          {portStatus['pg-existing'] === 'checking' ? '...' : portStatus['pg-existing'] === 'free' ? t('deploy.free') : portStatus['pg-existing'] === 'busy' ? t('deploy.busy') : t('deploy.check')}
                         </button>
                       </div></label>
-                    <label className="form-field"><span className="label">Usuario</span>
+                    <label className="form-field"><span className="label">{t('deploy.user')}</span>
                       <input className="field" value={deployPgUser} onChange={e => setDeployPgUser(e.target.value)} placeholder="postgres" /></label>
-                    <label className="form-field"><span className="label">Contraseña</span>
+                    <label className="form-field"><span className="label">{t('deploy.password')}</span>
                       <input className="field" type="password" value={deployPgPass} onChange={e => setDeployPgPass(e.target.value)} /></label>
-                    <label className="form-field" style={{ gridColumn: 'span 2' }}><span className="label">Base de datos</span>
+                    <label className="form-field" style={{ gridColumn: 'span 2' }}><span className="label">{t('deploy.database')}</span>
                       <input className="field" value={deployPgDb} onChange={e => setDeployPgDb(e.target.value)} placeholder="api_deploy" /></label>
                   </div>
                 ) : (
                   <div style={{ padding: '0.75rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '0.82rem', color: '#166534' }}>
-                    <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}> Nuevo contenedor PostgreSQL 16</div>
+                    <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}> {t('deploy.newPgContainerTitle')}</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.2rem 0.75rem', fontSize: '0.78rem' }}>
-                      <span style={{ color: '#4b5563' }}>Puerto:</span>
+                      <span style={{ color: '#4b5563' }}>{t('deploy.port')}:</span>
                       <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
                         <input className="field" type="number" value={containerPgPort} onChange={e => setContainerPgPort(e.target.value)} placeholder="5432"
                           style={{ width: '90px', fontSize: '0.78rem', padding: '0.2rem 0.4rem' }} />
                         <button type="button" className="btn ghost" style={{ fontSize: '0.65rem', padding: '0.15rem 0.4rem' }}
                           onClick={() => checkPort(containerPgPort, 'pg')}>
-                          {portStatus.pg === 'checking' ? '...' : portStatus.pg === 'free' ? '✓ Libre' : portStatus.pg === 'busy' ? '✗ Ocupado' : 'Comprobar'}
+                          {portStatus.pg === 'checking' ? '...' : portStatus.pg === 'free' ? t('deploy.free') : portStatus.pg === 'busy' ? t('deploy.busy') : t('deploy.check')}
                         </button>
                       </div>
-                      <span style={{ color: '#4b5563' }}>Usuario:</span>
+                      <span style={{ color: '#4b5563' }}>{t('deploy.user')}:</span>
                       <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerPgUser}</span>
-                      <span style={{ color: '#4b5563' }}>Contraseña:</span>
+                      <span style={{ color: '#4b5563' }}>{t('deploy.password')}:</span>
                       <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerPgPass}</span>
-                      <span style={{ color: '#4b5563' }}>Base de datos:</span>
+                      <span style={{ color: '#4b5563' }}>{t('deploy.database')}:</span>
                       <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerPgDb}</span>
                     </div>
                   </div>
@@ -502,51 +505,51 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
                   <label style={{ fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                     <input type="radio" name="msmode" checked={deployMySqlMode === 'existing'} onChange={() => setDeployMySqlMode('existing')} />
-                    Conectar a MySQL existente
+                    {t('deploy.connectExistingMySql')}
                   </label>
                   <label style={{ fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                     <input type="radio" name="msmode" checked={deployMySqlMode === 'new_container'} onChange={() => setDeployMySqlMode('new_container')} />
-                    Nuevo contenedor MySQL
+                    {t('deploy.newMySqlContainer')}
                   </label>
                 </div>
                 {deployMySqlMode === 'existing' ? (
                   <div className="form-grid" style={{ gap: '0.4rem' }}>
-                    <label className="form-field"><span className="label">Host</span>
+                    <label className="form-field"><span className="label">{t('deploy.host')}</span>
                       <input className="field" value={deployMySqlHost} onChange={e => setDeployMySqlHost(e.target.value)} placeholder="localhost" /></label>
-                    <label className="form-field"><span className="label">Puerto</span>
+                    <label className="form-field"><span className="label">{t('deploy.port')}</span>
                       <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
                         <input className="field" value={deployMySqlPort} onChange={e => setDeployMySqlPort(e.target.value)} placeholder="3306"
                           style={{ width: '90px' }} />
                         <button type="button" className="btn ghost" style={{ fontSize: '0.65rem', padding: '0.15rem 0.4rem' }}
                           onClick={() => checkPort(deployMySqlPort, 'mysql-existing')}>
-                          {portStatus['mysql-existing'] === 'checking' ? '...' : portStatus['mysql-existing'] === 'free' ? '✓ Libre' : portStatus['mysql-existing'] === 'busy' ? '✗ Ocupado' : 'Comprobar'}
+                          {portStatus['mysql-existing'] === 'checking' ? '...' : portStatus['mysql-existing'] === 'free' ? t('deploy.free') : portStatus['mysql-existing'] === 'busy' ? t('deploy.busy') : t('deploy.check')}
                         </button>
                       </div></label>
-                    <label className="form-field"><span className="label">Usuario</span>
+                    <label className="form-field"><span className="label">{t('deploy.user')}</span>
                       <input className="field" value={deployMySqlUser} onChange={e => setDeployMySqlUser(e.target.value)} placeholder="root" /></label>
-                    <label className="form-field"><span className="label">Contraseña</span>
+                    <label className="form-field"><span className="label">{t('deploy.password')}</span>
                       <input className="field" type="password" value={deployMySqlPass} onChange={e => setDeployMySqlPass(e.target.value)} /></label>
-                    <label className="form-field" style={{ gridColumn: 'span 2' }}><span className="label">Base de datos</span>
+                    <label className="form-field" style={{ gridColumn: 'span 2' }}><span className="label">{t('deploy.database')}</span>
                       <input className="field" value={deployMySqlDb} onChange={e => setDeployMySqlDb(e.target.value)} placeholder="api_deploy" /></label>
                   </div>
                 ) : (
                   <div style={{ padding: '0.75rem', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', fontSize: '0.82rem', color: '#0369a1' }}>
-                    <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}> Nuevo contenedor MySQL 8.0</div>
+                    <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}> {t('deploy.newMySqlContainerTitle')}</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.2rem 0.75rem', fontSize: '0.78rem' }}>
-                      <span style={{ color: '#4b5563' }}>Puerto:</span>
+                      <span style={{ color: '#4b5563' }}>{t('deploy.port')}:</span>
                       <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
                         <input className="field" type="number" value={containerMySqlPort} onChange={e => setContainerMySqlPort(e.target.value)} placeholder="3306"
                           style={{ width: '90px', fontSize: '0.78rem', padding: '0.2rem 0.4rem' }} />
                         <button type="button" className="btn ghost" style={{ fontSize: '0.65rem', padding: '0.15rem 0.4rem' }}
                           onClick={() => checkPort(containerMySqlPort, 'mysql')}>
-                          {portStatus.mysql === 'checking' ? '...' : portStatus.mysql === 'free' ? '✓ Libre' : portStatus.mysql === 'busy' ? '✗ Ocupado' : 'Comprobar'}
+                          {portStatus.mysql === 'checking' ? '...' : portStatus.mysql === 'free' ? t('deploy.free') : portStatus.mysql === 'busy' ? t('deploy.busy') : t('deploy.check')}
                         </button>
                       </div>
-                      <span style={{ color: '#4b5563' }}>Usuario:</span>
+                      <span style={{ color: '#4b5563' }}>{t('deploy.user')}:</span>
                       <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerMySqlUser}</span>
-                      <span style={{ color: '#4b5563' }}>Contraseña:</span>
+                      <span style={{ color: '#4b5563' }}>{t('deploy.password')}:</span>
                       <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerMySqlPass}</span>
-                      <span style={{ color: '#4b5563' }}>Base de datos:</span>
+                      <span style={{ color: '#4b5563' }}>{t('deploy.database')}:</span>
                       <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{containerMySqlDb}</span>
                     </div>
                   </div>
@@ -557,38 +560,38 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
           </div>
         ) : (
           <div className="form-grid" style={{ gap: '0.6rem' }}>
-            <label className="form-field"><span className="label">Usuario</span>
+            <label className="form-field"><span className="label">{t('deploy.user')}</span>
               <input className="field" value={sshUser} onChange={e => setSshUser(e.target.value)} placeholder="root" /></label>
-            <label className="form-field"><span className="label">Host / IP</span>
+            <label className="form-field"><span className="label">{t('deploy.hostIp')}</span>
               <input className="field" value={sshHost} onChange={e => setSshHost(e.target.value)} placeholder="midominio.com" /></label>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <label className="form-field" style={{ flex: 1 }}><span className="label">Puerto SSH</span>
+              <label className="form-field" style={{ flex: 1 }}><span className="label">{t('deploy.sshPort')}</span>
                 <input className="field" value={sshPort} onChange={e => setSshPort(e.target.value)} placeholder="22" /></label>
-              <label className="form-field" style={{ flex: 1 }}><span className="label">Puerto API</span>
+              <label className="form-field" style={{ flex: 1 }}><span className="label">{t('deploy.apiPort')}</span>
                 <input className="field" value={apiPort} onChange={e => setApiPort(e.target.value)} placeholder="8080" /></label>
             </div>
             <div className="form-field" style={{ gridColumn: '1 / -1' }}>
-              <span className="label">Autenticación</span>
+              <span className="label">{t('deploy.authentication')}</span>
               <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem' }}>
                 <label style={{ fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <input type="radio" name="a" checked={sshAuthType === 'password'} onChange={() => setSshAuthType('password')} /> Contraseña
+                  <input type="radio" name="a" checked={sshAuthType === 'password'} onChange={() => setSshAuthType('password')} /> {t('deploy.password')}
                 </label>
                 <label style={{ fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <input type="radio" name="a" checked={sshAuthType === 'key'} onChange={() => setSshAuthType('key')} /> Clave SSH
+                  <input type="radio" name="a" checked={sshAuthType === 'key'} onChange={() => setSshAuthType('key')} /> {t('deploy.sshKey')}
                 </label>
               </div>
               {sshAuthType === 'password'
-                ? <input className="field" type="password" value={sshPassword} onChange={e => setSshPassword(e.target.value)} placeholder="Contraseña" />
+                ? <input className="field" type="password" value={sshPassword} onChange={e => setSshPassword(e.target.value)} placeholder={t('deploy.passwordPlaceholder')} />
                 : <textarea className="field" style={{ minHeight: '70px', fontFamily: 'monospace', fontSize: '0.78rem' }}
                     value={sshKey} onChange={e => setSshKey(e.target.value)}
-                    placeholder="Pega tu clave privada (~/.ssh/id_rsa)" />}
+                    placeholder={t('deploy.sshKeyPlaceholder')} />}
             </div>
           </div>
         )}
 
         <button type="button" className="btn" style={{ width: '100%', padding: '0.6rem', fontWeight: 600, marginTop: '0.75rem' }}
           onClick={handleDeploy} disabled={deploying}>
-          {deploying ? 'Desplegando...' : deployDone ? ' Desplegado' : deployType === 'local' ? ' Desplegar Local' : ' Desplegar Remoto'}
+          {deploying ? t('deploy.deploying') : deployDone ? t('deploy.deployed') : deployType === 'local' ? t('deploy.deployLocal') : t('deploy.deployRemote')}
         </button>
 
         {deployLog.length > 0 && (
@@ -603,19 +606,20 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
 
 /* ========== PASSWORD DISPLAY ========== */
 function PasswordDisplay({ value }: { value: string }) {
+  const { t } = useTranslation()
   const [visible, setVisible] = useState(false)
   const [copied, setCopied] = useState(false)
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontFamily: 'monospace' }}>
-      {visible ? value : '•'.repeat(value.length > 20 ? 20 : value.length)}
+      {visible ? value : '\u2022'.repeat(value.length > 20 ? 20 : value.length)}
       <button type="button" onClick={() => setVisible(!visible)}
         style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '0.15rem', fontSize: '0.85rem', lineHeight: 1, color: '#64748b' }}
-        title={visible ? 'Ocultar' : 'Mostrar'}>
+        title={visible ? t('deploy.hide') : t('deploy.show')}>
         {visible ? '' : ''}
       </button>
       <button type="button" onClick={async () => { await navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
         style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '0.15rem', fontSize: '0.75rem', lineHeight: 1, color: copied ? '#16a34a' : '#64748b' }}>
-        {copied ? '✓' : ''}
+        {copied ? '\u2713' : ''}
       </button>
     </span>
   )
@@ -623,17 +627,18 @@ function PasswordDisplay({ value }: { value: string }) {
 
 /* ========== CLI PANEL ========== */
 function CliDeployPanel({ project }: any) {
+  const { t } = useTranslation()
   const steps = [
-    { title: 'Exportar proyecto', desc: 'Exporta a JSON portátil.', code: `apimaker init ${project.slug || '<slug>'} -o mi-api.json` },
-    { title: 'Desplegar localmente', desc: 'API independiente sin Docker.', code: 'apimaker deploy mi-api.json --port 8080' },
-    { title: 'Desplegar en VPS (SSH)', desc: 'Requiere Docker en el servidor.', code: 'apimaker deploy mi-api.json --ssh user@host --port 80' },
-    { title: 'Servir desde DB', desc: 'Mock en otro puerto desde la DB del builder.', code: `apimaker serve ${project.slug || '<slug>'} --port 8081` },
+    { title: t('deploy.cliExport'), desc: t('deploy.cliExportDesc'), code: `doapi init ${project.slug || '<slug>'} -o mi-api.json` },
+    { title: t('deploy.cliLocal'), desc: t('deploy.cliLocalDesc'), code: 'doapi deploy mi-api.json --port 8080' },
+    { title: t('deploy.cliVps'), desc: t('deploy.cliVpsDesc'), code: 'doapi deploy mi-api.json --ssh user@host --port 80' },
+    { title: t('deploy.cliServe'), desc: t('deploy.cliServeDesc'), code: `doapi serve ${project.slug || '<slug>'} --port 8081` },
   ]
   return (
     <div>
       <div className="info-card" style={{ marginBottom: '0.75rem' }}>
         <p className="muted-text" style={{ fontSize: '0.85rem', margin: 0 }}>
-          Usa <code className="docs-code--inline">apimaker --help</code> para ver todos los comandos.
+          {t('deploy.cliHelp')} <code className="docs-code--inline">doapi --help</code> {t('deploy.cliHelpEnd')}
         </p>
       </div>
       {steps.map((s, i) => (
@@ -647,11 +652,11 @@ function CliDeployPanel({ project }: any) {
         </div>
       ))}
       <div className="docs-checklist" style={{ marginTop: '1rem' }}>
-        <h3>Requisitos deploy remoto</h3>
+        <h3>{t('deploy.cliRequirements')}</h3>
         <ul>
-          <li><span className="docs-checkmark">✓</span> Servidor con Docker y docker compose</li>
-          <li><span className="docs-checkmark">✓</span> Conexión SSH configurada</li>
-          <li><span className="docs-checkmark">✓</span> Puerto API abierto en firewall</li>
+          <li><span className="docs-checkmark">{'\u2713'}</span> {t('deploy.cliReqDocker')}</li>
+          <li><span className="docs-checkmark">{'\u2713'}</span> {t('deploy.cliReqSsh')}</li>
+          <li><span className="docs-checkmark">{'\u2713'}</span> {t('deploy.cliReqFirewall')}</li>
         </ul>
       </div>
     </div>

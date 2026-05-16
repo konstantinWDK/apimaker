@@ -1,10 +1,10 @@
-# Infraestructura
+# Infrastructure
 
-Ideas para la primera entrega:
+Ideas for the first release:
 
-- Terraform para aprovisionar VPC, RDS PostgreSQL y buckets S3 compatibles.
-- Despliegue del backend en Railway/Render o contenedores en Azure Container Apps.
-- CDN estático (Cloudflare Pages) para el frontend.
-- Monitorización con Grafana Cloud + Loki para logs.
+- Terraform for provisioning VPC, RDS PostgreSQL, and compatible S3 buckets.
+- Backend deployment on Railway/Render or containers on Azure Container Apps.
+- Static CDN (Cloudflare Pages) for the frontend.
+- Monitoring with Grafana Cloud + Loki for logs.
 
-Este directorio almacenará módulos IaC y pipelines relacionados.
+This directory will store IaC modules and related pipelines.

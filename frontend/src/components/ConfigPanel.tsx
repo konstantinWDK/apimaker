@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { DatabaseConfigPanel } from './DatabaseConfigPanel'
 import { CredentialPanel } from './CredentialPanel'
 
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function ConfigPanel({ currentUsername, onUpdateCredentials, onResetCredentials }: Props) {
+  const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<'database' | 'admin'>('database')
 
   return (
@@ -20,21 +22,21 @@ export function ConfigPanel({ currentUsername, onUpdateCredentials, onResetCrede
           className={activeTab === 'database' ? 'active' : ''}
           onClick={() => setActiveTab('database')}
         >
-          Base de datos
+          {t('configPanel.database')}
         </button>
         <button
           type="button"
           className={activeTab === 'admin' ? 'active' : ''}
           onClick={() => setActiveTab('admin')}
         >
-          Administración
+          {t('configPanel.admin')}
         </button>
       </div>
 
       <div className="config-panel__content">
         {activeTab === 'database' && (
           <div className="config-section">
-            <p className="config-section__desc">Configura la conexión a base de datos para desarrollo y producción. Soporta SQLite y PostgreSQL.</p>
+            <p className="config-section__desc">{t('configPanel.databaseDesc')}</p>
             <DatabaseConfigPanel />
           </div>
         )}
@@ -42,8 +44,7 @@ export function ConfigPanel({ currentUsername, onUpdateCredentials, onResetCrede
         {activeTab === 'admin' && (
           <div className="config-section">
             <p className="config-section__desc">
-              Actualiza el usuario y contraseña que protegen este builder. Tras guardar, deberás iniciar sesión de nuevo.
-              También puedes restablecer a los valores por defecto (admin / admin).
+              {t('configPanel.adminDesc')}
             </p>
             <CredentialPanel
               currentUsername={currentUsername}
@@ -51,7 +52,7 @@ export function ConfigPanel({ currentUsername, onUpdateCredentials, onResetCrede
               onReset={onResetCredentials}
             />
             <p className="muted-text" style={{ marginTop: '1rem', fontSize: '0.85rem' }}>
-              Consejo: cambia estas credenciales después de cada despliegue y guarda el acceso en un gestor seguro.
+              {t('configPanel.tip')}
             </p>
           </div>
         )}

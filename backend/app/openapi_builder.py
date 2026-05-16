@@ -159,7 +159,7 @@ def build_openapi_document(project: Project) -> dict:
         "openapi": "3.1.0",
         "info": {
             "title": project.name,
-            "description": project.description or "Generated with API Maker",
+            "description": project.description or "Generated with DoApi",
             "version": project.updated_at.isoformat() if project.updated_at else "1.0.0",
         },
         "paths": paths or {"/": {"get": {"responses": {"200": {"description": "OK"}}}}},

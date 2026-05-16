@@ -30,28 +30,28 @@ stop_port() {
     fi
 }
 
-echo -e "${RED}AVISO: Esto eliminara configuracion, usuarios, bases de datos locales y dependencias instaladas.${NC}"
-read -r -p "Estas seguro de que quieres continuar? Escribe y para confirmar: " CONFIRM
+echo -e "${RED}WARNING: This will delete configuration, users, local databases and installed dependencies.${NC}"
+read -r -p "Are you sure you want to continue? Type y to confirm: " CONFIRM
 
 if [ "$CONFIRM" != "y" ]; then
-    echo "Operacion cancelada."
+    echo "Operation cancelled."
     exit 0
 fi
 
 DOCKER_CMD="$(compose_cmd)"
 
-echo -e "${BLUE}Deteniendo servicios Docker de este proyecto...${NC}"
+echo -e "${BLUE}Stopping Docker services of this project...${NC}"
 if [ -n "$DOCKER_CMD" ]; then
     $DOCKER_CMD --profile postgres --profile mysql down --volumes --remove-orphans || true
 else
-    echo -e "${YELLOW}Docker Compose no disponible; se omite parada de contenedores.${NC}"
+    echo -e "${YELLOW}Docker Compose not available; skipping container shutdown.${NC}"
 fi
 
-echo -e "${BLUE}Deteniendo procesos locales en puertos 8000 y 5173...${NC}"
+echo -e "${BLUE}Stopping local processes on ports 8000 and 5173...${NC}"
 stop_port 8000
 stop_port 5173
 
-echo -e "${BLUE}Limpiando archivos...${NC}"
+echo -e "${BLUE}Cleaning up files...${NC}"
 
 echo "  - Backend..."
 rm -rf backend/.venv
@@ -67,12 +67,12 @@ rm -rf frontend/node_modules
 rm -rf frontend/dist
 rm -rf frontend/.vite
 
-echo "  - Raiz..."
+echo "  - Root..."
 rm -f .env
 rm -f start.sh
 rm -f start.bat
 rm -rf .pytest_cache
 find . -maxdepth 2 -name "*.log" -delete
 
-echo -e "${GREEN}El proyecto ha sido restaurado a su estado inicial.${NC}"
-echo "Ahora puedes ejecutar ./install.sh para comenzar una nueva instalacion."
+echo -e "${GREEN}The project has been restored to its initial state.${NC}"
+echo "You can now run ./install.sh to start a new installation."

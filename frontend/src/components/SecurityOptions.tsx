@@ -1,19 +1,23 @@
+import { useTranslation } from 'react-i18next'
+
 interface Props {
   docsUrl: string
   sandboxUrl: string
 }
 
-const securityTips = [
-  'Protege el backend detrás de un reverse proxy con HTTPS (Nginx, Caddy o Cloudflare).',
-  'Define variables de entorno como APIMAKER_BUILDER_TOKEN y compártelas sólo con tu equipo.',
-  'Añade autenticación básica o JWT a las rutas /api/<projectId> si expones datos sensibles.',
-  'Limita las IPs que pueden acceder al builder; tus consumidores sólo necesitan las rutas /api y /projects/{id}/docs.',
-]
-
 export function SecurityOptions({ docsUrl, sandboxUrl }: Props) {
+  const { t } = useTranslation()
+
+  const securityTips = [
+    t('securityOptions.tip1'),
+    t('securityOptions.tip2'),
+    t('securityOptions.tip3'),
+    t('securityOptions.tip4'),
+  ]
+
   return (
     <div className="security-panel">
-      <h4>Opciones de seguridad recomendadas</h4>
+      <h4>{t('securityOptions.title')}</h4>
       <ul>
         {securityTips.map((tip) => (
           <li key={tip}>{tip}</li>
@@ -21,12 +25,12 @@ export function SecurityOptions({ docsUrl, sandboxUrl }: Props) {
       </ul>
       {docsUrl ? (
         <p>
-          URL actual de docs: <code>{docsUrl}</code>
+          {t('securityOptions.currentDocsUrl')}: <code>{docsUrl}</code>
         </p>
       ) : null}
       {sandboxUrl ? (
         <p>
-          Sandbox público sugerido: <code>{sandboxUrl}</code>
+          {t('securityOptions.suggestedSandbox')}: <code>{sandboxUrl}</code>
         </p>
       ) : null}
     </div>

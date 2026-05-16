@@ -29,7 +29,7 @@ def _get_webhook_dispatcher():
 from .project_service import project_service
 from .product_ops import create_runtime_log, dispatch_automations
 
-logger = logging.getLogger("apimaker.mock_server")
+logger = logging.getLogger("doapi.mock_server")
 
 # In-memory cache: _mock_cache[project_id][dataset_id] = list[dict]
 _mock_cache: dict[str, dict[str, list[dict]]] = {}

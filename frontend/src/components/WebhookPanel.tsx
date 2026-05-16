@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { readBackendConfig } from '../lib/backendConfig'
 
 interface Webhook {
@@ -20,6 +21,7 @@ const EVENT_OPTIONS = [
 ]
 
 export function WebhookPanel({ projectId }: Props) {
+  const { t } = useTranslation()
   const [webhooks, setWebhooks] = useState<Webhook[]>([])
   const [loading, setLoading] = useState(true)
   const [url, setUrl] = useState('')
@@ -29,7 +31,7 @@ export function WebhookPanel({ projectId }: Props) {
   const [testingId, setTestingId] = useState<string | null>(null)
 
   const getHeaders = useCallback(() => {
-    const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
+    const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('doapi-jwt-token') : null
     return {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -55,8 +57,8 @@ export function WebhookPanel({ projectId }: Props) {
   }
 
   const handleSubmit = async () => {
-    if (!url.trim()) { setError('La URL es obligatoria'); return }
-    if (selectedEvents.length === 0) { setError('Selecciona al menos un evento'); return }
+    if (!url.trim()) { setError(t('webhookPanel.urlRequired')); return }
+    if (selectedEvents.length === 0) { setError(t('webhookPanel.eventRequired')); return }
     setError(null)
 
     try {
@@ -65,10 +67,10 @@ export function WebhookPanel({ projectId }: Props) {
         headers: getHeaders(),
         body: JSON.stringify({ url: url.trim(), events: selectedEvents }),
       })
-      if (!res.ok) { setError('Error al crear webhook'); return }
+      if (!res.ok) { setError(t('webhookPanel.createError')); return }
       setUrl(''); setSelectedEvents(['create'])
       await fetchWebhooks()
-    } catch { setError('Error de conexion') }
+    } catch { setError(t('webhookPanel.connectionError')) }
   }
 
   const handleUpdate = async (id: string) => {
@@ -106,23 +108,23 @@ export function WebhookPanel({ projectId }: Props) {
     finally { setTestingId(null) }
   }
 
-  if (loading) return <p className="muted-text">Cargando webhooks...</p>
+  if (loading) return <p className="muted-text">{t('webhookPanel.loading')}</p>
 
   return (
     <div className="webhook-panel">
       <p className="webhook-panel__desc">
-        Los webhooks notifican a URLs externas cuando los datos cambian en el mock server.
+        {t('webhookPanel.description')}
       </p>
 
       {/* New webhook form */}
       <div className="webhook-form">
-        <p className="webhook-form__title">{editingId ? 'Editar webhook' : 'Nuevo webhook'}</p>
+        <p className="webhook-form__title">{editingId ? t('webhookPanel.editWebhook') : t('webhookPanel.newWebhook')}</p>
         <div className="webhook-form__field">
-          <label>URL del webhook</label>
+          <label>{t('webhookPanel.urlLabel')}</label>
           <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://ejemplo.com/webhook" />
         </div>
         <div className="webhook-form__field">
-          <label>Eventos</label>
+          <label>{t('webhookPanel.events')}</label>
           <div className="webhook-form__events">
             {EVENT_OPTIONS.map(opt => (
               <label key={opt.value} className={`webhook-event ${selectedEvents.includes(opt.value) ? 'active' : ''}`}>
@@ -139,7 +141,7 @@ export function WebhookPanel({ projectId }: Props) {
         </div>
         {error && <p className="error-text" style={{ margin: '0.5rem 0' }}>{error}</p>}
         <button type="button" className="btn primary btn-sm" onClick={handleSubmit}>
-          {editingId ? 'Guardar cambios' : 'Anadir webhook'}
+          {editingId ? t('webhookPanel.saveChanges') : t('webhookPanel.addWebhook')}
         </button>
       </div>
 
@@ -147,7 +149,7 @@ export function WebhookPanel({ projectId }: Props) {
       <div className="webhook-list">
         {webhooks.length === 0 ? (
           <p className="muted-text" style={{ textAlign: 'center', padding: '1.5rem' }}>
-            No hay webhooks configurados.
+            {t('webhookPanel.noWebhooks')}
           </p>
         ) : webhooks.map(wh => (
           <div key={wh.id} className={`webhook-item ${wh.is_active ? '' : 'inactive'}`}>
@@ -162,16 +164,16 @@ export function WebhookPanel({ projectId }: Props) {
               </div>
               <div className="webhook-item__actions">
                 <span className={`webhook-item__status ${wh.is_active ? 'active' : 'paused'}`}>
-                  {wh.is_active ? 'Activo' : 'Pausado'}
+                  {wh.is_active ? t('webhookPanel.active') : t('webhookPanel.paused')}
                 </span>
                 <button type="button" className="btn ghost btn-sm" onClick={() => handleTest(wh)} disabled={testingId === wh.id}>
-                  {testingId === wh.id ? '...' : 'Probar'}
+                  {testingId === wh.id ? '...' : t('webhookPanel.test')}
                 </button>
                 <button type="button" className="btn ghost btn-sm" onClick={() => handleUpdate(wh.id)}>
-                  {wh.is_active ? 'Pausar' : 'Activar'}
+                  {wh.is_active ? t('webhookPanel.pause') : t('webhookPanel.activate')}
                 </button>
                 <button type="button" className="btn ghost btn-sm btn-danger" onClick={() => handleDelete(wh.id)}>
-                  Eliminar
+                  {t('webhookPanel.delete')}
                 </button>
               </div>
             </div>

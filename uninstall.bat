@@ -4,13 +4,13 @@ setlocal EnableExtensions
 cd /d "%~dp0"
 
 echo =======================================
-echo    API Maker - Factory Reset
+echo    DoApi - Factory Reset
 echo =======================================
-echo AVISO: Esto eliminara configuracion, usuarios, bases de datos locales y dependencias instaladas.
-set /p "CONFIRM=Estas seguro de que quieres continuar? Escribe y para confirmar: "
+echo WARNING: This will delete configuration, users, local databases and installed dependencies.
+set /p "CONFIRM=Are you sure you want to continue? Type y to confirm: "
 
 if /i not "%CONFIRM%"=="y" (
-    echo Operacion cancelada.
+    echo Operation cancelled.
     exit /b 0
 )
 
@@ -22,21 +22,21 @@ if not defined DOCKER_CMD (
     if not errorlevel 1 set "DOCKER_CMD=docker-compose"
 )
 
-echo Deteniendo servicios Docker de este proyecto...
+echo Stopping Docker services of this project...
 if defined DOCKER_CMD (
     %DOCKER_CMD% --profile postgres --profile mysql down --volumes --remove-orphans 2>nul
 ) else (
-    echo Docker Compose no disponible; se omite parada de contenedores.
+    echo Docker Compose not available; skipping container shutdown.
 )
 
-echo Deteniendo procesos locales en puertos 8000 y 5173...
+echo Stopping local processes on ports 8000 and 5173...
 for %%P in (8000 5173) do (
     for /f "tokens=5" %%A in ('netstat -ano ^| findstr /R /C:":%%P .*LISTENING"') do (
         taskkill /F /PID %%A 2>nul
     )
 )
 
-echo Limpiando archivos...
+echo Cleaning up files...
 
 echo   - Backend...
 if exist "backend\.venv" rmdir /s /q "backend\.venv"
@@ -52,7 +52,7 @@ if exist "frontend\node_modules" rmdir /s /q "frontend\node_modules"
 if exist "frontend\dist" rmdir /s /q "frontend\dist"
 if exist "frontend\.vite" rmdir /s /q "frontend\.vite"
 
-echo   - Raiz...
+echo   - Root...
 if exist ".env" del /q ".env"
 if exist "start.sh" del /q "start.sh"
 if exist "start.bat" del /q "start.bat"
@@ -60,6 +60,6 @@ if exist ".pytest_cache" rmdir /s /q ".pytest_cache"
 del /q "*.log" 2>nul
 
 echo.
-echo El proyecto ha sido restaurado a su estado inicial.
-echo Ahora puedes ejecutar install.bat para comenzar una nueva instalacion.
+echo The project has been restored to its initial state.
+echo You can now run install.bat to start a new installation.
 pause

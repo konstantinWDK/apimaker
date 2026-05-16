@@ -156,7 +156,7 @@ def update_admin_config(
     _write_admin_config(admin_config)
 
     return {
-        "message": f"Configuración de {env} guardada. Reinicia el backend para aplicar los cambios si este es el entorno activo.",
+        "message": f"Configuration for {env} saved. Restart the backend to apply changes if this is the active environment.",
         "environment": env,
     }
 
@@ -192,13 +192,13 @@ def test_database_connection(
 
             return TestDbResponse(
                 success=True,
-                message=f"Conexión exitosa a PostgreSQL ({payload.host or payload.postgres_url})",
+                message=f"Successful connection to PostgreSQL ({payload.host or payload.postgres_url})",
                 database_type="postgresql",
             )
         else:
             return TestDbResponse(
                 success=True,
-                message="SQLite está en uso actualmente",
+                message="SQLite is currently in use",
                 database_type="sqlite",
             )
 
@@ -206,9 +206,9 @@ def test_database_connection(
         error_msg = str(e)
         # Clean up error message for user
         if "connection" in error_msg.lower() or "refused" in error_msg.lower():
-            error_msg = "No se pudo conectar. Verifica host, puerto y credenciales."
+            error_msg = "Could not connect. Check host, port, and credentials."
         elif "password" in error_msg.lower() or "auth" in error_msg.lower():
-            error_msg = "Error de autenticación. Verifica usuario y contraseña."
+            error_msg = "Authentication error. Check username and password."
 
         return TestDbResponse(
             success=False,
@@ -251,19 +251,19 @@ def sync_databases(
     if not CONFIG_PATH.exists():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No hay configuración de PostgreSQL. Configúrala primero en 'Base de datos'.",
+            detail="No PostgreSQL configuration found. Configure it first in 'Database'.",
         )
     with open(CONFIG_PATH, "r") as f:
         config = json.load(f)
 
     if target_env not in ["dev", "prod"]:
-        raise HTTPException(status_code=400, detail="Entorno de destino inválido. Usa 'dev' o 'prod'.")
+        raise HTTPException(status_code=400, detail="Invalid target environment. Use 'dev' or 'prod'.")
 
     postgres_url = config.get(target_env, {}).get("postgres_url")
     if not postgres_url:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"PostgreSQL de {target_env} no configurada. Configúrala primero.",
+            detail=f"PostgreSQL for {target_env} not configured. Configure it first.",
         )
 
     counts = {
@@ -283,7 +283,7 @@ def sync_databases(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No se pudo conectar a PostgreSQL: {e}",
+            detail=f"Could not connect to PostgreSQL: {e}",
         )
 
     try:
@@ -407,7 +407,7 @@ def sync_databases(
         counts["errors"].append(str(e))
         return SyncResponse(
             success=False,
-            message=f"Error durante la sincronización: {e}",
+            message=f"Error during synchronization: {e}",
             counts=counts,
         )
     finally:
@@ -485,7 +485,7 @@ def run_tests(
     except subprocess.TimeoutExpired:
         return RunTestsResponse(
             success=False,
-            output="Timeout: los tests superaron los 120 segundos.",
+            output="Timeout: tests exceeded 120 seconds.",
             passed=0,
             failed=0,
             total=0,
@@ -493,7 +493,7 @@ def run_tests(
     except FileNotFoundError:
         return RunTestsResponse(
             success=False,
-            output="Error: pytest no encontrado. Asegúrate de que está instalado en el entorno virtual.",
+            output="Error: pytest not found. Make sure it is installed in the virtual environment.",
             passed=0,
             failed=0,
             total=0,
@@ -501,7 +501,7 @@ def run_tests(
     except Exception as e:
         return RunTestsResponse(
             success=False,
-            output=f"Error al ejecutar tests: {str(e)}",
+            output=f"Error running tests: {str(e)}",
             passed=0,
             failed=0,
             total=0,

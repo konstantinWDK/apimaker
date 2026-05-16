@@ -1,49 +1,49 @@
-# API Maker
+# DoApi
 
-API Maker es una plataforma visual y open source para disenar, probar, documentar, generar y desplegar APIs REST listas para produccion. Incluye editor React, backend FastAPI, mock server persistente, seguridad por proyecto, generacion de ZIPs para varios stacks, deploy local con Docker, redeploy rapido y herramientas tipo internal-tool builder.
+DoApi is a visual, open-source platform for designing, testing, documenting, generating, and deploying production-ready REST APIs. It includes a React editor, FastAPI backend, persistent mock server, per-project security, multi-stack ZIP generation, local Docker deploy, fast redeploy, and internal-tool builder features.
 
-## Inicio rapido
+## Quick start
 
 ### Windows
 
-1. Ejecuta `install.bat`.
-2. Una vez terminada la instalacion, usa `start.bat` para arrancar la aplicacion.
+1. Run `install.bat`.
+2. Once installation finishes, use `start.bat` to launch the application.
 
 ### Linux/macOS
 
-1. Ejecuta `./install.sh`.
-2. Una vez terminada la instalacion, usa `./start.sh` para arrancar la aplicacion.
+1. Run `./install.sh`.
+2. Once installation finishes, use `./start.sh` to launch the application.
 
-El instalador configura el entorno, instala dependencias, crea el usuario administrador y gestiona la base de datos. Si eliges Docker, detectara automaticamente si los puertos estan ocupados y te permitira elegir puertos alternativos.
+The installer sets up the environment, installs dependencies, creates the admin user, and manages the database. If you choose Docker, it will automatically detect whether ports are in use and let you choose alternative ports.
 
-Bases soportadas:
+Supported databases:
 
-- SQLite local
-- PostgreSQL existente
-- PostgreSQL en contenedor Docker
-- MySQL/MariaDB existente
-- MySQL en contenedor Docker
+- Local SQLite
+- Existing PostgreSQL
+- PostgreSQL in Docker container
+- Existing MySQL/MariaDB
+- MySQL in Docker container
 
-Si eliges una base Docker, las credenciales se guardan en `.env`.
+If you choose a Docker-based database, credentials are saved in `.env`.
 
-Al terminar, abre:
+When finished, open:
 
 ```text
 http://localhost:5173
 ```
 
-## Arranque de la aplicacion
+## Starting the application
 
-La forma mas profesional y recomendada de arrancar es usar los scripts generados durante la instalacion:
+The most professional and recommended way to start is using the scripts generated during installation:
 
 - **Windows**: `start.bat`
 - **Linux/macOS**: `./start.sh`
 
-Estos scripts utilizan `concurrently` para unificar los logs del Backend y Frontend en una sola terminal con colores y prefijos.
+These scripts use `concurrently` to unify Backend and Frontend logs in a single terminal with colors and prefixes.
 
-### Arranque manual (Desarrollo)
+### Manual start (Development)
 
-Si prefieres arrancar cada servicio por separado:
+If you prefer to start each service separately:
 
 **Backend:**
 
@@ -61,88 +61,88 @@ npm install
 npm run dev
 ```
 
-## Desinstalacion
+## Uninstallation
 
-Para restaurar el proyecto al estado inicial, eliminando bases de datos, contenedores y entornos virtuales:
+To restore the project to its initial state, removing databases, containers, and virtual environments:
 
 - **Windows**: `uninstall.bat`
 - **Linux/macOS**: `./uninstall.sh`
 
-## Funciones principales
+## Main features
 
-### Builder visual
+### Visual builder
 
-- Proyectos con nombre, slug, descripcion, stack y configuracion.
-- Datasets manuales/importados con campos tipados, relaciones, enums, defaults y datos de ejemplo.
-- Endpoints CRUD y personalizados vinculados a datasets.
-- Mappings visuales entre campos.
-- Preview de payloads, ejemplos cURL y galeria de endpoints.
-- Sincronizacion con backend.
+- Projects with name, slug, description, stack, and configuration.
+- Manual/imported datasets with typed fields, relationships, enums, defaults, and sample data.
+- CRUD and custom endpoints linked to datasets.
+- Visual field mappings.
+- Payload preview, cURL examples, and endpoint gallery.
+- Backend synchronization.
 
-### Seguridad
+### Security
 
-- Login de usuarios con JWT.
-- Seguridad por proyecto:
-  - `none`: API publica
-  - `apikey`: cabecera `X-API-Key`
-  - `jwt`: cabecera `Authorization: Bearer <token>`
-- Generacion y rotacion de API keys/JWT secrets desde UI.
-- Rate limit configurable.
-- Mock server y deploy standalone respetan la seguridad configurada.
+- User login with JWT.
+- Per-project security:
+  - `none`: public API
+  - `apikey`: `X-API-Key` header
+  - `jwt`: `Authorization: Bearer <token>` header
+- API key/JWT secret generation and rotation from UI.
+- Configurable rate limit.
+- Mock server and standalone deploy respect configured security.
 
 ### Mock server
 
-- Rutas en `/api/mock/{project_id_or_slug}/{path}`.
-- Datos persistentes en base de datos.
-- Seeds desde `sample_rows`.
-- Validacion de tipos y requeridos.
-- Filtros, paginacion y lectura por ID/campo.
-- Eventos para logs, webhooks y automations.
+- Routes at `/api/mock/{project_id_or_slug}/{path}`.
+- Persistent data in database.
+- Seeds from `sample_rows`.
+- Type and required field validation.
+- Filters, pagination, and reading by ID/field.
+- Events for logs, webhooks, and automations.
 
-### Operaciones
+### Operations
 
-API Maker incluye una seccion **Operaciones** inspirada en herramientas como Budibase:
+DoApi includes an **Operations** section inspired by tools like Budibase:
 
-- Datasources por proyecto.
+- Per-project datasources.
 - Saved queries.
-- Ejecucion controlada de queries SELECT.
+- Controlled SELECT query execution.
 - Runtime logs.
-- Releases con snapshot.
-- Automations por eventos.
-- Imports OpenAPI/Postman.
-- Registro de plugins y deploy providers.
+- Releases with snapshot.
+- Event-driven automations.
+- OpenAPI/Postman imports.
+- Plugin and deploy provider registry.
 
-### Webhooks, releases y share
+### Webhooks, releases, and sharing
 
-- Webhooks por eventos `record.created`, `record.updated`, `record.deleted`.
-- Historial de entregas de webhooks.
-- Versiones/snapshots restaurables.
-- Releases publicadas.
-- Share links de solo lectura con password y expiracion opcional.
+- Webhooks for `record.created`, `record.updated`, `record.deleted` events.
+- Webhook delivery history.
+- Restorable versions/snapshots.
+- Published releases.
+- Read-only share links with optional password and expiration.
 
-## Generacion de codigo
+## Code generation
 
-Stacks soportados:
+Supported stacks:
 
-- **FastAPI**: SQLAlchemy, Pydantic, auth, Docker, setup y tests.
-- **Express**: Sequelize, Swagger, auth y Docker.
-- **NestJS**: TypeORM, Swagger decorators, AuthGuard y Docker.
+- **FastAPI**: SQLAlchemy, Pydantic, auth, Docker, setup, and tests.
+- **Express**: Sequelize, Swagger, auth, and Docker.
+- **NestJS**: TypeORM, Swagger decorators, AuthGuard, and Docker.
 
-Los ZIPs generados pueden incluir:
+Generated ZIPs can include:
 
-- Servidor completo.
+- Full server.
 - `README.md`.
 - `.env.example`.
 - `Dockerfile`.
 - `docker-compose.yml`.
 - `setup.sh`.
-- CI GitHub Actions.
+- GitHub Actions CI.
 - Seeds (`data.json`).
-- SDK TypeScript.
-- SDK Python.
-- Configs para Render/Railway.
+- TypeScript SDK.
+- Python SDK.
+- Render/Railway configs.
 
-Descarga del bundle:
+Bundle download:
 
 ```text
 GET /projects/{project_id}/download
@@ -150,47 +150,47 @@ GET /projects/{project_id}/download
 
 ## Deploy
 
-### Desde la UI
+### From the UI
 
-La pagina **Despliegue** permite:
+The **Deploy** page lets you:
 
-- Deploy local con Docker.
-- Usar SQLite, PostgreSQL o MySQL.
-- Crear PostgreSQL/MySQL en contenedor.
-- Ver deployments activos.
-- Iniciar, detener, reiniciar y eliminar deployments.
-- Aplicar cambios a una API ya desplegada sin cambiar de puerto.
+- Local deploy with Docker.
+- Use SQLite, PostgreSQL, or MySQL.
+- Create PostgreSQL/MySQL in a container.
+- View active deployments.
+- Start, stop, restart, and delete deployments.
+- Apply changes to an already deployed API without changing ports.
 
-Cuando cambias endpoints, datasets, seguridad o configuracion, usa:
+When you change endpoints, datasets, security, or configuration, use:
 
 ```text
-Aplicar cambios
+Apply changes
 ```
 
-Esto guarda el proyecto, reexporta `project.json` y recrea el contenedor en el mismo puerto.
+This saves the project, re-exports `project.json`, and recreates the container on the same port.
 
 ### CLI
 
 ```bash
-apimaker init <slug> -o proyecto.json
-apimaker deploy proyecto.json --port 8080
-apimaker serve <slug> --port 8081
-apimaker deploy proyecto.json --ssh usuario@host --port 80
+doapi init <slug> -o project.json
+doapi deploy project.json --port 8080
+doapi serve <slug> --port 8081
+doapi deploy project.json --ssh user@host --port 80
 ```
 
-## Documentacion
+## Documentation
 
-- App docs: ruta `/docs` del frontend.
-- Redoc por proyecto: `/projects/{project_id}/docs`.
-- OpenAPI por proyecto: `/projects/{project_id}/openapi.json`.
-- API backend: `docs/API.md`.
-- Estado funcional: `docs/PROJECT_OVERVIEW.md`.
+- App docs: `/docs` route in the frontend.
+- Per-project Redoc: `/projects/{project_id}/docs`.
+- Per-project OpenAPI: `/projects/{project_id}/openapi.json`.
+- Backend API: `docs/API.md`.
+- Feature status: `docs/PROJECT_OVERVIEW.md`.
 - Roadmap: `docs/ROADMAP.md`.
 
-## Estructura
+## Structure
 
 ```text
-apimaker/
+doapi/
 |-- backend/
 |   |-- app/
 |   |   |-- routers/      # auth, projects, mock, deploy, product_ops, webhooks, versions, share
@@ -234,24 +234,24 @@ cd frontend
 npm run lint
 ```
 
-Cobertura actual:
+Current coverage:
 
 - Health/auth.
-- Migracion JSON a DB.
-- Generacion de bundles FastAPI/Express/NestJS.
+- JSON to DB migration.
+- FastAPI/Express/NestJS bundle generation.
 - Mock server.
 - Product operations.
-- Seguridad persistida.
-- Deploy standalone.
+- Persisted security.
+- Standalone deploy.
 
-## Requisitos
+## Requirements
 
 - Python 3.11+
 - Node.js 18+
-- Docker Desktop opcional, necesario para deploy local con contenedores
+- Docker Desktop optional, required for local container deploy
 
-## Notas importantes
+## Important notes
 
-- Los cambios en una API ya desplegada no se aplican solos: pulsa **Aplicar cambios** en la pagina de Deploy.
-- Si usas JWT en una API generada, necesitas enviar un token firmado con el `jwt_secret` del proyecto.
-- Las credenciales generadas por instalacion/deploy se guardan en `.env` o en el registro de deployments.
+- Changes to an already deployed API are not applied automatically: click **Apply changes** on the Deploy page.
+- If you use JWT on a generated API, you need to send a token signed with the project's `jwt_secret`.
+- Credentials generated by installation/deploy are saved in `.env` or the deployments registry.

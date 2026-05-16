@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { FormEvent } from 'react'
 import { clsx } from 'clsx'
 
@@ -25,15 +26,6 @@ const emptyEndpoint = (datasetId?: string): ApiEndpoint => ({
   targetDatasetId: datasetId,
 })
 
-const OPERATION_OPTIONS: Array<{ value: ApiEndpoint['operationType']; label: string; method: string; desc: string }> = [
-  { value: 'list', label: 'GET · Listar', method: 'GET', desc: 'Obtiene todos los registros del dataset' },
-  { value: 'get', label: 'GET · Detalle', method: 'GET', desc: 'Obtiene un registro por su ID' },
-  { value: 'create', label: 'POST · Crear', method: 'POST', desc: 'Crea un nuevo registro' },
-  { value: 'update', label: 'PUT · Actualizar', method: 'PUT', desc: 'Reemplaza un registro existente' },
-  { value: 'delete', label: 'DELETE · Eliminar', method: 'DELETE', desc: 'Elimina un registro' },
-  { value: 'custom', label: 'OTRO · Custom', method: '', desc: 'Define tu propio metodo y ruta' },
-]
-
 const METHOD_OPTIONS: ApiEndpoint['method'][] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
 
 const METHOD_COLORS: Record<ApiEndpoint['method'], string> = {
@@ -45,16 +37,29 @@ const METHOD_COLORS: Record<ApiEndpoint['method'], string> = {
 }
 
 export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewBase, warningMessage, clearWarning }: Props) {
+  const { t } = useTranslation()
   const [draft, setDraft] = useState<ApiEndpoint>(emptyEndpoint(project.datasets[0]?.id))
   const [editDraft, setEditDraft] = useState<ApiEndpoint | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const { config } = useBackendConfig()
 
+  const OPERATION_OPTIONS: Array<{ value: ApiEndpoint['operationType']; label: string; method: string; desc: string }> = useMemo(
+    () => [
+      { value: 'list', label: t('endpoint.list'), method: 'GET', desc: t('endpoint.listDesc') },
+      { value: 'get', label: t('endpoint.detail'), method: 'GET', desc: t('endpoint.detailDesc') },
+      { value: 'create', label: t('endpoint.create'), method: 'POST', desc: t('endpoint.createDesc') },
+      { value: 'update', label: t('endpoint.update'), method: 'PUT', desc: t('endpoint.updateDesc') },
+      { value: 'delete', label: t('endpoint.delete'), method: 'DELETE', desc: t('endpoint.deleteDesc') },
+      { value: 'custom', label: t('endpoint.custom'), method: '', desc: t('endpoint.customDesc') },
+    ],
+    [t],
+  )
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!draft.name.trim() || !draft.path.trim()) {
-      setError('Completa el nombre y la ruta del endpoint')
+      setError(t('endpoint.completeFields'))
       return
     }
     onAdd(draft)
@@ -67,7 +72,7 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
     event.preventDefault()
     if (!editDraft) return
     if (!editDraft.name.trim() || !editDraft.path.trim()) {
-      setError('Nombre y path son obligatorios')
+      setError(t('endpoint.namePathRequired'))
       return
     }
     onAdd(editDraft)
@@ -141,7 +146,7 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
             <span className="icon"></span> {previewUrl}
           </a>
         ) : (
-          <p className="muted-text" style={{ fontSize: '0.8rem', margin: 0 }}>Guarda el proyecto para ver la URL de prueba del mock.</p>
+          <p className="muted-text" style={{ fontSize: '0.8rem', margin: 0 }}>{t('builder.saveFirst')}</p>
         )}
       </div>
 
@@ -149,9 +154,9 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
 
       {/* ─── Nuevo Endpoint ─── */}
       <form onSubmit={handleSubmit} className="endpoint-blueprint">
-        <p className="endpoint-blueprint__title">Nuevo endpoint</p>
+        <p className="endpoint-blueprint__title">{t('endpoint.newTitle')}</p>
         <p className="endpoint-blueprint__desc">
-          Selecciona un dataset, elige el tipo de operacion y completa los datos. La ruta se genera automaticamente segun el tipo.
+          {t('endpoint.newDesc')}
         </p>
 
         {/* Operation type selector */}
@@ -173,7 +178,7 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
         {/* Fields */}
         <div className="endpoint-blueprint__fields">
           <div className="endpoint-blueprint__field">
-            <label>Dataset</label>
+            <label>{t('endpoint.dataset')}</label>
             <select
               value={draft.targetDatasetId}
               onChange={(e) => {
@@ -194,7 +199,7 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
 
           {draft.operationType === 'custom' && (
             <div className="endpoint-blueprint__field">
-              <label>Metodo HTTP</label>
+              <label>{t('endpoint.method')}</label>
               <select
                 value={draft.method}
                 onChange={(e) => setDraft({ ...draft, method: e.target.value as ApiEndpoint['method'] })}
@@ -207,7 +212,7 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
           )}
 
           <div className="endpoint-blueprint__field">
-            <label>Ruta</label>
+            <label>{t('endpoint.path')}</label>
             <input
               value={draft.path}
               onChange={(e) => setDraft({ ...draft, path: e.target.value })}
@@ -216,27 +221,27 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
           </div>
 
           <div className="endpoint-blueprint__field">
-            <label>Nombre</label>
+            <label>{t('endpoint.name')}</label>
             <input
               value={draft.name}
               onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-              placeholder="Ej: Listar usuarios"
+              placeholder={t('endpoint.namePlaceholder')}
             />
           </div>
         </div>
 
         <div className="endpoint-blueprint__field endpoint-blueprint__field--wide">
-          <label>Descripcion (opcional)</label>
+          <label>{t('endpoint.description')}</label>
           <input
             value={draft.summary}
             onChange={(e) => setDraft({ ...draft, summary: e.target.value })}
-            placeholder="Explica brevemente que hace este endpoint"
+            placeholder={t('endpoint.descPlaceholder')}
           />
         </div>
 
         <div className="endpoint-blueprint__actions">
           <button type="submit" className="btn primary">
-            Anadir endpoint
+            {t('endpoint.add')}
           </button>
         </div>
       </form>
@@ -244,11 +249,11 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
       {/* ─── Lista de endpoints ─── */}
       <div className="endpoint-list" style={{ marginTop: '1.5rem' }}>
         <p className="endpoint-blueprint__title" style={{ fontSize: '0.95rem', marginBottom: '0.75rem' }}>
-          Endpoints definidos ({endpoints.length})
+          {t('endpoint.defined', { count: endpoints.length })}
         </p>
         {endpoints.length === 0 ? (
           <p className="endpoint-empty" style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8', fontSize: '0.85rem' }}>
-            No hay endpoints. Usa el formulario de arriba para anadir uno.
+            {t('endpoint.noEndpoints')}
           </p>
         ) : (
           endpoints.map((endpoint) => (
@@ -266,28 +271,28 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
                     </div>
                     {editDraft.operationType === 'custom' && (
                       <div className="endpoint-blueprint__field">
-                        <label>Metodo</label>
+                        <label>{t('endpoint.method')}</label>
                         <select value={editDraft.method} onChange={(e) => setEditDraft({ ...editDraft, method: e.target.value as ApiEndpoint['method'] })}>
                           {METHOD_OPTIONS.map((m) => (<option key={m} value={m}>{m}</option>))}
                         </select>
                       </div>
                     )}
                     <div className="endpoint-blueprint__field">
-                      <label>Ruta</label>
+                      <label>{t('endpoint.path')}</label>
                       <input value={editDraft.path} onChange={(e) => setEditDraft({ ...editDraft, path: e.target.value })} />
                     </div>
                     <div className="endpoint-blueprint__field">
-                      <label>Nombre</label>
+                      <label>{t('endpoint.name')}</label>
                       <input value={editDraft.name} onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} />
                     </div>
                   </div>
                   <div className="endpoint-blueprint__field endpoint-blueprint__field--wide">
-                    <label>Descripcion</label>
-                    <input value={editDraft.summary} onChange={(e) => setEditDraft({ ...editDraft, summary: e.target.value })} placeholder="Opcional" />
+                    <label>{t('endpoint.description')}</label>
+                    <input value={editDraft.summary} onChange={(e) => setEditDraft({ ...editDraft, summary: e.target.value })} placeholder={t('endpoint.optional')} />
                   </div>
                   <div className="endpoint-blueprint__actions" style={{ marginTop: '0.5rem' }}>
-                    <button type="submit" className="btn primary btn-small">Guardar</button>
-                    <button type="button" className="btn subtle btn-small" onClick={cancelEdit}>Cancelar</button>
+                    <button type="submit" className="btn primary btn-small">{t('endpoint.save')}</button>
+                    <button type="button" className="btn subtle btn-small" onClick={cancelEdit}>{t('endpoint.cancel')}</button>
                   </div>
                 </form>
               ) : (
@@ -301,7 +306,7 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
                       <span className="endpoint-item__type-badge">{endpoint.operationType}</span>
                     )}
                     <span className="endpoint-item__dataset">
-                      {project.datasets.find(d => d.id === endpoint.targetDatasetId)?.name || 'Sin dataset'}
+                      {project.datasets.find(d => d.id === endpoint.targetDatasetId)?.name || t('endpoint.noDataset')}
                     </span>
                   </div>
                   <div className="endpoint-item__body">
@@ -309,8 +314,8 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
                     {endpoint.summary ? <p className="endpoint-item__summary">{endpoint.summary}</p> : null}
                   </div>
                   <div className="endpoint-item__actions">
-                    <button type="button" className="endpoint-item__edit" onClick={() => handleEdit(endpoint)}>Editar</button>
-                    <button type="button" className="endpoint-item__remove" onClick={() => onRemove(endpoint.id)} aria-label={`Eliminar ${endpoint.name}`}>&times;</button>
+                    <button type="button" className="endpoint-item__edit" onClick={() => handleEdit(endpoint)}>{t('endpoint.edit')}</button>
+                    <button type="button" className="endpoint-item__remove" onClick={() => onRemove(endpoint.id)} aria-label={t('endpoint.delete')}>&times;</button>
                   </div>
                 </>
               )}

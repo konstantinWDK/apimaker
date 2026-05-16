@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Database, Shield, Layout, Server, CheckCircle, ArrowRight, Loader2, Box } from 'lucide-react';
 import './SetupWizard.css';
 import { readBackendConfig } from '../lib/backendConfig';
@@ -8,6 +9,7 @@ interface SetupWizardProps {
 }
 
 export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
+  const { t } = useTranslation();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +23,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
     port: 5432,
     username: 'postgres',
     password: '',
-    database: 'apimaker',
+    database: 'doapi',
     import_sample_data: true,
     use_docker: false
   });
@@ -48,7 +50,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
       
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.detail || 'Error durante la configuración');
+        throw new Error(data.detail || t('login.error'));
       }
       
       setStep(4);
@@ -69,14 +71,14 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
             <div className="logo-icon">
               <Server size={24} color="white" />
             </div>
-            <span className="logo-text">API Maker</span>
+            <span className="logo-text">DoApi</span>
           </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            <StepItem icon={<Shield />} label="Admin" active={step === 1} completed={step > 1} />
-            <StepItem icon={<Database />} label="Database" active={step === 2} completed={step > 2} />
-            <StepItem icon={<Layout />} label="Options" active={step === 3} completed={step > 3} />
-            <StepItem icon={<CheckCircle />} label="Finish" active={step === 4} completed={step > 4} />
+            <StepItem icon={<Shield />} label={t('setup.stepAdmin')} active={step === 1} completed={step > 1} />
+            <StepItem icon={<Database />} label={t('setup.stepDatabase')} active={step === 2} completed={step > 2} />
+            <StepItem icon={<Layout />} label={t('setup.stepOptions')} active={step === 3} completed={step > 3} />
+            <StepItem icon={<CheckCircle />} label={t('setup.stepFinish')} active={step === 4} completed={step > 4} />
           </div>
         </div>
 
@@ -84,13 +86,13 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
         <div className="setup-wizard-content">
           {step === 1 && (
             <div className="animate-in">
-              <h2 className="step-title">Setup Admin</h2>
-              <p className="step-subtitle">Create the primary administrator account.</p>
+              <h2 className="step-title">{t('setup.title')}</h2>
+              <p className="step-subtitle">{t('setup.subtitle')}</p>
               
               <div className="form-fields">
-                <Field label="Username" name="admin_username" value={formData.admin_username} onChange={handleChange} placeholder="admin" />
-                <Field label="Password" name="admin_password" value={formData.admin_password} onChange={handleChange} type="password" placeholder="••••••••" />
-                <Field label="Email (Optional)" name="admin_email" value={formData.admin_email} onChange={handleChange} type="email" placeholder="admin@example.com" />
+                <Field label={t('setup.username')} name="admin_username" value={formData.admin_username} onChange={handleChange} placeholder={t('setup.usernamePlaceholder')} />
+                <Field label={t('setup.password')} name="admin_password" value={formData.admin_password} onChange={handleChange} type="password" placeholder={t('setup.passwordPlaceholder')} />
+                <Field label={t('setup.email')} name="admin_email" value={formData.admin_email} onChange={handleChange} type="email" placeholder={t('setup.emailPlaceholder')} />
               </div>
               
               <button 
@@ -100,15 +102,15 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                 className="btn-primary"
                 style={{ marginTop: '2rem' }}
               >
-                Next Step <ArrowRight size={18} />
+                {t('setup.nextStep')} <ArrowRight size={18} />
               </button>
             </div>
           )}
 
           {step === 2 && (
             <div className="animate-in">
-              <h2 className="step-title">Database</h2>
-              <p className="step-subtitle">Choose where to store your API data.</p>
+              <h2 className="step-title">{t('setup.dbTitle')}</h2>
+              <p className="step-subtitle">{t('setup.dbSubtitle')}</p>
               
               <div className="form-fields" style={{ overflowY: 'auto', maxHeight: '300px', paddingRight: '0.5rem' }}>
                 <div className="db-grid">
@@ -116,40 +118,40 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                     onClick={() => setFormData(p => ({...p, database_type: 'sqlite'}))}
                     className={`db-option ${formData.database_type === 'sqlite' ? 'active' : ''}`}
                   >
-                    <div className="db-option-title">SQLite</div>
-                    <div className="db-option-desc">Zero config, local file.</div>
+                    <div className="db-option-title">{t('setup.sqlite')}</div>
+                    <div className="db-option-desc">{t('setup.sqliteDesc')}</div>
                   </div>
                   <div 
                     onClick={() => setFormData(p => ({...p, database_type: 'postgresql'}))}
                     className={`db-option ${formData.database_type === 'postgresql' ? 'active' : ''}`}
                   >
-                    <div className="db-option-title">PostgreSQL</div>
-                    <div className="db-option-desc">Robust, production ready.</div>
+                    <div className="db-option-title">{t('setup.postgres')}</div>
+                    <div className="db-option-desc">{t('setup.postgresDesc')}</div>
                   </div>
                 </div>
 
                 {formData.database_type === 'postgresql' && (
                   <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <Field label="Host" name="host" value={formData.host} onChange={handleChange} placeholder="localhost" />
+                    <Field label={t('setup.host')} name="host" value={formData.host} onChange={handleChange} placeholder={t('setup.hostPlaceholder')} />
                     <div className="db-grid">
-                      <Field label="Port" name="port" value={formData.port} onChange={handleChange} type="number" />
-                      <Field label="Database" name="database" value={formData.database} onChange={handleChange} />
+                      <Field label={t('setup.port')} name="port" value={formData.port} onChange={handleChange} type="number" />
+                      <Field label={t('setup.database')} name="database" value={formData.database} onChange={handleChange} />
                     </div>
-                    <Field label="User" name="username" value={formData.username} onChange={handleChange} />
-                    <Field label="Password" name="password" value={formData.password} onChange={handleChange} type="password" />
+                    <Field label={t('setup.user')} name="username" value={formData.username} onChange={handleChange} />
+                    <Field label={t('setup.password')} name="password" value={formData.password} onChange={handleChange} type="password" />
                   </div>
                 )}
               </div>
               
               <div style={{ display: 'flex', gap: '0.75rem', marginTop: '2rem' }}>
-                <button type="button" onClick={() => setStep(1)} className="btn-secondary">Back</button>
+                <button type="button" onClick={() => setStep(1)} className="btn-secondary">{t('setup.back')}</button>
                 <button 
                   type="button"
                   onClick={() => setStep(3)}
                   className="btn-primary"
                   style={{ flex: 1 }}
                 >
-                  Next Step <ArrowRight size={18} />
+                  {t('setup.nextStep')} <ArrowRight size={18} />
                 </button>
               </div>
             </div>
@@ -157,8 +159,8 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
 
           {step === 3 && (
             <div className="animate-in">
-              <h2 className="step-title">Final Options</h2>
-              <p className="step-subtitle">Customize your initial experience.</p>
+              <h2 className="step-title">{t('setup.optionsTitle')}</h2>
+              <p className="step-subtitle">{t('setup.optionsSubtitle')}</p>
               
               <div className="form-fields">
                 <label className="checkbox-card">
@@ -170,8 +172,8 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                     className="checkbox-input"
                   />
                   <div>
-                    <div className="checkbox-title">Import Pokedex Demo</div>
-                    <div className="checkbox-desc">Starts with a complete project including characters and endpoints.</div>
+                    <div className="checkbox-title">{t('setup.importDemo')}</div>
+                    <div className="checkbox-desc">{t('setup.importDemoDesc')}</div>
                   </div>
                 </label>
 
@@ -186,9 +188,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                   <div>
                     <div className="checkbox-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <Box size={16} color="#818cf8" />
-                      <span>Usar Docker Compose</span>
+                      <span>{t('setup.useDocker')}</span>
                     </div>
-                    <div className="checkbox-desc">Genera configuración para levantar todo con Docker. Requiere Docker instalado.</div>
+                    <div className="checkbox-desc">{t('setup.useDockerDesc')}</div>
                   </div>
                 </label>
 
@@ -200,7 +202,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
               </div>
               
               <div style={{ display: 'flex', gap: '0.75rem', marginTop: '2rem' }}>
-                <button type="button" onClick={() => setStep(2)} className="btn-secondary">Back</button>
+                <button type="button" onClick={() => setStep(2)} className="btn-secondary">{t('setup.back')}</button>
                 <button 
                   type="button"
                   onClick={handleRunSetup}
@@ -208,7 +210,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                   className="btn-primary"
                   style={{ flex: 1 }}
                 >
-                  {loading ? <Loader2 className="spin" size={20} /> : 'Finish Setup'}
+                  {loading ? <Loader2 className="spin" size={20} /> : t('setup.finish')}
                 </button>
               </div>
             </div>
@@ -219,11 +221,11 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
               <div style={{ width: '5rem', height: '5rem', backgroundColor: 'rgba(34, 197, 94, 0.2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
                 <CheckCircle size={40} color="#22c55e" />
               </div>
-              <h2 className="step-title">Setup Complete!</h2>
+              <h2 className="step-title">{t('setup.complete')}</h2>
               <p className="step-subtitle" style={{ maxWidth: '20rem', margin: '0 auto 2rem' }}>
                 {formData.use_docker 
-                  ? "Configuración Docker generada. Ahora puedes ejecutar 'docker-compose up -d' para levantar el sistema."
-                  : "API Maker has been successfully configured. You are ready to start creating APIs."}
+                  ? t('setup.dockerReady')
+                  : t('setup.ready')}
               </p>
               
               <button 
@@ -232,7 +234,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                 className="btn-primary"
                 style={{ maxWidth: '200px', margin: '0 auto' }}
               >
-                Go to Dashboard
+                {t('setup.goToDashboard')}
               </button>
             </div>
           )}

@@ -315,35 +315,35 @@ def render_bundle(
             readme_content = f"#  {project_name}\n\n"
         else:
             readme_content = f"# {project_name}\n\n"
-        readme_content += f"{project_description or 'API generada con API Maker.'}\n\n"
-        readme_content += "Este proyecto contiene una API profesional completa, lista para ser desplegada en producción.\n\n"
+        readme_content += f"{project_description or 'API generated with DoApi.'}\n\n"
+        readme_content += "This project contains a complete professional API, ready to be deployed to production.\n\n"
         
-        readme_content += "##  Arranque Rápido\n\n"
-        readme_content += "La forma más sencilla de configurar y levantar la API es usando el instalador interactivo:\n\n"
+        readme_content += "##  Quick Start\n\n"
+        readme_content += "The easiest way to set up and run the API is using the interactive installer:\n\n"
         readme_content += "```bash\n"
         readme_content += "chmod +x setup.sh && ./setup.sh\n"
         readme_content += "```\n\n"
-        readme_content += "Este script configurará el entorno, las variables de entorno (`.env`) y te permitirá elegir entre ejecución local o con Docker.\n\n"
+        readme_content += "This script will configure the environment, environment variables (`.env`), and let you choose between local execution or Docker.\n\n"
 
-        readme_content += "##  Despliegue con Docker\n\n"
-        readme_content += "Si prefieres usar Docker directamente:\n\n"
+        readme_content += "##  Docker Deployment\n\n"
+        readme_content += "If you prefer to use Docker directly:\n\n"
         readme_content += "```bash\n"
         readme_content += "docker-compose up -d --build\n"
         readme_content += "```\n"
-        readme_content += "La API estará disponible en `http://localhost:8000`.\n\n"
+        readme_content += "The API will be available at `http://localhost:8000`.\n\n"
 
-        readme_content += "##  Documentación Interactiva\n\n"
-        readme_content += "Una vez levantada la API, puedes acceder a la documentación completa de todos tus recursos en:\n"
+        readme_content += "##  Interactive Documentation\n\n"
+        readme_content += "Once the API is running, you can access the full documentation for all your resources at:\n"
         readme_content += "- **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)\n"
         readme_content += "- **ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)\n\n"
 
-        readme_content += "##  Estructura del Proyecto\n\n"
+        readme_content += "##  Project Structure\n\n"
         readme_content += f"- Stack: **{context['target_stack'].upper()}**\n"
-        readme_content += "- Base de Datos: SQLite (desarrollo) / PostgreSQL (producción vía Docker)\n"
-        readme_content += f"- Autenticación: {context['auth_method']}\n"
-        readme_content += "- Datasets incluidos: " + ", ".join([ds['name'] for ds in context['datasets']]) + "\n\n"
+        readme_content += "- Database: SQLite (development) / PostgreSQL (production via Docker)\n"
+        readme_content += f"- Authentication: {context['auth_method']}\n"
+        readme_content += "- Included Datasets: " + ", ".join([ds['name'] for ds in context['datasets']]) + "\n\n"
 
-        readme_content += "##  Instalación Manual\n\n"
+        readme_content += "##  Manual Installation\n\n"
         if stack == "fastapi":
             readme_content += (
                 "```bash\n"
@@ -364,24 +364,24 @@ def render_bundle(
             )
 
         if context["include_data"] and any(d["sample_rows"] for d in context["datasets"]):
-            readme_content += "\n##  Datos Iniciales (Seeds)\n"
-            readme_content += "Este proyecto incluye un archivo `data.json`. La API importará estos datos automáticamente en el primer arranque si la base de datos está vacía.\n"
+            readme_content += "\n##  Initial Data (Seeds)\n"
+            readme_content += "This project includes a `data.json` file. The API will import this data automatically on first startup if the database is empty.\n"
 
-        readme_content += "\n##  Despliegue en la Nube\n\n"
+        readme_content += "\n##  Cloud Deployment\n\n"
         readme_content += "### Railway\n"
         readme_content += "```bash\n"
-        readme_content += "# Instala Railway CLI y ejecuta:\nrailway login\nrailway up\n```\n"
-        readme_content += "Railway detecta automáticamente el Dockerfile incluido en el proyecto.\n\n"
+        readme_content += "# Install Railway CLI and run:\nrailway login\nrailway up\n```\n"
+        readme_content += "Railway automatically detects the Dockerfile included in the project.\n\n"
         readme_content += "### Render\n"
-        readme_content += "1. Sube este repositorio a GitHub\n"
-        readme_content += "2. Conecta tu repo en https://render.com\n"
-        readme_content += "3. Render usará el archivo `deploy/render.yaml` para configurar el servicio automáticamente.\n\n"
-        readme_content += "### Docker Compose (auto-hospedado)\n"
+        readme_content += "1. Push this repository to GitHub\n"
+        readme_content += "2. Connect your repo at https://render.com\n"
+        readme_content += "3. Render will use the `deploy/render.yaml` file to configure the service automatically.\n\n"
+        readme_content += "### Docker Compose (self-hosted)\n"
         readme_content += "```bash\n"
         readme_content += "docker compose up -d --build\n"
         readme_content += "```\n"
 
-        readme_content += "\n---\n*Generado con  por API Maker Studio*"
+        readme_content += "\n---\n*Generated with  by DoApi*"
         
         zf.writestr("README.md", readme_content)
 

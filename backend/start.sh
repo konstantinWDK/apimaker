@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Script to start the API Maker backend using the virtual environment
+# Script to start the DoApi backend using the virtual environment
 
 # Get the directory where this script is located
 BACKEND_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 cd "$BACKEND_DIR"
 
-echo "🚀 Starting API Maker Backend..."
+echo "🚀 Starting DoApi Backend..."
 
 # Check if .venv exists
 if [ ! -d ".venv" ]; then

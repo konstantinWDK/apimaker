@@ -1,4 +1,4 @@
-"""Domain services for API Maker backend."""
+"""Domain services for DoApi backend."""
 
 from .project_service import project_service
 from .generation import run_generation

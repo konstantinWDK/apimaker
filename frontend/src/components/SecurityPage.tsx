@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useProjectBuilder } from '../hooks/useProjectBuilder'
 import { readBackendConfig } from '../lib/backendConfig'
 import type { ProjectDraft } from '../types/schemas'
@@ -22,6 +23,7 @@ function generateJwtSecret(): string {
 }
 
 export function SecurityPage() {
+  const { t } = useTranslation()
   const { project, updateProject } = useProjectBuilder()
   const [testResult, setTestResult] = useState<{ status: number; body: string } | null>(null)
   const [testLoading, setTestLoading] = useState(false)
@@ -65,24 +67,24 @@ export function SecurityPage() {
   }
 
   const checklist = [
-    { id: 'https', label: 'HTTPS obligatorio en producción', ok: true },
-    { id: 'auth', label: 'Autenticación configurada', ok: project.authMethod !== 'none' },
-    { id: 'key', label: 'Clave/Secreto generado y no default', ok: !!(project.authMethod === 'apikey' && project.apiKey) || !!(project.authMethod === 'jwt' && project.jwtSecret) },
-    { id: 'ratelimit', label: 'Rate limit configurado', ok: !!project.rateLimit && project.rateLimit > 0 },
-    { id: 'cors', label: 'CORS restringido en producción', ok: true },
-    { id: 'workers', label: 'Múltiples workers en producción', ok: true },
+    { id: 'https', label: t('security.checklistHttps'), ok: true },
+    { id: 'auth', label: t('security.checklistAuth'), ok: project.authMethod !== 'none' },
+    { id: 'key', label: t('security.checklistKey'), ok: !!(project.authMethod === 'apikey' && project.apiKey) || !!(project.authMethod === 'jwt' && project.jwtSecret) },
+    { id: 'ratelimit', label: t('security.checklistRateLimit'), ok: !!project.rateLimit && project.rateLimit > 0 },
+    { id: 'cors', label: t('security.checklistCors'), ok: true },
+    { id: 'workers', label: t('security.checklistWorkers'), ok: true },
   ]
 
   return (
     <div className="info-page">
       <div className="info-hero">
         <div className="info-hero__content">
-          <h1 className="info-hero__title">Seguridad</h1>
+          <h1 className="info-hero__title">{t('security.title')}</h1>
           <p className="info-hero__subtitle">
-            Configura la autenticación, genera credenciales y prueba la seguridad de tu API.
+            {t('security.subtitle')}
           </p>
           <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.25rem' }}>
-            Proyecto: <strong style={{ color: '#e2e8f0' }}>{project.name || 'Sin nombre'}</strong>
+            {t('security.project')}: <strong style={{ color: '#e2e8f0' }}>{project.name || t('security.unnamed')}</strong>
             {projectPrefix && <span style={{ marginLeft: '0.5rem' }}>— ID: <code style={{ color: '#94a3b8' }}>{projectPrefix}</code></span>}
           </p>
         </div>
@@ -91,13 +93,13 @@ export function SecurityPage() {
       <div className="info-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
         {/* Auth Method */}
         <div className="info-card" style={{ gridColumn: '1 / -1' }}>
-          <h3 className="info-card__title" style={{ marginBottom: '0.75rem' }}>Método de Autenticación</h3>
+          <h3 className="info-card__title" style={{ marginBottom: '0.75rem' }}>{t('security.authMethodTitle')}</h3>
           <p className="muted-text" style={{ fontSize: '0.82rem', marginBottom: '1rem' }}>
-            Define cómo se autenticarán los clientes al consumir tu API <strong>{project.name}</strong>.
+            {t('security.authMethodDesc')} <strong>{project.name}</strong>.
           </p>
           <div className="form-grid">
             <label className="form-field">
-              <span className="label">Tipo</span>
+              <span className="label">{t('security.type')}</span>
               <select
                 className="field"
                 value={project.authMethod || 'none'}
@@ -107,50 +109,50 @@ export function SecurityPage() {
                   if (e.target.value === 'jwt' && !project.jwtSecret) handleChange('jwtSecret', generateJwtSecret())
                 }}
               >
-                <option value="none">Ninguno (Público)</option>
-                <option value="apikey">API Key (X-API-Key)</option>
-                <option value="jwt">JWT (Bearer Token)</option>
+                <option value="none">{t('security.authNone')}</option>
+                <option value="apikey">{t('security.authApiKey')}</option>
+                <option value="jwt">{t('security.authJwt')}</option>
               </select>
             </label>
 
             {project.authMethod === 'apikey' && (
               <div className="form-field" style={{ gridColumn: '1 / -1' }}>
-                <span className="label">API Key</span>
+                <span className="label">{t('security.apiKey')}</span>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <input className="field" readOnly value={project.apiKey || ''} style={{ fontFamily: 'monospace', flex: 1 }} />
                   <button type="button" className="btn ghost" onClick={() => copyToClipboard(project.apiKey || '', 'key')}>
-                    {copied === 'key' ? 'Copiado' : 'Copiar'}
+                    {copied === 'key' ? t('security.copied') : t('security.copy')}
                   </button>
                   <button type="button" className="btn ghost" onClick={() => handleChange('apiKey', generateKey())}>
-                    Regenerar
+                    {t('security.regenerate')}
                   </button>
                 </div>
                 <p className="muted-text" style={{ fontSize: '0.75rem', marginTop: '0.3rem' }}>
-                  Enviar en cabecera: <code className="docs-code--inline">X-API-Key: {project.apiKey || '&lt;tu-clave&gt;'}</code>
+                  {t('security.sendInHeader')}: <code className="docs-code--inline">X-API-Key: {project.apiKey || t('security.yourKey')}</code>
                 </p>
               </div>
             )}
 
             {project.authMethod === 'jwt' && (
               <div className="form-field" style={{ gridColumn: '1 / -1' }}>
-                <span className="label">Secreto JWT</span>
+                <span className="label">{t('security.jwtSecret')}</span>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <input className="field" readOnly value={project.jwtSecret || ''} style={{ fontFamily: 'monospace', flex: 1 }} />
                   <button type="button" className="btn ghost" onClick={() => copyToClipboard(project.jwtSecret || '', 'jwt')}>
-                    {copied === 'jwt' ? 'Copiado' : 'Copiar'}
+                    {copied === 'jwt' ? t('security.copied') : t('security.copy')}
                   </button>
                   <button type="button" className="btn ghost" onClick={() => handleChange('jwtSecret', generateJwtSecret())}>
-                    Regenerar
+                    {t('security.regenerate')}
                   </button>
                 </div>
                 <p className="muted-text" style={{ fontSize: '0.75rem', marginTop: '0.3rem' }}>
-                  Enviar en cabecera: <code className="docs-code--inline">Authorization: Bearer &lt;token&gt;</code>
+                  {t('security.sendInHeader')}: <code className="docs-code--inline">Authorization: Bearer &lt;token&gt;</code>
                 </p>
               </div>
             )}
 
             <label className="form-field">
-              <span className="label">Rate Limit</span>
+              <span className="label">{t('security.rateLimit')}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <input
                   type="number" className="field" style={{ width: '100px' }}
@@ -158,7 +160,7 @@ export function SecurityPage() {
                   onChange={(e) => handleChange('rateLimit', e.target.value ? parseInt(e.target.value, 10) : undefined)}
                   placeholder="0"
                 />
-                <span className="muted-text">peticiones / minuto</span>
+                <span className="muted-text">{t('security.rateLimitUnit')}</span>
               </div>
             </label>
           </div>
@@ -166,26 +168,26 @@ export function SecurityPage() {
 
         {/* Test Auth */}
         <div className="info-card">
-          <h3 className="info-card__title" style={{ marginBottom: '0.75rem' }}>Probar Autenticación</h3>
+          <h3 className="info-card__title" style={{ marginBottom: '0.75rem' }}>{t('security.testAuthTitle')}</h3>
           <p className="muted-text" style={{ fontSize: '0.82rem', marginBottom: '0.75rem' }}>
-            Envía una petición de prueba al mock server con la configuración actual.
+            {t('security.testAuthDesc')}
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.75rem' }}>
             <div className="form-field" style={{ margin: 0 }}>
-              <span className="label">Proyecto</span>
+              <span className="label">{t('security.project')}</span>
               <span style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{project.name || '—'}</span>
             </div>
             <div className="form-field" style={{ margin: 0 }}>
-              <span className="label">Endpoint de prueba</span>
+              <span className="label">{t('security.testEndpoint')}</span>
               <span style={{ fontFamily: 'monospace', fontSize: '0.82rem', wordBreak: 'break-all' }}>{mockUrl}</span>
             </div>
             <div className="form-field" style={{ margin: 0 }}>
-              <span className="label">Método de auth</span>
+              <span className="label">{t('security.authMethod')}</span>
               <span style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
-                {project.authMethod === 'apikey' ? 'API Key (X-API-Key)' :
-                 project.authMethod === 'jwt' ? 'JWT (Bearer Token)' :
-                 project.authMethod === 'basic' ? 'Basic Auth' : 'Ninguno (público)'}
+                {project.authMethod === 'apikey' ? t('security.authApiKeyLabel') :
+                 project.authMethod === 'jwt' ? t('security.authJwtLabel') :
+                 project.authMethod === 'basic' ? 'Basic Auth' : t('security.authNoneLabel')}
               </span>
             </div>
           </div>
@@ -198,12 +200,12 @@ export function SecurityPage() {
                 : `curl ${mockUrl}`}
           </div>
           <button type="button" className="btn" onClick={testAuth} disabled={testLoading}>
-            {testLoading ? 'Probando...' : 'Probar Autenticación'}
+            {testLoading ? t('security.testing') : t('security.testAuth')}
           </button>
           {testResult && (
             <div style={{ marginTop: '0.75rem' }}>
               <span style={{ fontSize: '0.82rem', fontWeight: 600, color: testResult.status === 200 ? '#166534' : '#991b1b' }}>
-                {testResult.status === 200 ? ' Acceso permitido' : testResult.status === 401 ? ' Acceso denegado (401)' : ` Error (${testResult.status})`}
+                {testResult.status === 200 ? ` ${t('security.accessGranted')}` : testResult.status === 401 ? ` ${t('security.accessDenied')}` : ` ${t('security.error')} (${testResult.status})`}
               </span>
               <pre style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.3rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                 {testResult.body}
@@ -214,7 +216,7 @@ export function SecurityPage() {
 
         {/* Security Checklist */}
         <div className="info-card">
-          <h3 className="info-card__title" style={{ marginBottom: '0.75rem' }}>Checklist de Seguridad</h3>
+          <h3 className="info-card__title" style={{ marginBottom: '0.75rem' }}>{t('security.checklistTitle')}</h3>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {checklist.map(item => (
               <li key={item.id} style={{
@@ -228,34 +230,31 @@ export function SecurityPage() {
             ))}
           </ul>
           <p className="muted-text" style={{ fontSize: '0.75rem', marginTop: '0.75rem' }}>
-            Checklist orientativo. En producción seguir las guías de seguridad del framework.
+            {t('security.checklistHint')}
           </p>
         </div>
       </div>
 
       {/* Generated API Security */}
       <div className="info-card" style={{ marginTop: '1rem' }}>
-        <h3 className="info-card__title" style={{ marginBottom: '0.75rem' }}>Seguridad en la API Generada</h3>
+        <h3 className="info-card__title" style={{ marginBottom: '0.75rem' }}>{t('security.generatedApiTitle')}</h3>
         <div className="info-stacks" style={{ gap: '0.75rem' }}>
           <div className="info-stack">
-            <div className="info-stack__head"><strong>Código generado</strong></div>
+            <div className="info-stack__head"><strong>{t('security.generatedCode')}</strong></div>
             <p className="info-stack__desc">
-              El bundle incluye middleware de autenticación según el método elegido: validación de API Key
-              o verificación JWT con el secreto configurado. Rate limit implementado con计数 middleware.
+              {t('security.generatedCodeDesc')}
             </p>
           </div>
           <div className="info-stack">
-            <div className="info-stack__head"><strong>Mock server</strong></div>
+            <div className="info-stack__head"><strong>{t('security.mockServer')}</strong></div>
             <p className="info-stack__desc">
-              El simulador respeta la configuración de seguridad. Las rutas mock requieren las mismas
-              credenciales que la API generada, permitiendo probar la autenticación antes de desplegar.
+              {t('security.mockServerDesc')}
             </p>
           </div>
           <div className="info-stack">
-            <div className="info-stack__head"><strong>Recomendaciones</strong></div>
+            <div className="info-stack__head"><strong>{t('security.recommendations')}</strong></div>
             <p className="info-stack__desc">
-              Usa HTTPS en producción. Genera claves únicas por proyecto. No compartas secretos JWT.
-              Rate limit protege contra abusos. CORS restringido a orígenes conocidos.
+              {t('security.recommendationsDesc')}
             </p>
           </div>
         </div>

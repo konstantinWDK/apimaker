@@ -8,7 +8,7 @@ export interface ShareSnapshot {
   result: GenerationResult
 }
 
-const SHARE_STORAGE_KEY = 'apimaker-share-snapshots'
+const SHARE_STORAGE_KEY = 'doapi-share-snapshots'
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
 

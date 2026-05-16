@@ -3,15 +3,15 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-apimaker}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-apimaker}
-      POSTGRES_DB: ${POSTGRES_DB:-apimaker}
+      POSTGRES_USER: ${POSTGRES_USER:-doapi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-doapi}
+      POSTGRES_DB: ${POSTGRES_DB:-doapi}
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-apimaker} -d ${POSTGRES_DB:-apimaker}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-doapi} -d ${POSTGRES_DB:-doapi}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -23,10 +23,10 @@ services:
   mysql:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-apimaker_root}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-apimaker}
-      MYSQL_USER: ${MYSQL_USER:-apimaker}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-apimaker}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-doapi_root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-doapi}
+      MYSQL_USER: ${MYSQL_USER:-doapi}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-doapi}
     ports:
       - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
     volumes:
@@ -46,7 +46,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - APIMAKER_DATABASE_URL=${APIMAKER_DATABASE_URL:-sqlite:///./app/data/apimaker.db}
+      - APIMAKER_DATABASE_URL=${APIMAKER_DATABASE_URL:-sqlite:///./app/data/doapi.db}
       - APIMAKER_ENVIRONMENT=${APIMAKER_ENVIRONMENT:-development}
       - APIMAKER_JWT_SECRET_KEY=${APIMAKER_JWT_SECRET_KEY:-secret}
       - APIMAKER_DEPLOY_HOST_PATH=${APIMAKER_DEPLOY_HOST_PATH:-.}

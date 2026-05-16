@@ -1,4 +1,4 @@
-"""FastAPI entrypoint for API Maker backend."""
+"""FastAPI entrypoint for DoApi backend."""
 
 import logging
 from contextlib import asynccontextmanager
@@ -22,7 +22,7 @@ from .services.mock_server import router as mock_api_router
 settings = get_settings()
 
 # SECURITY: Crash if using default JWT secret in production
-_DEFAULT_JWT_SECRET = "apimaker-dev-secret-key-change-this-in-prod"
+_DEFAULT_JWT_SECRET = "doapi-dev-secret-key-change-this-in-prod"
 if settings.environment == "production" and settings.jwt_secret_key == _DEFAULT_JWT_SECRET:
     raise RuntimeError(
         "SECURITY ERROR: APIMAKER_JWT_SECRET_KEY must be set in production. "
@@ -31,7 +31,7 @@ if settings.environment == "production" and settings.jwt_secret_key == _DEFAULT_
 
 app = FastAPI(title=settings.project_name)
 
-# En desarrollo, permitir todos los orígenes CORS
+# In development, allow all CORS origins
 if settings.environment == "development":
     app.add_middleware(
         CORSMiddleware,
@@ -81,7 +81,7 @@ app.include_router(product_ops_router.system_router)
 def on_startup() -> None:
     """Initialize database tables on startup."""
     logging.basicConfig(level=logging.INFO)
-    logging.info("Starting API Maker backend...")
+    logging.info("Starting DoApi backend...")
     logging.info(f"Environment: {settings.environment}")
     logging.info(f"CORS origins: {'*' if settings.environment == 'development' else settings.allow_origins}")
     try:

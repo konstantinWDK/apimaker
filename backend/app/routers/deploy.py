@@ -21,7 +21,7 @@ from ..db import get_session
 from ..security import CurrentUser, require_admin
 from ..services.project_service import project_service
 
-logger = logging.getLogger("apimaker.deploy")
+logger = logging.getLogger("doapi.deploy")
 router = APIRouter(prefix="/api/deploy", tags=["deploy"])
 
 # When running inside Docker, APIMAKER_DEPLOY_HOST_PATH maps the container's
@@ -47,7 +47,7 @@ else:
 
 TRACKING_FILE = DEPLOY_ROOT / ".deployments.json"
 PORT_RANGE = range(8080, 8100)
-DEPLOY_IMAGE = "apimaker-deploy:latest"
+DEPLOY_IMAGE = "doapi-deploy:latest"
 
 
 def _safe_slug(slug: str) -> str:
@@ -170,15 +170,15 @@ def _find_free_port(preferred: int) -> tuple[int, list[str]]:
     if _port_is_free(preferred):
         return preferred, logs
 
-    logs.append(f" Puerto {preferred} está ocupado. Buscando disponible...")
+    logs.append(f" Port {preferred} is occupied. Searching for available one...")
     for port in PORT_RANGE:
         if port == preferred:
             continue
         if _port_is_free(port):
-            logs.append(f" Puerto disponible encontrado: {port}")
+            logs.append(f" Available port found: {port}")
             return port, logs
 
-    raise HTTPException(status_code=409, detail="No hay puertos disponibles en el rango 8080-8099")
+    raise HTTPException(status_code=409, detail="No available ports in range 8080-8099")
 
 
 def _ensure_deploy_image(logs: list[str], force: bool = False) -> bool:
@@ -194,7 +194,7 @@ def _ensure_deploy_image(logs: list[str], force: bool = False) -> bool:
         except Exception:
             pass
 
-    logs.append(f" Construyendo imagen local {DEPLOY_IMAGE}...")
+    logs.append(f" Building local image {DEPLOY_IMAGE}...")
     try:
         result = subprocess.run(
             ["docker", "build", "-t", DEPLOY_IMAGE, "-f", "Dockerfile", "."],
@@ -202,12 +202,12 @@ def _ensure_deploy_image(logs: list[str], force: bool = False) -> bool:
             capture_output=True, text=True, timeout=300,
         )
         if result.returncode != 0:
-            logs.append(f" Error construyendo imagen: {result.stderr.strip()[:300]}")
+            logs.append(f" Error building image: {result.stderr.strip()[:300]}")
             return False
-        logs.append(" Imagen construida")
+        logs.append(" Image built")
         return True
     except subprocess.TimeoutExpired:
-        logs.append(" Timeout construyendo imagen (>5min)")
+        logs.append(" Timeout building image (>5min)")
         return False
     except Exception as e:
         logs.append(f" Error: {str(e)}")
@@ -217,12 +217,12 @@ def _ensure_deploy_image(logs: list[str], force: bool = False) -> bool:
 def _build_docker_compose(
     port: int, slug: str, db_url: str,
     include_postgres_container: bool = False,
-    pg_user: str = "apimaker",
+    pg_user: str = "doapi",
     pg_pass: str = "",
     pg_db: str = "api_deploy",
     pg_port: int = 5432,
     include_mysql_container: bool = False,
-    mysql_user: str = "apimaker",
+    mysql_user: str = "doapi",
     mysql_pass: str = "",
     mysql_db: str = "api_deploy",
     mysql_port: int = 3306,
@@ -452,10 +452,10 @@ def deploy_remote(
         raise HTTPException(status_code=400, detail="Invalid SSH host")
     if not (1 <= req.port <= 65535 and 1 <= req.api_port <= 65535):
         raise HTTPException(status_code=400, detail="Invalid port")
-    remote_dir = f"/opt/apimaker/{slug}"
+    remote_dir = f"/opt/doapi/{slug}"
     remote_url = f"{req.user}@{req.host}"
 
-    logs.append(f" Conectando a {remote_url}...")
+    logs.append(f" Connecting to {remote_url}...")
 
     # Build SSH command prefix
     ssh_base = ["ssh", remote_url, "-p", str(req.port), "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10"]
@@ -471,26 +471,26 @@ def deploy_remote(
 
     try:
         # Create remote directory
-        logs.append(" Creando directorio remoto...")
+        logs.append(" Creating remote directory...")
         subprocess.run(ssh_base + [f"mkdir -p {remote_dir}"], capture_output=True, text=True, timeout=15)
 
         # Export project as JSON
-        logs.append(" Exportando proyecto...")
+        logs.append(" Exporting project...")
         from ..routers.projects import _db_to_pydantic
         export_data = _db_to_pydantic(project, data["datasets"], data["endpoints"], include_secrets=True)
         json_path = Path(tempfile.gettempdir()) / f"{slug}-project.json"
         json_path.write_text(export_data.model_dump_json(indent=2))
 
-        logs.append(" Subiendo project.json al servidor...")
+        logs.append(" Uploading project.json to server...")
         subprocess.run(scp_base + [str(json_path), f"{remote_url}:{remote_dir}/project.json"], capture_output=True, text=True, timeout=30)
         json_path.unlink(missing_ok=True)
 
         # Deploy via SSH using the CLI on the remote server
-        logs.append(" Desplegando en el servidor remoto...")
+        logs.append(" Deploying on remote server...")
         deploy_cmd = (
             f"cd {remote_dir} && "
-            f"pip install apimaker-backend -q --no-cache-dir && "
-            f"apimaker deploy project.json --port {req.api_port}"
+            f"pip install doapi-backend -q --no-cache-dir && "
+            f"doapi deploy project.json --port {req.api_port}"
         )
         result = subprocess.run(ssh_base + [deploy_cmd], capture_output=True, text=True, timeout=300)
         if result.stdout.strip():
@@ -500,7 +500,7 @@ def deploy_remote(
             return DeployStatus(status="error", logs=logs)
 
         url = f"http://{req.host}:{req.api_port}/api"
-        logs.append(f" API desplegada en {url}")
+        logs.append(f" API deployed at {url}")
 
         # Track deployment
         tracking = _load_tracking()
@@ -511,10 +511,10 @@ def deploy_remote(
         }
         _save_tracking(tracking)
 
-        return DeployStatus(status="running", url=url, logs=logs, message="Deploy remoto exitoso")
+        return DeployStatus(status="running", url=url, logs=logs, message="Remote deploy successful")
 
     except subprocess.TimeoutExpired:
-        logs.append(" Timeout en conexión SSH")
+        logs.append(" SSH connection timeout")
         return DeployStatus(status="timeout", logs=logs)
     except Exception as e:
         logs.append(f" Error: {str(e)}")
@@ -536,15 +536,15 @@ def delete_deployment(req: SlugRequest, user: CurrentUser = Depends(require_admi
             cwd=str(deploy_dir), capture_output=True, timeout=60,
         )
         shutil.rmtree(deploy_dir)
-        logs.append(" Directorio de deploy eliminado")
+        logs.append(" Deploy directory removed")
     else:
-        logs.append(" No hay directorio de deployment")
+        logs.append(" No deployment directory found")
 
     tracking = _load_tracking()
     if slug in tracking:
         del tracking[slug]
         _save_tracking(tracking)
-        logs.append(" Deployment eliminado del registro")
+        logs.append(" Deployment removed from registry")
 
     return DeployStatus(status="deleted", logs=logs, message="Deployment eliminado")
 
@@ -564,7 +564,7 @@ def redeploy_local(
 
     project_ref = req.project_id or slug
     project, deployed_endpoints = _export_project_json(session, project_ref, deploy_dir / "project.json")
-    logs.append(" Proyecto actualizado en project.json")
+    logs.append(" Project updated in project.json")
 
     _ensure_deploy_image(logs, force=True)
 
@@ -577,9 +577,9 @@ def redeploy_local(
             logs.append(result.stdout.strip()[:500])
         if result.returncode != 0:
             logs.append(result.stderr.strip()[:500])
-            return DeployStatus(status="error", logs=logs, message="Error recreando deployment")
+            return DeployStatus(status="error", logs=logs, message="Error recreating deployment")
     except subprocess.TimeoutExpired:
-        logs.append(" Timeout recreando contenedor (>3min)")
+        logs.append(" Timeout recreating container (>3min)")
         return DeployStatus(status="timeout", logs=logs)
     except Exception as e:
         logs.append(f" Error: {str(e)}")
@@ -598,8 +598,8 @@ def redeploy_local(
         _save_tracking(tracking)
 
     url = tracking.get(slug, {}).get("url") if tracking else None
-    logs.append(" Cambios aplicados al deployment")
-    return DeployStatus(status="running", url=url, logs=logs, message="Redeploy completado")
+    logs.append(" Changes applied to deployment")
+    return DeployStatus(status="running", url=url, logs=logs, message="Redeploy completed")
 
 
 def _check_docker_container(slug: str) -> str:
@@ -655,7 +655,7 @@ def docker_status(user: CurrentUser = Depends(require_admin)) -> dict:
             return {"available": True, "version": version, "containers_running": running}
         return {"available": False, "error": result.stderr.strip()}
     except FileNotFoundError:
-        return {"available": False, "error": "Docker no instalado"}
+        return {"available": False, "error": "Docker not installed"}
     except Exception as e:
         return {"available": False, "error": str(e)}
 
@@ -690,11 +690,11 @@ def check_port(port: int, user: CurrentUser = Depends(require_admin)) -> dict:
 def rebuild_deploy_image(user: CurrentUser = Depends(require_admin)) -> DeployStatus:
     """Rebuild the local deploy Docker image."""
     logs: list[str] = []
-    logs.append(" Eliminando imagen anterior...")
+    logs.append(" Removing previous image...")
     subprocess.run(["docker", "rmi", "-f", DEPLOY_IMAGE], capture_output=True, timeout=30)
     if _ensure_deploy_image(logs):
-        return DeployStatus(status="ok", logs=logs, message="Imagen reconstruida")
-    return DeployStatus(status="error", logs=logs, message="Error al reconstruir la imagen")
+        return DeployStatus(status="ok", logs=logs, message="Image rebuilt")
+    return DeployStatus(status="error", logs=logs, message="Error rebuilding image")
 
 
 @router.post("/local")
@@ -717,7 +717,7 @@ def deploy_local(
     # Stop the existing deployment for this project before checking the port.
     # Otherwise redeploying on the same port would be seen as a conflict.
     if deploy_dir.exists():
-        logs.append(" Deteniendo contenedor anterior...")
+        logs.append(" Stopping previous container...")
         subprocess.run(
             ["docker", "compose", "down", "--remove-orphans", "-v"],
             cwd=str(deploy_dir), capture_output=True, timeout=30,
@@ -729,7 +729,7 @@ def deploy_local(
     logs.extend(port_logs)
 
     deploy_dir.mkdir(parents=True, exist_ok=True)
-    logs.append(f" Directorio: {deploy_dir}")
+    logs.append(f" Directory: {deploy_dir}")
 
     # Build DB URL for the deployed API
     include_postgres_container = False
@@ -741,38 +741,38 @@ def deploy_local(
     if req.db_type == "postgresql":
         if req.deploy_postgres_mode == "new_container":
             include_postgres_container = True
-            container_pg_user = req.db_user or "apimaker"
+            container_pg_user = req.db_user or "doapi"
             container_pg_pass = req.db_password or _deploy_password_for_slug(slug)
             container_pg_db = req.db_name or "api_deploy"
-            logs.append(f" Nuevo contenedor PostgreSQL: usuario={container_pg_user}, bd={container_pg_db}")
+            logs.append(f" New PostgreSQL container: user={container_pg_user}, db={container_pg_db}")
             deploy_db_url = ""
         elif req.db_host:
             deploy_db_url = f"postgresql+psycopg2://{req.db_user}:{req.db_password}@{req.db_host}:{req.db_port}/{req.db_name or 'api'}"
-            logs.append(f" Usando PostgreSQL existente: {req.db_host}:{req.db_port}/{req.db_name}")
+            logs.append(f" Using existing PostgreSQL: {req.db_host}:{req.db_port}/{req.db_name}")
         else:
             deploy_db_url = f"sqlite:////app/deployments/{slug}/data.db"
-            logs.append(" Usando SQLite embebida (persistente en disco)")
+            logs.append(" Using embedded SQLite (persistent on disk)")
     elif req.db_type == "mysql":
         if req.deploy_mysql_mode == "new_container":
             include_mysql_container = True
-            container_mysql_user = req.db_user or "apimaker"
+            container_mysql_user = req.db_user or "doapi"
             container_mysql_pass = req.db_password or _deploy_password_for_slug(slug)
             container_mysql_db = req.db_name or "api_deploy"
-            logs.append(f" Nuevo contenedor MySQL: usuario={container_mysql_user}, bd={container_mysql_db}")
+            logs.append(f" New MySQL container: user={container_mysql_user}, db={container_mysql_db}")
             deploy_db_url = ""
         elif req.db_host:
             deploy_db_url = f"mysql+pymysql://{req.db_user}:{req.db_password}@{req.db_host}:{req.db_port}/{req.db_name or 'api'}"
-            logs.append(f" Usando MySQL existente: {req.db_host}:{req.db_port}/{req.db_name}")
+            logs.append(f" Using existing MySQL: {req.db_host}:{req.db_port}/{req.db_name}")
         else:
             deploy_db_url = f"sqlite:////app/deployments/{slug}/data.db"
-            logs.append(" Usando SQLite embebida (persistente en disco)")
+            logs.append(" Using embedded SQLite (persistent on disk)")
     else:
         deploy_db_url = f"sqlite:////app/deployments/{slug}/data.db"
-        logs.append(" Usando SQLite embebida (persistente en disco)")
+        logs.append(" Using embedded SQLite (persistent on disk)")
 
     # Export project as JSON for the standalone server
     _export_project_json(session, project.id, deploy_dir / "project.json")
-    logs.append(" Proyecto exportado a project.json")
+    logs.append(" Project exported to project.json")
 
     # Write docker-compose.yml
     if include_postgres_container:
@@ -782,7 +782,7 @@ def deploy_local(
             pg_host_port = 5432
         else:
             pg_host_port = port + 1
-            logs.append(f" Puerto 5432 ocupado, usando {pg_host_port}")
+            logs.append(f" Port 5432 occupied, using {pg_host_port}")
         compose = _build_docker_compose(
             port=port, slug=slug, db_url="",
             include_postgres_container=True,
@@ -796,7 +796,7 @@ def deploy_local(
             mysql_host_port = 3306
         else:
             mysql_host_port = port + 1
-            logs.append(f" Puerto 3306 ocupado, usando {mysql_host_port}")
+            logs.append(f" Port 3306 occupied, using {mysql_host_port}")
         compose = _build_docker_compose(
             port=port, slug=slug, db_url="",
             include_mysql_container=True,
@@ -808,22 +808,22 @@ def deploy_local(
             port=port, slug=slug, db_url=deploy_db_url
         )
     (deploy_dir / "docker-compose.yml").write_text(compose, encoding="utf-8")
-    logs.append(f" docker-compose.yml (puerto {port})")
+    logs.append(f" docker-compose.yml (port {port})")
 
     # Check Docker
     try:
         subprocess.run(["docker", "--version"], capture_output=True, check=True, timeout=10)
     except (subprocess.CalledProcessError, FileNotFoundError):
-        logs.append(" Docker no disponible. Instrucciones:")
+        logs.append(" Docker not available. Instructions:")
         logs.append(f"   cd {deploy_dir} && docker compose up -d")
         return DeployStatus(status="no_docker", logs=logs)
 
     # Build or verify local deploy image
     if not _ensure_deploy_image(logs):
-        logs.append(" No se pudo preparar la imagen Docker. Revisa los logs.")
-        return DeployStatus(status="error", logs=logs, message="Error preparando imagen Docker")
+        logs.append(" Could not prepare Docker image. Check the logs.")
+        return DeployStatus(status="error", logs=logs, message="Error preparing Docker image")
 
-    logs.append(" Levantando contenedor...")
+    logs.append(" Starting container...")
     try:
         result = subprocess.run(
             ["docker", "compose", "up", "-d"],
@@ -878,9 +878,9 @@ def deploy_local(
     _save_tracking(tracking)
 
     url = f"http://localhost:{port}/api"
-    logs.append(f" API en {url}")
-    logs.append(f" Deployments activos:")
+    logs.append(f" API at {url}")
+    logs.append(f" Active deployments:")
     for s, d in _load_tracking().items():
         logs.append(f"   {d['name']}: {d['url']}")
 
-    return DeployStatus(status="running", url=url, logs=logs, message=f"Deploy exitoso en puerto {port}")
+    return DeployStatus(status="running", url=url, logs=logs, message=f"Successful deploy on port {port}")

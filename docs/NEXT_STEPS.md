@@ -1,33 +1,33 @@
-# Próximos pasos sugeridos
+# Suggested next steps
 
-Este documento resume las funcionalidades pendientes o ideas de evolución para que API Maker llegue a producción como herramienta auto‑hospedable.
+This document summarizes pending features or evolution ideas for DoApi to reach production as a self-hostable tool.
 
 ## Backend
 
-1. **Mock server / runtime real**: implementar rutas `/api/{projectId}/*` que expongan datos a partir del dataset cargado (json-server embebido o FastAPI dinámico).
-2. **Generador de artefactos**: conectar el módulo `generator/` para producir código (FastAPI/Express/Nest) y SDKs desde la definición guardada.
-3. **Persistencia robusta**: mover de JSON plano a una base SQL (SQLite/Postgres) con migraciones y/versionado de proyectos.
-4. **Autenticación avanzada**: roles, múltiples usuarios y tokens por proyecto; quizá OAuth o SSO.
+1. **Mock server / real runtime**: implement `/api/{projectId}/*` routes that expose data from the loaded dataset (embedded json-server or dynamic FastAPI).
+2. **Artifact generator**: connect the `generator/` module to produce code (FastAPI/Express/Nest) and SDKs from the saved definition.
+3. **Robust persistence**: move from flat JSON to a SQL database (SQLite/Postgres) with migrations and project versioning.
+4. **Advanced authentication**: roles, multiple users, and per-project tokens; possibly OAuth or SSO.
 
 ## Frontend
 
-1. **Conectar con backend real**: consumir `/projects` para listar guardados, editar y hacer CRUD completo desde la UI.
-2. **Playground real**: después de que exista el mock server, permitir ejecutar requests reales desde “Endpoints & Simulador”.
-3. **Wizard de despliegue**: flujo guiado para exportar la API, descargar código o push a GitHub.
-4. **Mejor gestión de snapshots**: comparar versiones, clonar proyectos y etiquetar releases (v1, v2...).
+1. **Connect to real backend**: consume `/projects` to list saved projects, edit, and perform full CRUD from the UI.
+2. **Real playground**: once the mock server exists, allow executing real requests from "Endpoints & Simulator".
+3. **Deployment wizard**: guided flow to export the API, download code, or push to GitHub.
+4. **Better snapshot management**: compare versions, clone projects, and tag releases (v1, v2...).
 
-## Seguridad y distribución
+## Security and distribution
 
-1. **Login multiusuario**: reemplazar el login básico por un sistema gestionado (JWT o integración con proxies que ya tenga el cliente).
-2. **Configuración centralizada**: exponer un archivo `.env` o panel para definir URL del backend, tokens, etc., sin editar código.
-3. **Installer/CLI**: empaquetar la app (Docker Compose o instalador) para que los usuarios la desplieguen con un comando.
+1. **Multi-user login**: replace the basic login with a managed system (JWT or integration with existing client proxies).
+2. **Centralized configuration**: expose an `.env` file or panel to define backend URL, tokens, etc., without editing code.
+3. **Installer/CLI**: package the app (Docker Compose or installer) so users can deploy it with a single command.
 
-## Documentación y demo
+## Documentation and demo
 
-1. **API de ejemplo completa**: documentar cómo levantar un mock server con la demo Pokédex y consumirla desde Postman/cURL.
-2. **Guías paso a paso**: tutoriales para crear API desde CSV, sincronizar y compartir docs.
-3. **Video/demo interactivo**: mostrar el flujo end-to-end para adopción más rápida por parte de clientes.
+1. **Complete example API**: document how to spin up a mock server with the Pokédex demo and consume it from Postman/cURL.
+2. **Step-by-step guides**: tutorials for creating an API from CSV, syncing, and sharing docs.
+3. **Interactive video/demo**: show the end-to-end flow for faster client adoption.
 
 ---
 
-Este archivo se actualizará a medida que prioricemos nuevas características. Puedes abrir issues o PRs sobre cualquiera de estos puntos.
+This file will be updated as we prioritize new features. You can open issues or PRs on any of these items.

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import type { GenerationResult } from '../types/schemas'
 import { readBackendConfig } from '../lib/backendConfig'
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function GenerationResultPanel({ result, projectId }: Props) {
+  const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -29,7 +31,7 @@ export function GenerationResultPanel({ result, projectId }: Props) {
     setCopied(true)
     if (timeoutRef.current) clearTimeout(timeoutRef.current)
     timeoutRef.current = setTimeout(() => setCopied(false), 2000)
-    toast('Copiado al portapapeles', 'info')
+    toast(t('generation.copiedToClipboard'), 'info')
   }
 
   const handleDownload = async () => {
@@ -38,10 +40,10 @@ export function GenerationResultPanel({ result, projectId }: Props) {
       const { baseUrl } = readBackendConfig()
       const cleanBase = baseUrl?.replace(/\/$/, '')
       const url = `${cleanBase}/projects/${projectId}/download`
-      let token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
+      let token = typeof window !== 'undefined' ? window.sessionStorage.getItem('doapi-jwt-token') : null
 
       if (!token) {
-        toast('No hay sesión activa. Inicia sesión primero.', 'error')
+        toast(t('generation.noSession'), 'error')
         setDownloading(false)
         return
       }
@@ -51,7 +53,7 @@ export function GenerationResultPanel({ result, projectId }: Props) {
       })
 
       if (!res.ok) {
-        toast(`Error al descargar: ${res.status}`, 'error')
+        toast(t('generation.downloadError').replace('{status}', String(res.status)), 'error')
         setDownloading(false)
         return
       }
@@ -63,7 +65,7 @@ export function GenerationResultPanel({ result, projectId }: Props) {
       link.click()
       URL.revokeObjectURL(link.href)
     } catch (err) {
-      toast('Error de conexión con el backend', 'error')
+      toast(t('generation.connectionError'), 'error')
     } finally {
       setDownloading(false)
     }
@@ -74,12 +76,12 @@ export function GenerationResultPanel({ result, projectId }: Props) {
     try {
       const { baseUrl } = readBackendConfig()
       const cleanBase = baseUrl?.replace(/\/$/, '')
-      const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
+      const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('doapi-jwt-token') : null
 
       const res = await fetch(`${cleanBase}/projects/${projectId}/export`, {
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       })
-      if (!res.ok) throw new Error('Error al exportar')
+      if (!res.ok) throw new Error(t('generation.exportError'))
 
       const data = await res.json()
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -88,9 +90,9 @@ export function GenerationResultPanel({ result, projectId }: Props) {
       link.download = `${projectId}-export.json`
       link.click()
       URL.revokeObjectURL(link.href)
-      toast('Proyecto exportado correctamente', 'info')
+      toast(t('generation.exportSuccess'), 'info')
     } catch (err) {
-      toast('Error al exportar el proyecto', 'error')
+      toast(t('generation.exportFail'), 'error')
     } finally {
       setExporting(false)
     }
@@ -105,7 +107,7 @@ export function GenerationResultPanel({ result, projectId }: Props) {
       const data = JSON.parse(text)
       const { baseUrl } = readBackendConfig()
       const cleanBase = baseUrl?.replace(/\/$/, '')
-      const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
+      const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('doapi-jwt-token') : null
 
       const res = await fetch(`${cleanBase}/projects/import`, {
         method: 'POST',
@@ -121,10 +123,10 @@ export function GenerationResultPanel({ result, projectId }: Props) {
         throw new Error(errText)
       }
 
-      toast('Proyecto importado correctamente. Recarga la pagina para verlo.', 'success')
+      toast(t('generation.importSuccess'), 'success')
       if (fileInputRef.current) fileInputRef.current.value = ''
     } catch (err) {
-      toast(`Error al importar: ${err instanceof Error ? err.message : 'Formato invalido'}`, 'error')
+      toast(t('generation.importError').replace('{msg}', err instanceof Error ? err.message : t('generation.invalidFormat')), 'error')
     }
   }
 
@@ -140,21 +142,21 @@ export function GenerationResultPanel({ result, projectId }: Props) {
               <div className="stack-badge">
                 {result.stack === 'fastapi' ? ' Python' : ' Node.js'}
               </div>
-              <h3>Código Fuente Completo</h3>
+              <h3>{t('generation.sourceCode')}</h3>
             </div>
-            <p className="card-desc">Proyecto estructurado con modelos, rutas y Docker.</p>
+            <p className="card-desc">{t('generation.sourceCodeDesc')}</p>
             <button
               type="button"
               className="btn primary btn-full btn-large"
               onClick={handleDownload}
               disabled={downloading}
             >
-              {downloading ? 'Generando ZIP...' : ' Descargar Bundle (.zip)'}
+              {downloading ? t('generation.generatingZip') : t('generation.downloadBundle')}
             </button>
           </div>
 
           <div className="deploy-card sandbox-card">
-            <p className="label">Sandbox Base URL</p>
+            <p className="label">{t('generation.sandboxUrl')}</p>
             <div className="url-display">
               <code>{baseUrl}/...</code>
               <button className="copy-icon-btn" onClick={() => handleCopy(baseUrl)}>
@@ -163,13 +165,13 @@ export function GenerationResultPanel({ result, projectId }: Props) {
             </div>
             <div className="card-footer-actions">
               <a className="btn ghost btn-small" href={result.docsUrl} target="_blank" rel="noreferrer">
-                 Ver Documentación (Redoc)
+                {t('generation.viewDocs')}
               </a>
             </div>
           </div>
 
           <div className="deploy-card deploy-options-card">
-            <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.9rem' }}>Despliegue 1-click</h3>
+            <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.9rem' }}>{t('generation.oneClickDeploy')}</h3>
             <div className="deploy-options">
               <div className="deploy-option">
                 <div className="deploy-option__icon">
@@ -177,7 +179,7 @@ export function GenerationResultPanel({ result, projectId }: Props) {
                 </div>
                 <div className="deploy-option__info">
                   <strong>Railway</strong>
-                  <p>Conecta tu repo de GitHub y Railway detecta automaticamente el Dockerfile.</p>
+                  <p>{t('generation.railwayDesc')}</p>
                 </div>
                 <button className="btn ghost btn-sm" onClick={() => handleCopy('railway up')}>railway up</button>
               </div>
@@ -187,9 +189,9 @@ export function GenerationResultPanel({ result, projectId }: Props) {
                 </div>
                 <div className="deploy-option__info">
                   <strong>Render</strong>
-                  <p>Usa el archivo <code>deploy/render.yaml</code> incluido en el bundle para deploy automatizado.</p>
+                  <p>{t('generation.renderDesc')}</p>
                 </div>
-                <a className="btn ghost btn-sm" href="https://render.com/docs/deploy-blueprint" target="_blank" rel="noreferrer">Blueprint</a>
+                <a className="btn ghost btn-sm" href="https://render.com/docs/deploy-blueprint" target="_blank" rel="noreferrer">{t('generation.blueprint')}</a>
               </div>
               <div className="deploy-option">
                 <div className="deploy-option__icon">
@@ -197,24 +199,24 @@ export function GenerationResultPanel({ result, projectId }: Props) {
                 </div>
                 <div className="deploy-option__info">
                   <strong>Docker Compose</strong>
-                  <p>Usa <code>docker compose up -d</code> para levantar localmente con PostgreSQL.</p>
+                  <p>{t('generation.composeDesc')}</p>
                 </div>
-                <button className="btn ghost btn-sm" onClick={() => handleCopy('docker compose up -d')}>Copiar</button>
+                <button className="btn ghost btn-sm" onClick={() => handleCopy('docker compose up -d')}>{t('generation.copy')}</button>
               </div>
             </div>
           </div>
 
           <div className="deploy-card export-card">
-            <h3 style={{ margin: '0 0 0.5rem', fontSize: '0.9rem' }}>Exportar / Importar Proyecto</h3>
+            <h3 style={{ margin: '0 0 0.5rem', fontSize: '0.9rem' }}>{t('generation.exportImport')}</h3>
             <p className="card-desc" style={{ fontSize: '0.8rem', marginBottom: '0.75rem' }}>
-              Exporta el proyecto completo como JSON para compartirlo o importarlo en otra instancia.
+              {t('generation.exportImportDesc')}
             </p>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button type="button" className="btn ghost btn-small" onClick={handleExport} disabled={exporting}>
-                {exporting ? 'Exportando...' : ' Exportar JSON'}
+                {exporting ? t('generation.exporting') : t('generation.exportJson')}
               </button>
               <button type="button" className="btn ghost btn-small" onClick={() => fileInputRef.current?.click()}>
-                 Importar JSON
+                {t('generation.importJson')}
               </button>
               <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
             </div>
@@ -223,29 +225,29 @@ export function GenerationResultPanel({ result, projectId }: Props) {
 
         {/* Right: Steps */}
         <div className="deploy-steps-panel">
-          <h4 className="steps-title"> Guía de Despliegue</h4>
+          <h4 className="steps-title">{t('generation.deployGuide')}</h4>
           <div className="step-item">
             <div className="step-circle">1</div>
             <div className="step-content">
-              <strong>Descomprimir</strong>
-              <p>Extrae el ZIP en tu carpeta de proyectos.</p>
+              <strong>{t('generation.step1Title')}</strong>
+              <p>{t('generation.step1Desc')}</p>
             </div>
           </div>
           <div className="step-item">
             <div className="step-circle">2</div>
             <div className="step-content">
-              <strong>Instalar y Lanzar</strong>
+              <strong>{t('generation.step2Title')}</strong>
               <div className="code-block">
                 <code>./setup.sh</code>
                 <button onClick={() => handleCopy('./setup.sh')}></button>
               </div>
-              <p className="muted-text-tiny" style={{ marginTop: '4px' }}>Si falla, usa: <code>bash setup.sh</code></p>
+              <p className="muted-text-tiny" style={{ marginTop: '4px' }}>{t('generation.step2Hint')} <code>bash setup.sh</code></p>
             </div>
           </div>
           <div className="step-item">
             <div className="step-circle">3</div>
             <div className="step-content">
-              <strong>Docker Compose</strong>
+              <strong>{t('generation.step3Title')}</strong>
               <div className="code-block">
                 <code>docker compose up -d</code>
                 <button onClick={() => handleCopy('docker compose up -d')}></button>

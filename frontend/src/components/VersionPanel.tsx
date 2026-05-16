@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { readBackendConfig } from '../lib/backendConfig'
 
 interface ProjectVersion {
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function VersionPanel({ projectId }: Props) {
+  const { t } = useTranslation()
   const [versions, setVersions] = useState<ProjectVersion[]>([])
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
@@ -22,7 +24,7 @@ export function VersionPanel({ projectId }: Props) {
   const [success, setSuccess] = useState<string | null>(null)
 
   const getHeaders = useCallback(() => {
-    const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
+    const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('doapi-jwt-token') : null
     return {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -49,35 +51,35 @@ export function VersionPanel({ projectId }: Props) {
         method: 'POST', headers: getHeaders(),
         body: JSON.stringify({ message }),
       })
-      if (!res.ok) { setError('Error al crear version'); return }
+      if (!res.ok) { setError(t('versionPanel.createError')); return }
       setMessage('')
-      setSuccess('Version creada correctamente')
+      setSuccess(t('versionPanel.createSuccess'))
       await fetchVersions()
-    } catch { setError('Error de conexion') }
+    } catch { setError(t('versionPanel.connectionError')) }
     finally { setSaving(false) }
   }
 
   const handleRestore = async (versionId: string) => {
-    if (!confirm('Restaurar esta version sobrescribira el proyecto actual. Continuar?')) return
+    if (!confirm(t('versionPanel.confirmRestore'))) return
     setRestoring(versionId); setError(null); setSuccess(null)
     try {
       const res = await fetch(`${apiUrl}/${versionId}/restore`, {
         method: 'POST', headers: getHeaders(),
       })
-      if (!res.ok) { setError('Error al restaurar'); return }
+      if (!res.ok) { setError(t('versionPanel.restoreError')); return }
       const data = await res.json()
-      setSuccess(data.message || 'Version restaurada. Recarga la pagina.')
+      setSuccess(data.message || t('versionPanel.restoreSuccess'))
       await fetchVersions()
-    } catch { setError('Error de conexion') }
+    } catch { setError(t('versionPanel.connectionError')) }
     finally { setRestoring(null) }
   }
 
-  if (loading) return <p className="muted-text">Cargando versiones...</p>
+  if (loading) return <p className="muted-text">{t('versionPanel.loading')}</p>
 
   return (
     <div className="version-panel">
       <p className="version-panel__desc">
-        Crea instantaneas del proyecto para poder volver a estados anteriores. Cada version guarda datasets, endpoints y configuracion.
+        {t('versionPanel.description')}
       </p>
 
       {/* Create version */}
@@ -85,12 +87,12 @@ export function VersionPanel({ projectId }: Props) {
         <input
           value={message}
           onChange={e => setMessage(e.target.value)}
-          placeholder="Descripcion de esta version (ej: 'Agregue campo email')"
+          placeholder={t('versionPanel.placeholder')}
           className="field"
           style={{ flex: 1, padding: '0.45rem 0.6rem', fontSize: '0.85rem' }}
         />
         <button type="button" className="btn primary" onClick={handleCreate} disabled={saving}>
-          {saving ? 'Guardando...' : 'Guardar version'}
+          {saving ? t('versionPanel.saving') : t('versionPanel.saveVersion')}
         </button>
       </div>
 
@@ -101,7 +103,7 @@ export function VersionPanel({ projectId }: Props) {
       <div className="version-list">
         {versions.length === 0 ? (
           <p className="muted-text" style={{ textAlign: 'center', padding: '1.5rem' }}>
-            No hay versiones guardadas. Crea la primera para empezar el historial.
+            {t('versionPanel.noVersions')}
           </p>
         ) : (
           versions.map((v, i) => {
@@ -111,7 +113,7 @@ export function VersionPanel({ projectId }: Props) {
                 <div className="version-item__head">
                   <div className="version-item__info">
                     <span className="version-item__badge">v{v.version}</span>
-                    {isLatest && <span className="version-item__latest">Actual</span>}
+                    {isLatest && <span className="version-item__latest">{t('versionPanel.current')}</span>}
                     <span className="version-item__date">
                       {new Date(v.created_at).toLocaleString()}
                     </span>
@@ -124,7 +126,7 @@ export function VersionPanel({ projectId }: Props) {
                         onClick={() => handleRestore(v.id)}
                         disabled={restoring === v.id}
                       >
-                        {restoring === v.id ? 'Restaurando...' : 'Restaurar'}
+                        {restoring === v.id ? t('versionPanel.restoring') : t('versionPanel.restore')}
                       </button>
                     )}
                   </div>

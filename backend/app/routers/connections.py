@@ -29,7 +29,7 @@ from ..models import (
 )
 from ..security import CurrentUser, get_current_user_from_header, require_connection_access, require_project_access
 
-logger = logging.getLogger("apimaker.connections")
+logger = logging.getLogger("doapi.connections")
 router = APIRouter(prefix="/api/connections", tags=["connections"])
 
 # ── Password encryption ──
@@ -163,7 +163,7 @@ def test_connection(connection_id: str, session: Session = Depends(get_session),
             result = c.execute(text("SELECT version()"))
             version = result.scalar() or ""
         engine.dispose()
-        return TestConnectionResult(success=True, message="Conexion exitosa", server_version=str(version)[:100])
+        return TestConnectionResult(success=True, message="Connection successful", server_version=str(version)[:100])
     except Exception as e:
         return TestConnectionResult(success=False, message=str(e)[:200])
 

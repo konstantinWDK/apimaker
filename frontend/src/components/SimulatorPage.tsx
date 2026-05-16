@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ApiPlayground } from './ApiPlayground'
 import { useProjectBuilder } from '../hooks/useProjectBuilder'
 import { apiFetch } from '../lib/api'
@@ -14,6 +15,7 @@ interface Deployment {
 }
 
 export function SimulatorPage() {
+  const { t } = useTranslation()
   const { project, startMock, mockRunning, mockLoading, mockError } = useProjectBuilder()
   const [selectedDatasetId, setSelectedDatasetId] = useState<string | undefined>(
     project.datasets[0]?.id
@@ -38,22 +40,22 @@ export function SimulatorPage() {
   return (
     <div className="simulator-page">
       <div className="simulator-page__header">
-        <p className="simulator-page__eyebrow">API Simulator</p>
+        <p className="simulator-page__eyebrow">{t('simulator.eyebrow')}</p>
         <h1 className="simulator-page__title">
-          Probando <span>{project.name || 'Nuevo Proyecto'}</span>
+          {t('simulator.title')} <span>{project.name || t('simulator.newProject')}</span>
         </h1>
         {project.datasets.length > 0 && (
           <div className="simulator-page__dataset-select">
-            <label className="simulator-page__dataset-label">Dataset activo</label>
+            <label className="simulator-page__dataset-label">{t('simulator.activeDataset')}</label>
             <select
               className="simulator-page__dataset-dropdown"
               value={selectedDatasetId || ''}
               onChange={e => setSelectedDatasetId(e.target.value || undefined)}
             >
-              <option value="">Todos los datasets</option>
+              <option value="">{t('simulator.allDatasets')}</option>
               {project.datasets.map(ds => (
                 <option key={ds.id} value={ds.id}>
-                  {ds.name} ({ds.fields.length} campos, {(ds.sampleRows || []).length} filas)
+                  {ds.name} ({ds.fields.length} {t('simulator.fields')}, {(ds.sampleRows || []).length} {t('simulator.rows')})
                 </option>
               ))}
             </select>
@@ -63,13 +65,13 @@ export function SimulatorPage() {
 
       {runningDeployments.length > 0 && (
         <div className="sim-deployments">
-          <div className="sim-deployments__label">Despliegues activos</div>
+          <div className="sim-deployments__label">{t('simulator.activeDeployments')}</div>
           <div className="sim-deployments__list">
             <button
               className={`sim-deployments__item${!activeDeploymentUrl ? ' active' : ''}`}
               onClick={() => setActiveDeploymentUrl(null)}
             >
-              Mock local
+              {t('simulator.localMock')}
             </button>
             {runningDeployments.map(dep => (
               <button

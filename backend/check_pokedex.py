@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 # Path relative to the script execution point
-db_path = Path("backend/app/data/apimaker.db").absolute()
+db_path = Path("backend/app/data/doapi.db").absolute()
 engine = create_engine(f"sqlite:///{db_path}")
 
 with Session(engine) as session:

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { GeneratedEndpoint } from '../types/schemas'
 
 interface Props {
@@ -16,7 +17,9 @@ const methodColors: Record<string, string> = {
 }
 
 export function EndpointGallery({ endpoints, baseUrl, authMethod, apiKey }: Props) {
-  if (!endpoints.length) return <p className="muted-text">Añade endpoints para ver el resumen aquí.</p>
+  const { t } = useTranslation()
+
+  if (!endpoints.length) return <p className="muted-text">{t('gallery.empty')}</p>
 
   return (
     <div className="endpoint-gallery">
@@ -45,15 +48,15 @@ export function EndpointGallery({ endpoints, baseUrl, authMethod, apiKey }: Prop
             <p className="endpoint-card__description">{endpoint.description}</p>
             
             <details className="endpoint-card__curl">
-              <summary>Ver ejemplo curl</summary>
+              <summary>{t('gallery.viewCurl')}</summary>
               <pre className="preview-json" style={{ fontSize: '0.7rem', marginTop: '0.4rem', padding: '0.5rem' }}>
                 {curl}
               </pre>
               <p className="muted-text" style={{ fontSize: '0.65rem', marginTop: '0.2rem' }}>
-                {endpoint.method === 'GET' ? 'Obtiene datos del servidor.' : 
-                 endpoint.method === 'POST' ? 'Crea un nuevo registro enviando un JSON en el body.' :
-                 endpoint.method === 'PUT' ? 'Actualiza un registro existente enviando el objeto completo.' :
-                 'Interacción directa con la API.'}
+                {endpoint.method === 'GET' ? t('gallery.getDesc') : 
+                 endpoint.method === 'POST' ? t('gallery.createDesc') :
+                 endpoint.method === 'PUT' ? t('gallery.updateDesc') :
+                 t('gallery.customDesc')}
               </p>
             </details>
           </article>

@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning'
 
@@ -39,8 +40,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         addToast(detail.message, detail.type || 'info')
       }
     }
-    window.addEventListener('apimaker-toast', handler)
-    return () => window.removeEventListener('apimaker-toast', handler)
+    window.addEventListener('doapi-toast', handler)
+    return () => window.removeEventListener('doapi-toast', handler)
   }, [addToast])
 
   return (
@@ -59,10 +60,11 @@ export function useToast() {
 
 /** Dispatch a toast event from non-React code (zustand store, etc.) */
 export function fireToast(message: string, type: ToastType = 'info') {
-  window.dispatchEvent(new CustomEvent('apimaker-toast', { detail: { message, type } }))
+  window.dispatchEvent(new CustomEvent('doapi-toast', { detail: { message, type } }))
 }
 
 function ToastContainer() {
+  const { t } = useTranslation()
   const ctx = useContext(ToastContext)
   if (!ctx) return null
   const { toasts, removeToast } = ctx
@@ -73,7 +75,7 @@ function ToastContainer() {
         <div key={toast.id} className={`toast toast-${toast.type}`}>
           <span className="toast-message">{toast.message}</span>
           <button type="button" className="toast-close" onClick={() => removeToast(toast.id)}>
-            ×
+            {t('toast.close')}
           </button>
         </div>
       ))}

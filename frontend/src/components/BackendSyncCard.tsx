@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import type { ProjectDraft } from '../types/schemas'
 import { syncProjectWithBackend } from '../lib/api'
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export function BackendSyncCard({ project, onSynced }: Props) {
+  const { t } = useTranslation()
   const { config } = useBackendConfig()
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [message, setMessage] = useState<string | null>(null)
@@ -26,10 +28,10 @@ export function BackendSyncCard({ project, onSynced }: Props) {
       const result = await syncProjectWithBackend(project)
       onSynced(result.remoteId)
       setStatus('success')
-      setMessage('Proyecto sincronizado con el backend')
+      setMessage(t('backendSync.synced'))
     } catch (error) {
       setStatus('error')
-      setMessage(error instanceof Error ? error.message : 'No se pudo sincronizar el proyecto')
+      setMessage(error instanceof Error ? error.message : t('backendSync.syncFailed'))
     }
   }
 
@@ -38,22 +40,22 @@ export function BackendSyncCard({ project, onSynced }: Props) {
   return (
     <div className="backend-sync">
       <p className="muted-text">
-        Sincroniza el proyecto con tu backend FastAPI para acceder a los endpoints permanentes y la UI de documentación.
+        {t('backendSync.description')}
       </p>
       <div className="backend-sync__actions">
         <button type="button" className="btn primary" onClick={handleSync} disabled={!isConfigured || status === 'loading'}>
-          {status === 'loading' ? 'Sincronizando...' : 'Sincronizar con backend'}
+          {status === 'loading' ? t('backendSync.syncing') : t('backendSync.syncButton')}
         </button>
-        {!isConfigured ? <p className="muted-text">Configura la URL del backend en la pestaña Información.</p> : null}
+        {!isConfigured ? <p className="muted-text">{t('backendSync.notConfigured')}</p> : null}
       </div>
       {message ? <p className={status === 'error' ? 'error-text' : 'success-text'}>{message}</p> : null}
       {docsUrl ? (
         <div className="backend-sync__links">
           <a className="link" href={docsUrl} target="_blank" rel="noreferrer">
-            Ver documentación (Redoc)
+            {t('backendSync.viewDocs')}
           </a>
           <a className="link" href={openapiUrl ?? undefined} target="_blank" rel="noreferrer">
-            Descargar openapi.json
+            {t('backendSync.downloadOpenapi')}
           </a>
         </div>
       ) : null}

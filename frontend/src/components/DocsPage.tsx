@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 const METHOD_COLORS: Record<string, string> = {
   GET: '#0ea5e9', POST: '#10b981', PUT: '#f59e0b', PATCH: '#a855f7', DELETE: '#f43f5e',
@@ -6,51 +7,51 @@ const METHOD_COLORS: Record<string, string> = {
 
 type DocTab = 'overview' | 'tutorial' | 'cli' | 'codigo' | 'desplegar'
 
-const TABS: { id: DocTab; label: string; icon: string }[] = [
-  { id: 'overview', label: 'Visión General', icon: '★' },
-  { id: 'tutorial', label: 'Tutorial', icon: '✓' },
-  { id: 'cli', label: 'CLI', icon: '⌘' },
-  { id: 'codigo', label: 'Código', icon: '</>' },
-  { id: 'desplegar', label: 'Desplegar', icon: '▲' },
-]
-
-const CLI_SECTIONS = [
-  { id: 'cli-install', label: 'Instalación' },
-  { id: 'cli-deploy', label: 'apimaker deploy' },
-  { id: 'cli-serve', label: 'apimaker serve' },
-  { id: 'cli-init', label: 'apimaker init' },
-  { id: 'cli-ssh', label: 'Deploy remoto (SSH)' },
-]
-
 export function DocsPage() {
+  const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<DocTab>('overview')
   const [activeSection, setActiveSection] = useState('')
+
+  const TABS: { id: DocTab; label: string; icon: string }[] = [
+    { id: 'overview', label: t('docs.tabOverview'), icon: '★' },
+    { id: 'tutorial', label: t('docs.tabTutorial'), icon: '✓' },
+    { id: 'cli', label: t('docs.tabCli'), icon: '⌘' },
+    { id: 'codigo', label: t('docs.tabCode'), icon: '</>' },
+    { id: 'desplegar', label: t('docs.tabDeploy'), icon: '▲' },
+  ]
+
+  const CLI_SECTIONS = [
+    { id: 'cli-install', label: t('docs.cliInstall') },
+    { id: 'cli-deploy', label: t('docs.cliDeploy') },
+    { id: 'cli-serve', label: t('docs.cliServe') },
+    { id: 'cli-init', label: t('docs.cliInit') },
+    { id: 'cli-ssh', label: t('docs.cliSsh') },
+  ]
 
   const renderOverview = () => (
     <div>
       <div className="info-hero" style={{ marginBottom: '1.5rem' }}>
         <div className="info-hero__content">
-          <h1 className="info-hero__title">API Maker</h1>
+          <h1 className="info-hero__title">DoApi</h1>
           <p className="info-hero__subtitle">
-            Constructor de APIs visual y open source. Define datasets, diseña endpoints y genera código
-            listo para producción en FastAPI, Express o NestJS.
+            {t('docs.overviewSubtitle')}
           </p>
           <div className="info-hero__stats">
             <div className="info-hero__stat">
               <span className="info-hero__stat-value">3</span>
-              <span className="info-hero__stat-label">Stacks</span>
+              <span className="info-hero__stat-label">{t('docs.stacks')}</span>
             </div>
             <div className="info-hero__stat">
               <span className="info-hero__stat-value">30+</span>
-              <span className="info-hero__stat-label">Endpoints API</span>
+              <span className="info-hero__stat-label">{t('docs.endpointsApi')}</span>
             </div>
             <div className="info-hero__stat">
               <span className="info-hero__stat-value">2</span>
-              <span className="info-hero__stat-label">SDKs</span>
+              <span className="info-hero__stat-label">{t('docs.sdks')}</span>
             </div>
             <div className="info-hero__stat">
               <span className="info-hero__stat-value">1</span>
-              <span className="info-hero__stat-label">Comando</span>
+              <span className="info-hero__stat-label">{t('docs.command')}</span>
             </div>
           </div>
         </div>
@@ -58,61 +59,61 @@ export function DocsPage() {
 
       <div className="info-grid">
         <div className="info-card">
-          <h3 className="info-card__title">Datasets</h3>
-          <p className="info-card__desc">Define esquemas con tipos, relaciones y datos de ejemplo. Importa desde CSV, Excel o base de datos externa.</p>
+          <h3 className="info-card__title">{t('docs.datasetsTitle')}</h3>
+          <p className="info-card__desc">{t('docs.datasetsDesc')}</p>
         </div>
         <div className="info-card">
-          <h3 className="info-card__title">Endpoints REST</h3>
-          <p className="info-card__desc">CRUD automático + rutas personalizadas vinculadas a datasets. GET, POST, PUT, PATCH y DELETE.</p>
+          <h3 className="info-card__title">{t('docs.endpointsRestTitle')}</h3>
+          <p className="info-card__desc">{t('docs.endpointsRestDesc')}</p>
         </div>
         <div className="info-card">
-          <h3 className="info-card__title">Generación de código</h3>
-          <p className="info-card__desc">Bundle listo para producción con modelos, controladores, seguridad, Docker y SDKs en TypeScript y Python.</p>
+          <h3 className="info-card__title">{t('docs.codeGenTitle')}</h3>
+          <p className="info-card__desc">{t('docs.codeGenDesc')}</p>
         </div>
         <div className="info-card">
-          <h3 className="info-card__title">Mock server</h3>
-          <p className="info-card__desc">Simula tu API en tiempo real con datos persistentes en base de datos, filtros y autenticación.</p>
+          <h3 className="info-card__title">{t('docs.mockServerTitle')}</h3>
+          <p className="info-card__desc">{t('docs.mockServerDesc')}</p>
         </div>
         <div className="info-card">
-          <h3 className="info-card__title">CLI Deploy</h3>
-          <p className="info-card__desc">Despliega tu API en cualquier servidor con un solo comando. Exporta, sirve o despliega vía SSH sin depender de la UI.</p>
+          <h3 className="info-card__title">{t('docs.cliDeployTitle')}</h3>
+          <p className="info-card__desc">{t('docs.cliDeployDesc')}</p>
         </div>
         <div className="info-card">
-          <h3 className="info-card__title">Share Links</h3>
-          <p className="info-card__desc">Snapshots de solo lectura con contraseña y expiración. Comparte tu API documentada sin exponer el editor.</p>
+          <h3 className="info-card__title">{t('docs.shareLinksTitle')}</h3>
+          <p className="info-card__desc">{t('docs.shareLinksDesc')}</p>
         </div>
       </div>
 
       <div className="docs-section" id="arquitectura">
-        <h2 className="docs-section__title">Arquitectura</h2>
+        <h2 className="docs-section__title">{t('docs.architecture')}</h2>
         <div className="info-stacks">
           <div className="info-stack">
             <div className="info-stack__head">
               <span className="info-stack__dot" style={{ background: '#6366f1' }} />
-              <strong>Modelos / Schemas</strong>
+              <strong>{t('docs.modelsSchemas')}</strong>
             </div>
-            <p className="info-stack__desc">Define datasets con tipos, validaciones y relaciones. Se traducen a SQLModel, Sequelize o TypeORM según el stack.</p>
+            <p className="info-stack__desc">{t('docs.modelsSchemasDesc')}</p>
           </div>
           <div className="info-stack">
             <div className="info-stack__head">
               <span className="info-stack__dot" style={{ background: '#0ea5e9' }} />
-              <strong>Controladores / Routers</strong>
+              <strong>{t('docs.controllers')}</strong>
             </div>
-            <p className="info-stack__desc">Endpoints REST con CRUD completo y rutas personalizadas. Parámetros dinámicos {'{id}'} y vinculación directa a datasets.</p>
+            <p className="info-stack__desc">{t('docs.controllersDesc')}</p>
           </div>
           <div className="info-stack">
             <div className="info-stack__head">
               <span className="info-stack__dot" style={{ background: '#10b981' }} />
-              <strong>Seguridad</strong>
+              <strong>{t('docs.security')}</strong>
             </div>
-            <p className="info-stack__desc">JWT con tokens de acceso (24h) y refresh (7 días). API Key opcional. Rate limiting configurable.</p>
+            <p className="info-stack__desc">{t('docs.securityDesc')}</p>
           </div>
           <div className="info-stack">
             <div className="info-stack__head">
               <span className="info-stack__dot" style={{ background: '#f59e0b' }} />
-              <strong>Despliegue</strong>
+              <strong>{t('docs.deployment')}</strong>
             </div>
-            <p className="info-stack__desc">Docker Compose multi-etapa, seeds automáticos, health checks y CI/CD incluidos en el bundle generado.</p>
+            <p className="info-stack__desc">{t('docs.deploymentDesc')}</p>
           </div>
         </div>
       </div>
@@ -122,38 +123,38 @@ export function DocsPage() {
   const renderTutorial = () => (
     <div>
       <div className="docs-header">
-        <h1 className="docs-header__title">Tutorial paso a paso</h1>
-        <p className="docs-header__desc">Crea tu primera API en 10 pasos. Ejemplo práctico: API de usuarios de un banco.</p>
+        <h1 className="docs-header__title">{t('docs.tutorialTitle')}</h1>
+        <p className="docs-header__desc">{t('docs.tutorialDesc')}</p>
       </div>
 
       {[
         {
-          num: 1, title: 'Instala API Maker',
-          desc: 'Ejecuta el instalador desde la terminal. Detectará conflictos de puertos y generará scripts de arranque personalizados:',
-          code: './install.sh\n\n# El Setup Wizard te guía:\n# - Usuario admin (por defecto: admin / admin)\n# - BD: SQLite o PostgreSQL (con gestión de puertos)\n# - Generación automática de start.sh / start.bat',
+          num: 1, title: t('docs.tutorialStep1Title'),
+          desc: t('docs.tutorialStep1Desc'),
+          code: t('docs.tutorialStep1Code'),
         },
         {
-          num: 2, title: 'Arranca la aplicación',
-          desc: 'Usa el script generado para iniciar el Backend y Frontend de forma unificada con logs profesionales:',
-          code: './start.sh\n\n# Frontend: http://localhost:5173\n# Backend:  http://localhost:8000',
+          num: 2, title: t('docs.tutorialStep2Title'),
+          desc: t('docs.tutorialStep2Desc'),
+          code: t('docs.tutorialStep2Code'),
         },
         {
-          num: 3, title: 'Inicia sesión',
-          desc: 'Accede a http://localhost:5173 con las credenciales que configuraste en el wizard.',
-          code: 'Usuario: admin\nContraseña: admin',
+          num: 3, title: t('docs.tutorialStep3Title'),
+          desc: t('docs.tutorialStep3Desc'),
+          code: t('docs.tutorialStep3Code'),
         },
         {
-          num: 4, title: 'Configura tu proyecto',
-          desc: 'Define nombre, descripción y stack tecnológico desde el panel Editor.',
+          num: 4, title: t('docs.tutorialStep4Title'),
+          desc: t('docs.tutorialStep4Desc'),
           fields: [
-            { label: 'Nombre', value: 'API Usuarios Banco' },
-            { label: 'Descripción', value: 'API REST para gestión de clientes bancarios' },
-            { label: 'Stack', value: 'fastapi' },
+            { label: t('docs.tutorialFieldName'), value: 'API Usuarios Banco' },
+            { label: t('docs.tutorialFieldDesc'), value: t('docs.tutorialFieldDescValue') },
+            { label: t('docs.tutorialFieldStack'), value: 'fastapi' },
           ],
         },
         {
-          num: 5, title: 'Define el dataset',
-          desc: 'Ve a la pestaña "Datasets" y añade los campos del modelo. Puedes importar desde CSV, Excel o una BD externa:',
+          num: 5, title: t('docs.tutorialStep5Title'),
+          desc: t('docs.tutorialStep5Desc'),
           table: [
             { name: 'id_cliente', type: 'integer', req: true },
             { name: 'nombre', type: 'string', req: true },
@@ -165,36 +166,36 @@ export function DocsPage() {
           ],
         },
         {
-          num: 6, title: 'Diseña los endpoints',
-          desc: 'En la pestaña "Endpoints" añade las rutas REST. Cada endpoint se vincula a un dataset:',
+          num: 6, title: t('docs.tutorialStep6Title'),
+          desc: t('docs.tutorialStep6Desc'),
           endpoints: [
-            { method: 'GET', path: '/clientes', summary: 'Listar todos los clientes' },
-            { method: 'GET', path: '/clientes/{id}', summary: 'Obtener un cliente por ID' },
-            { method: 'POST', path: '/clientes', summary: 'Crear un nuevo cliente' },
-            { method: 'PUT', path: '/clientes/{id}', summary: 'Actualizar un cliente' },
-            { method: 'DELETE', path: '/clientes/{id}', summary: 'Eliminar un cliente' },
+            { method: 'GET', path: '/clientes', summary: t('docs.tutorialEpList') },
+            { method: 'GET', path: '/clientes/{id}', summary: t('docs.tutorialEpGet') },
+            { method: 'POST', path: '/clientes', summary: t('docs.tutorialEpCreate') },
+            { method: 'PUT', path: '/clientes/{id}', summary: t('docs.tutorialEpUpdate') },
+            { method: 'DELETE', path: '/clientes/{id}', summary: t('docs.tutorialEpDelete') },
           ],
         },
         {
-          num: 7, title: 'Prueba en el Simulador',
-          desc: 'En la pestaña "Simulador", lanza el mock server y prueba tus endpoints con datos realistas generados automáticamente.',
+          num: 7, title: t('docs.tutorialStep7Title'),
+          desc: t('docs.tutorialStep7Desc'),
         },
         {
-          num: 8, title: 'Configura Seguridad',
-          desc: 'Elige autenticación (JWT, API Key), rate limiting y configura secretos. Todo se incluye en el código generado.',
+          num: 8, title: t('docs.tutorialStep8Title'),
+          desc: t('docs.tutorialStep8Desc'),
         },
         {
-          num: 9, title: 'Genera la API',
-          desc: 'Pulsa "Guardar y lanzar API" para sincronizar con el backend y obtener URL del sandbox, docs Redoc y share link.',
+          num: 9, title: t('docs.tutorialStep9Title'),
+          desc: t('docs.tutorialStep9Desc'),
         },
         {
-          num: 10, title: 'Descarga el bundle',
-          desc: 'En la pestaña "API generada" encontrarás el bundle .zip con código listo para producción: modelos, controladores, Docker, seeds, tests y SDKs.',
+          num: 10, title: t('docs.tutorialStep10Title'),
+          desc: t('docs.tutorialStep10Desc'),
         },
         {
-          num: 11, title: 'Despliega a producción',
-          desc: 'Usa el CLI, Docker o tu plataforma favorita para poner tu API en producción.',
-          code: '# Docker (recomendado)\ndocker compose up -d --build\n\n# CLI Deploy\napimaker deploy proyecto.json --port 80\n\n# O manual\npip install -r requirements.txt\nuvicorn main:app --host 0.0.0.0 --port 8000',
+          num: 11, title: t('docs.tutorialStep11Title'),
+          desc: t('docs.tutorialStep11Desc'),
+          code: '# Docker (recomendado)\ndocker compose up -d --build\n\n# CLI Deploy\ndoapi deploy proyecto.json --port 80\n\n# O manual\npip install -r requirements.txt\nuvicorn main:app --host 0.0.0.0 --port 8000',
         },
       ].map((step) => (
         <div key={step.num} className="info-step" style={{ marginBottom: '0.75rem' }}>
@@ -215,11 +216,11 @@ export function DocsPage() {
             )}
             {step.table && (
               <table className="docs-tutorial-table">
-                <thead><tr><th>Campo</th><th>Tipo</th><th>Requerido</th></tr></thead>
+                <thead><tr><th>{t('docs.tutorialTableField')}</th><th>{t('docs.tutorialTableType')}</th><th>{t('docs.tutorialTableRequired')}</th></tr></thead>
                 <tbody>
                   {step.table.map((f) => (
                     <tr key={f.name}>
-                      <td><code>{f.name}</code></td><td>{f.type}</td><td>{f.req ? 'Sí' : '—'}</td>
+                      <td><code>{f.name}</code></td><td>{f.type}</td><td>{f.req ? t('docs.yes') : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -245,61 +246,60 @@ export function DocsPage() {
   const renderCli = () => (
     <div>
       <div className="docs-header">
-        <h1 className="docs-header__title">CLI — Apimaker</h1>
+        <h1 className="docs-header__title">{t('docs.cliPageTitle')}</h1>
         <p className="docs-header__desc">
-          La interfaz de línea de comandos permite desplegar, servir y exportar proyectos de API Maker
-          desde cualquier entorno, sin depender de la interfaz gráfica.
+          {t('docs.cliPageDesc')}
         </p>
       </div>
 
       <div className="docs-section" id="cli-install">
-        <h2 className="docs-section__title">Instalación</h2>
+        <h2 className="docs-section__title">{t('docs.cliInstall')}</h2>
         <p className="docs-section__text">
-          El CLI viene incluido en el paquete <code className="docs-code--inline">apimaker-backend</code>.
+          {t('docs.cliInstallDesc')} <code className="docs-code--inline">doapi-backend</code>.
         </p>
-        <div className="docs-code">pip install apimaker-backend</div>
-        <div className="docs-code">apimaker --help</div>
+        <div className="docs-code">pip install doapi-backend</div>
+        <div className="docs-code">doapi --help</div>
       </div>
 
       <div className="docs-section" id="cli-deploy">
-        <h2 className="docs-section__title">apimaker deploy</h2>
-        <p className="docs-section__text">Despliega un proyecto exportado como API independiente. Lee el JSON, crea la DB, importa datos y levanta el servidor.</p>
-        <div className="docs-code">apimaker deploy &lt;archivo.json&gt; [opciones]</div>
+        <h2 className="docs-section__title">{t('docs.cliDeploy')}</h2>
+        <p className="docs-section__text">{t('docs.cliDeployDesc')}</p>
+        <div className="docs-code">doapi deploy &lt;archivo.json&gt; [opciones]</div>
         <table className="docs-table">
-          <thead><tr><th>Opción</th><th>Default</th><th>Descripción</th></tr></thead>
+          <thead><tr><th>{t('docs.cliOption')}</th><th>{t('docs.cliDefault')}</th><th>{t('docs.cliDescription')}</th></tr></thead>
           <tbody>
-            <tr><td><code className="docs-code--inline">--port</code></td><td>8080</td><td>Puerto del servidor</td></tr>
-            <tr><td><code className="docs-code--inline">--host</code></td><td>0.0.0.0</td><td>Host de escucha</td></tr>
-            <tr><td><code className="docs-code--inline">--db</code></td><td>SQLite</td><td>URL de base de datos</td></tr>
-            <tr><td><code className="docs-code--inline">--ssh</code></td><td>-</td><td>Destino SSH para deploy remoto</td></tr>
+            <tr><td><code className="docs-code--inline">--port</code></td><td>8080</td><td>{t('docs.cliPortDesc')}</td></tr>
+            <tr><td><code className="docs-code--inline">--host</code></td><td>0.0.0.0</td><td>{t('docs.cliHostDesc')}</td></tr>
+            <tr><td><code className="docs-code--inline">--db</code></td><td>SQLite</td><td>{t('docs.cliDbDesc')}</td></tr>
+            <tr><td><code className="docs-code--inline">--ssh</code></td><td>-</td><td>{t('docs.cliSshDesc')}</td></tr>
           </tbody>
         </table>
-        <div className="docs-code"><span className="comment"># Exportar y desplegar</span>
-apimaker init pokedex-demo
-apimaker deploy pokedex-demo.json --port 8080
+        <div className="docs-code"><span className="comment">{t('docs.cliExportDeploy')}</span>
+doapi init pokedex-demo
+doapi deploy pokedex-demo.json --port 8080
 
-<span className="comment"># URLs limpias:</span>
-GET    /api/pokemon          <span className="comment"># Listar</span>
-GET    /api/pokemon/25       <span className="comment"># Detalle</span>
-POST   /api/pokemon          <span className="comment"># Crear</span></div>
+<span className="comment">{t('docs.cliCleanUrls')}</span>
+GET    /api/pokemon          <span className="comment">{t('docs.cliList')}</span>
+GET    /api/pokemon/25       <span className="comment">{t('docs.cliDetail')}</span>
+POST   /api/pokemon          <span className="comment">{t('docs.cliCreate')}</span></div>
       </div>
 
       <div className="docs-section" id="cli-serve">
-        <h2 className="docs-section__title">apimaker serve</h2>
-        <p className="docs-section__text">Sirve un proyecto existente de la DB del builder como API independiente en un puerto separado.</p>
-        <div className="docs-code">apimaker serve &lt;slug&gt; --port 8081</div>
+        <h2 className="docs-section__title">{t('docs.cliServe')}</h2>
+        <p className="docs-section__text">{t('docs.cliServeDesc')}</p>
+        <div className="docs-code">doapi serve &lt;slug&gt; --port 8081</div>
       </div>
 
       <div className="docs-section" id="cli-init">
-        <h2 className="docs-section__title">apimaker init</h2>
-        <p className="docs-section__text">Exporta un proyecto de la DB a JSON para desplegar con <code className="docs-code--inline">apimaker deploy</code>.</p>
-        <div className="docs-code">apimaker init pokedex-demo -o mi-api.json</div>
+        <h2 className="docs-section__title">{t('docs.cliInit')}</h2>
+        <p className="docs-section__text">{t('docs.cliInitDesc')} <code className="docs-code--inline">doapi deploy</code>.</p>
+        <div className="docs-code">doapi init pokedex-demo -o mi-api.json</div>
       </div>
 
       <div className="docs-section" id="cli-ssh">
-        <h2 className="docs-section__title">Deploy remoto (SSH)</h2>
-        <p className="docs-section__text">Despliega directamente en un VPS vía SSH + Docker. El CLI copia el archivo, genera docker-compose y levanta los contenedores.</p>
-        <div className="docs-code">apimaker deploy proyecto.json --ssh usuario@midominio.com --port 80</div>
+        <h2 className="docs-section__title">{t('docs.cliSsh')}</h2>
+        <p className="docs-section__text">{t('docs.cliSshDesc')}</p>
+        <div className="docs-code">doapi deploy proyecto.json --ssh usuario@midominio.com --port 80</div>
       </div>
     </div>
   )
@@ -307,8 +307,8 @@ POST   /api/pokemon          <span className="comment"># Crear</span></div>
   const renderCodigo = () => (
     <div>
       <div className="docs-header">
-        <h1 className="docs-header__title">Ejemplos de código</h1>
-        <p className="docs-header__desc">Ejemplos en múltiples lenguajes para consumir tu API. Los endpoints se generan dinámicamente desde tu proyecto.</p>
+        <h1 className="docs-header__title">{t('docs.codePageTitle')}</h1>
+        <p className="docs-header__desc">{t('docs.codePageDesc')}</p>
       </div>
 
       <div className="docs-section">
@@ -359,25 +359,25 @@ res = requests.post(BASE + "/pokemon", json={
   const renderDesplegar = () => (
     <div>
       <div className="docs-header">
-        <h1 className="docs-header__title">Despliegue</h1>
-        <p className="docs-header__desc">Todas las formas de llevar tu API a producción.</p>
+        <h1 className="docs-header__title">{t('docs.deployPageTitle')}</h1>
+        <p className="docs-header__desc">{t('docs.deployPageDesc')}</p>
       </div>
 
       <div className="docs-deploy-grid">
         <div className="docs-deploy-card docs-deploy-card--recommended">
           <div className="docs-deploy-header">
-            <span className="docs-recommended-badge">Recomendado</span>
-            <h3>CLI Deploy</h3>
+            <span className="docs-recommended-badge">{t('docs.recommended')}</span>
+            <h3>{t('docs.cliDeploy')}</h3>
           </div>
-          <p>Despliega tu API exportada con un solo comando. El CLI crea la base de datos, importa los datos del proyecto y levanta el servidor con URLs limpias. No necesitas Docker ni configurar nada.</p>
-          <pre className="docs-deploy-code">apimaker deploy proyecto.json --port 8080</pre>
+          <p>{t('docs.deployCliDesc')}</p>
+          <pre className="docs-deploy-code">doapi deploy proyecto.json --port 8080</pre>
         </div>
 
         <div className="docs-deploy-card">
           <div className="docs-deploy-header">
             <h3>Docker</h3>
           </div>
-          <p>El bundle generado incluye un Dockerfile listo para producción. Construye la imagen y ejecuta el contenedor en cualquier servidor con Docker instalado.</p>
+          <p>{t('docs.deployDockerDesc')}</p>
           <pre className="docs-deploy-code">docker build -t my-api .
 docker run -p 8000:8000 my-api</pre>
         </div>
@@ -386,7 +386,7 @@ docker run -p 8000:8000 my-api</pre>
           <div className="docs-deploy-header">
             <h3>Docker Compose</h3>
           </div>
-          <p>El bundle incluye docker-compose.yml con API + PostgreSQL configurado. Es la opción más completa para entornos de producción.</p>
+          <p>{t('docs.deployComposeDesc')}</p>
           <pre className="docs-deploy-code">docker compose up -d --build
 # API en http://localhost:8000
 # Docs en http://localhost:8000/docs</pre>
@@ -396,7 +396,7 @@ docker run -p 8000:8000 my-api</pre>
           <div className="docs-deploy-header">
             <h3>Railway</h3>
           </div>
-          <p>Railway detecta automáticamente el proyecto. El bundle incluye <code className="docs-code--inline">deploy/railway.json</code> con la configuración. Conecta tu repositorio de GitHub y Railway lo despliega solo.</p>
+          <p>{t('docs.deployRailwayDesc')}</p>
           <pre className="docs-deploy-code">railway login
 railway up</pre>
         </div>
@@ -405,17 +405,17 @@ railway up</pre>
           <div className="docs-deploy-header">
             <h3>Render</h3>
           </div>
-          <p>Render despliega desde GitHub. El bundle incluye <code className="docs-code--inline">deploy/render.yaml</code> con la configuración del servicio. Sube el proyecto a GitHub y conéctalo desde el dashboard de Render.</p>
-          <pre className="docs-deploy-code">1. Sube el proyecto a GitHub
-2. Ve a render.com
-3. Nuevo Blueprint {'>'} conecta tu repo</pre>
+          <p>{t('docs.deployRenderDesc')}</p>
+          <pre className="docs-deploy-code">1. {t('docs.deployRenderStep1')}
+2. {t('docs.deployRenderStep2')}
+3. {t('docs.deployRenderStep3')}</pre>
         </div>
 
         <div className="docs-deploy-card">
           <div className="docs-deploy-header">
-            <h3>CI/CD (GitHub Actions)</h3>
+            <h3>{t('docs.deployCiCd')}</h3>
           </div>
-          <p>Automatiza el despliegue en tu VPS al hacer push a main. El bundle incluye un workflow en <code className="docs-code--inline">.github/workflows/deploy.yml</code> que se conecta por SSH y ejecuta docker compose.</p>
+          <p>{t('docs.deployCiCdDesc')}</p>
           <pre className="docs-deploy-code"># .github/workflows/deploy.yml
 on: push
 jobs:
@@ -428,19 +428,19 @@ jobs:
 
         <div className="docs-deploy-card">
           <div className="docs-deploy-header">
-            <h3>SSH Remoto</h3>
+            <h3>{t('docs.deploySshRemote')}</h3>
           </div>
-          <p>Usa <code className="docs-code--inline">apimaker deploy --ssh</code> para desplegar directamente en cualquier VPS con Docker. El CLI copia el archivo, genera el docker-compose y levanta los contenedores automáticamente.</p>
-          <pre className="docs-deploy-code">apimaker deploy proyecto.json \
+          <p>{t('docs.deploySshRemoteDesc')}</p>
+          <pre className="docs-deploy-code">doapi deploy proyecto.json \
   --ssh usuario@midominio.com \
   --port 80</pre>
         </div>
 
         <div className="docs-deploy-card">
           <div className="docs-deploy-header">
-            <h3>VPS Manual</h3>
+            <h3>{t('docs.deployVpsManual')}</h3>
           </div>
-          <p>Instalación directa en tu servidor. Para FastAPI necesitas Python 3.11+, para Express/NestJS necesitas Node.js 18+.</p>
+          <p>{t('docs.deployVpsManualDesc')}</p>
           <pre className="docs-deploy-code"># FastAPI (Python)
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
@@ -452,14 +452,14 @@ npm install && npm start</pre>
       </div>
 
       <div className="docs-checklist">
-        <h3>Checklist de Producción</h3>
+        <h3>{t('docs.checklistTitle')}</h3>
         <ul>
-          <li><span className="docs-checkmark">✓</span> <strong>Base de Datos:</strong> Usa PostgreSQL persistente en lugar de SQLite.</li>
-          <li><span className="docs-checkmark">✓</span> <strong>Seguridad:</strong> Cambia las claves secretas en el archivo <code className="docs-code--inline">.env</code>.</li>
-          <li><span className="docs-checkmark">✓</span> <strong>HTTPS:</strong> Obligatorio en producción. Usa Certbot o Cloudflare.</li>
-          <li><span className="docs-checkmark">✓</span> <strong>Workers:</strong> Usa múltiples workers (gunicorn, pm2).</li>
-          <li><span className="docs-checkmark">✓</span> <strong>CORS:</strong> Restringe orígenes permitidos en producción.</li>
-          <li><span className="docs-checkmark">✓</span> <strong>SDK:</strong> Los bundles incluyen clientes TypeScript y Python en <code className="docs-code--inline">sdks/</code>.</li>
+          <li><span className="docs-checkmark">✓</span> <strong>{t('docs.checklistDb')}:</strong> {t('docs.checklistDbDesc')}</li>
+          <li><span className="docs-checkmark">✓</span> <strong>{t('docs.checklistSecurity')}:</strong> {t('docs.checklistSecurityDesc')}</li>
+          <li><span className="docs-checkmark">✓</span> <strong>{t('docs.checklistHttps')}:</strong> {t('docs.checklistHttpsDesc')}</li>
+          <li><span className="docs-checkmark">✓</span> <strong>{t('docs.checklistWorkers')}:</strong> {t('docs.checklistWorkersDesc')}</li>
+          <li><span className="docs-checkmark">✓</span> <strong>{t('docs.checklistCors')}:</strong> {t('docs.checklistCorsDesc')}</li>
+          <li><span className="docs-checkmark">✓</span> <strong>{t('docs.checklistSdk')}:</strong> {t('docs.checklistSdkDesc')}</li>
         </ul>
       </div>
     </div>
@@ -467,18 +467,18 @@ npm install && npm start</pre>
 
   const sidebarSections: Record<DocTab, { id: string; label: string }[]> = {
     overview: [
-      { id: 'overview', label: 'Visión General' },
-      { id: 'arquitectura', label: 'Arquitectura' },
+      { id: 'overview', label: t('docs.tabOverview') },
+      { id: 'arquitectura', label: t('docs.architecture') },
     ],
     tutorial: [
-      { id: 'tutorial', label: 'Tutorial' },
+      { id: 'tutorial', label: t('docs.tabTutorial') },
     ],
     cli: CLI_SECTIONS,
     codigo: [
-      { id: 'codigo', label: 'Ejemplos de código' },
+      { id: 'codigo', label: t('docs.tabCode') },
     ],
     desplegar: [
-      { id: 'desplegar', label: 'Despliegue' },
+      { id: 'desplegar', label: t('docs.tabDeploy') },
     ],
   }
 
@@ -507,7 +507,7 @@ npm install && npm start</pre>
 
       <aside className="docs-sidebar">
         <div className="docs-sidebar__title">
-          {TABS.find(t => t.id === activeTab)?.label || 'Secciones'}
+          {TABS.find(t => t.id === activeTab)?.label || t('docs.sections')}
         </div>
         <ul className="docs-toc">
           {sidebarSections[activeTab]?.map(s => (

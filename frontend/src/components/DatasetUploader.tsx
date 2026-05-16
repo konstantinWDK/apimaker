@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { read, utils } from 'xlsx'
 
 import type { DatasetMeta, FieldSchema } from '../types/schemas'
@@ -7,14 +8,6 @@ interface Props {
   dataset?: DatasetMeta
   onCommit: (dataset: DatasetMeta) => void
 }
-
-const typeOptions: Array<{ value: FieldSchema['type']; label: string }> = [
-  { value: 'string', label: 'Texto' },
-  { value: 'integer', label: 'Número entero' },
-  { value: 'float', label: 'Número decimal' },
-  { value: 'boolean', label: 'Booleano' },
-  { value: 'datetime', label: 'Fecha/Hora' },
-]
 
 const emptyField = (): FieldSchema => ({
   id: crypto.randomUUID(),
@@ -56,6 +49,7 @@ const generateSampleRows = (fields: FieldSchema[], count = 1) => {
 }
 
 export function DatasetUploader({ dataset, onCommit }: Props) {
+  const { t } = useTranslation()
   const [name, setName] = useState(dataset?.name ?? 'Dataset principal')
   const [sourceType, setSourceType] = useState<DatasetMeta['sourceType']>(dataset?.sourceType ?? 'manual')
   const [fields, setFields] = useState<FieldSchema[]>(dataset?.fields ?? Array.from({ length: 5 }, emptyField))
@@ -63,6 +57,17 @@ export function DatasetUploader({ dataset, onCommit }: Props) {
   const [uploadName, setUploadName] = useState(dataset?.uploadedFrom ?? '')
   const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  const typeOptions: Array<{ value: FieldSchema['type']; label: string }> = useMemo(
+    () => [
+      { value: 'string', label: t('datasetUploader.text') },
+      { value: 'integer', label: t('datasetUploader.integer') },
+      { value: 'float', label: t('datasetUploader.decimal') },
+      { value: 'boolean', label: t('datasetUploader.boolean') },
+      { value: 'datetime', label: t('datasetUploader.datetime') },
+    ],
+    [t],
+  )
 
   // Sync local state when dataset prop changes (e.g., demo loaded)
   useEffect(() => {
@@ -143,13 +148,13 @@ export function DatasetUploader({ dataset, onCommit }: Props) {
       const buffer = await file.arrayBuffer()
       const workbook = read(buffer, { type: 'array' })
       const sheetName = workbook.SheetNames[0]
-      if (!sheetName) throw new Error('El archivo no tiene contenido')
+      if (!sheetName) throw new Error(t('datasetUploader.emptyFile'))
       const jsonRows = utils.sheet_to_json<Record<string, string>>(workbook.Sheets[sheetName], { defval: '' })
-      if (!jsonRows.length) throw new Error('El archivo está vacío')
+      if (!jsonRows.length) throw new Error(t('datasetUploader.fileEmpty'))
       parseFromRows(jsonRows)
       setSourceType('upload')
     } catch (error) {
-      setUploadError(error instanceof Error ? error.message : 'Error al procesar archivo')
+      setUploadError(error instanceof Error ? error.message : t('datasetUploader.processError'))
     }
   }
 
@@ -169,28 +174,28 @@ export function DatasetUploader({ dataset, onCommit }: Props) {
     <div className="dataset-builder">
       <div className="dataset-builder__controls">
         <label className="form-field">
-          <span className="label">Fuente de datos</span>
+          <span className="label">{t('datasetUploader.manual')}</span>
           <select
             value={sourceType}
             onChange={(event) => setSourceType(event.target.value as DatasetMeta['sourceType'])}
             className="field"
           >
-            <option value="manual">Constructor manual</option>
-            <option value="upload">Subir CSV / Excel</option>
+            <option value="manual">{t('datasetUploader.manual')}</option>
+            <option value="upload">{t('datasetUploader.uploadCsv')}</option>
           </select>
         </label>
         <label className="form-field">
-          <span className="label">Nombre del dataset</span>
+          <span className="label">{t('datasetUploader.datasetName')}</span>
           <input value={name} onChange={(event) => setName(event.target.value)} className="field" />
         </label>
         {sourceType === 'upload' ? (
           <div className="form-field file-upload">
-            <span className="label">Archivo</span>
+            <span className="label">{t('datasetUploader.selectFile')}</span>
             <div className="file-upload__row">
               <button type="button" className="btn ghost btn-small" onClick={() => fileInputRef.current?.click()}>
-                Seleccionar archivo
+                {t('datasetUploader.selectFile')}
               </button>
-              <span className="file-upload__name">{uploadName || 'Ningún archivo seleccionado'}</span>
+              <span className="file-upload__name">{uploadName || t('datasetUploader.noFile')}</span>
             </div>
             <input
               ref={fileInputRef}
@@ -213,7 +218,7 @@ export function DatasetUploader({ dataset, onCommit }: Props) {
             <span className="dataset-column__title">#{index + 1}</span>
             <div className="dataset-column__row">
               <input
-                placeholder="Nombre columna"
+                placeholder={t('datasetUploader.columnName')}
                 value={field.name}
                 onChange={(event) => updateField(field.id, { name: event.target.value })}
                 className="field"
@@ -235,7 +240,7 @@ export function DatasetUploader({ dataset, onCommit }: Props) {
                   checked={field.required}
                   onChange={(event) => updateField(field.id, { required: event.target.checked })}
                 />
-                <span>Oblig.</span>
+                <span>{t('datasetUploader.required')}</span>
               </label>
               <button type="button" className="chip" onClick={() => removeField(field.id)} disabled={fields.length === 1}>
                 ✕
@@ -247,10 +252,10 @@ export function DatasetUploader({ dataset, onCommit }: Props) {
 
       <div className="dataset-builder__footer">
         <button type="button" className="btn ghost" onClick={addField}>
-          + Añadir columna
+          {t('datasetUploader.addColumn')}
         </button>
         <button type="button" className="btn primary" onClick={handleCommit} disabled={!hasValidFields}>
-          Guardar esquema
+          {t('datasetUploader.saveSchema')}
         </button>
       </div>
     </div>

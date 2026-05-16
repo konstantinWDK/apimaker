@@ -18,7 +18,7 @@ fail() {
 }
 
 require_cmd() {
-    command -v "$1" >/dev/null 2>&1 || fail "Falta $2 ($1). Instalalo y vuelve a ejecutar este script."
+    command -v "$1" >/dev/null 2>&1 || fail "Missing $2 ($1). Install it and re-run this script."
 }
 
 compose_cmd() {
@@ -44,7 +44,7 @@ random_hex() {
 }
 
 echo -e "${BLUE}=======================================${NC}"
-echo -e "${BLUE}   API Maker - Configuracion${NC}"
+echo -e "${BLUE}   DoApi - Setup${NC}"
 echo -e "${BLUE}=======================================${NC}"
 
 require_cmd python3 "Python 3.11+"
@@ -52,7 +52,7 @@ require_cmd npm "Node.js/npm"
 
 DOCKER_CMD="$(compose_cmd)"
 
-echo -e "${BLUE}Instalando dependencias...${NC}"
+echo -e "${BLUE}Installing dependencies...${NC}"
 cd backend
 if [ ! -d ".venv" ]; then
     python3 -m venv .venv
@@ -68,23 +68,23 @@ npm install
 cd ..
 
 echo ""
-echo -e "${YELLOW}CONFIGURACION DEL ADMINISTRADOR${NC}"
-read -r -p "Introduce el nombre de usuario [admin]: " ADMIN_USER
+echo -e "${YELLOW}ADMIN CONFIGURATION${NC}"
+read -r -p "Enter username [admin]: " ADMIN_USER
 ADMIN_USER="${ADMIN_USER:-admin}"
-read -r -s -p "Introduce la contrasena para $ADMIN_USER [admin]: " ADMIN_PASS
+read -r -s -p "Enter password for $ADMIN_USER [admin]: " ADMIN_PASS
 echo ""
 ADMIN_PASS="${ADMIN_PASS:-admin}"
 
 echo ""
-echo -e "${YELLOW}CONFIGURACION DE BASE DE DATOS${NC}"
-echo "1) SQLite (local, rapida)"
+echo -e "${YELLOW}DATABASE CONFIGURATION${NC}"
+echo "1) SQLite (local, fast)"
 echo "2) PostgreSQL"
 echo "3) MySQL / MariaDB"
-read -r -p "Elige una opcion [1]: " DB_CHOICE
+read -r -p "Choose an option [1]: " DB_CHOICE
 DB_CHOICE="${DB_CHOICE:-1}"
 
 DB_TYPE="sqlite"
-DB_URL="sqlite:///./app/data/apimaker.db"
+DB_URL="sqlite:///./app/data/doapi.db"
 DB_URL_DOCKER="$DB_URL"
 NEED_DOCKER_DB=false
 
@@ -94,32 +94,32 @@ case "$DB_CHOICE" in
     2)
         DB_TYPE="postgresql"
         echo ""
-        echo "1) Usar PostgreSQL existente"
-        echo "2) Crear nuevo PostgreSQL en Docker"
-        read -r -p "Elige una opcion [2]: " DB_SUB
+        echo "1) Use existing PostgreSQL"
+        echo "2) Create new PostgreSQL in Docker"
+        read -r -p "Choose an option [2]: " DB_SUB
         DB_SUB="${DB_SUB:-2}"
         if [ "$DB_SUB" = "1" ]; then
             read -r -p "Host [localhost]: " PG_HOST; PG_HOST="${PG_HOST:-localhost}"
-            read -r -p "Puerto [5432]: " PG_PORT; PG_PORT="${PG_PORT:-5432}"
-            read -r -p "Usuario [postgres]: " PG_USER; PG_USER="${PG_USER:-postgres}"
-            read -r -s -p "Contrasena: " PG_PASS; echo ""
-            read -r -p "Nombre BD [apimaker]: " PG_DB; PG_DB="${PG_DB:-apimaker}"
+            read -r -p "Port [5432]: " PG_PORT; PG_PORT="${PG_PORT:-5432}"
+            read -r -p "User [postgres]: " PG_USER; PG_USER="${PG_USER:-postgres}"
+            read -r -s -p "Password: " PG_PASS; echo ""
+            read -r -p "Database name [doapi]: " PG_DB; PG_DB="${PG_DB:-doapi}"
         else
             NEED_DOCKER_DB=true
-            PG_HOST="localhost"; PG_PORT="5432"; PG_USER="apimaker"; PG_DB="apimaker"
+            PG_HOST="localhost"; PG_PORT="5432"; PG_USER="doapi"; PG_DB="doapi"
             if (echo > /dev/tcp/localhost/5432) >/dev/null 2>&1; then
-                echo -e "${YELLOW}ADVERTENCIA: El puerto 5432 ya esta en uso.${NC}"
-                echo -e "${YELLOW}Para crear la nueva base de datos en Docker necesitamos usar otro puerto.${NC}"
-                read -r -p "Introduce el puerto a usar [5433]: " ALT_PORT
+                echo -e "${YELLOW}WARNING: Port 5432 is already in use.${NC}"
+                echo -e "${YELLOW}To create the new database in Docker we need to use another port.${NC}"
+                read -r -p "Enter the port to use [5433]: " ALT_PORT
                 ALT_PORT="${ALT_PORT:-5433}"
                 if ! [[ "$ALT_PORT" =~ ^[0-9]+$ ]]; then
-                    echo "Puerto invalido. Usando 5433 por defecto."
+                    echo "Invalid port. Using 5433 by default."
                     ALT_PORT="5433"
                 fi
                 PG_PORT="$ALT_PORT"
             fi
             PG_PASS="$(random_hex 12)"
-            echo -e "${CYAN}Se generara un contenedor PostgreSQL en el puerto $PG_PORT.${NC}"
+            echo -e "${CYAN}A PostgreSQL container will be created on port $PG_PORT.${NC}"
         fi
         PG_PASS_ENC="$(urlencode "$PG_PASS")"
         DB_URL="postgresql+psycopg2://$PG_USER:$PG_PASS_ENC@$PG_HOST:$PG_PORT/$PG_DB"
@@ -128,49 +128,49 @@ case "$DB_CHOICE" in
     3)
         DB_TYPE="mysql"
         echo ""
-        echo "1) Usar MySQL/MariaDB existente"
-        echo "2) Crear nuevo MySQL en Docker"
-        read -r -p "Elige una opcion [2]: " DB_SUB
+        echo "1) Use existing MySQL/MariaDB"
+        echo "2) Create new MySQL in Docker"
+        read -r -p "Choose an option [2]: " DB_SUB
         DB_SUB="${DB_SUB:-2}"
         if [ "$DB_SUB" = "1" ]; then
             read -r -p "Host [localhost]: " MY_HOST; MY_HOST="${MY_HOST:-localhost}"
-            read -r -p "Puerto [3306]: " MY_PORT; MY_PORT="${MY_PORT:-3306}"
-            read -r -p "Usuario [root]: " MY_USER; MY_USER="${MY_USER:-root}"
-            read -r -s -p "Contrasena: " MY_PASS; echo ""
-            read -r -p "Nombre BD [apimaker]: " MY_DB; MY_DB="${MY_DB:-apimaker}"
+            read -r -p "Port [3306]: " MY_PORT; MY_PORT="${MY_PORT:-3306}"
+            read -r -p "User [root]: " MY_USER; MY_USER="${MY_USER:-root}"
+            read -r -s -p "Password: " MY_PASS; echo ""
+            read -r -p "Database name [doapi]: " MY_DB; MY_DB="${MY_DB:-doapi}"
         else
             NEED_DOCKER_DB=true
-            MY_HOST="localhost"; MY_PORT="3306"; MY_USER="apimaker"; MY_DB="apimaker"
+            MY_HOST="localhost"; MY_PORT="3306"; MY_USER="doapi"; MY_DB="doapi"
             if (echo > /dev/tcp/localhost/3306) >/dev/null 2>&1; then
-                echo -e "${YELLOW}ADVERTENCIA: El puerto 3306 ya esta en uso.${NC}"
-                echo -e "${YELLOW}Para crear la nueva base de datos en Docker necesitamos usar otro puerto.${NC}"
-                read -r -p "Introduce el puerto a usar [3307]: " ALT_PORT
+                echo -e "${YELLOW}WARNING: Port 3306 is already in use.${NC}"
+                echo -e "${YELLOW}To create the new database in Docker we need to use another port.${NC}"
+                read -r -p "Enter the port to use [3307]: " ALT_PORT
                 ALT_PORT="${ALT_PORT:-3307}"
                 if ! [[ "$ALT_PORT" =~ ^[0-9]+$ ]]; then
-                    echo "Puerto invalido. Usando 3307 por defecto."
+                    echo "Invalid port. Using 3307 by default."
                     ALT_PORT="3307"
                 fi
                 MY_PORT="$ALT_PORT"
             fi
             MY_PASS="$(random_hex 12)"
-            echo -e "${CYAN}Se generara un contenedor MySQL en el puerto $MY_PORT.${NC}"
+            echo -e "${CYAN}A MySQL container will be created on port $MY_PORT.${NC}"
         fi
         MY_PASS_ENC="$(urlencode "$MY_PASS")"
         DB_URL="mysql+pymysql://$MY_USER:$MY_PASS_ENC@$MY_HOST:$MY_PORT/$MY_DB"
         DB_URL_DOCKER="$DB_URL"
         ;;
     *)
-        fail "Opcion de base de datos no valida."
+        fail "Invalid database option."
         ;;
 esac
 
 echo ""
-echo -e "${YELLOW}DESPLIEGUE${NC}"
-read -r -p "Quieres levantar la app con Docker? (y/n) [n]: " USE_DOCKER
+echo -e "${YELLOW}DEPLOYMENT${NC}"
+read -r -p "Do you want to run the app with Docker? (y/n) [n]: " USE_DOCKER
 USE_DOCKER="${USE_DOCKER:-n}"
 
 if [ "$USE_DOCKER" = "y" ]; then
-    [ -n "$DOCKER_CMD" ] || fail "Docker Compose no esta disponible."
+    [ -n "$DOCKER_CMD" ] || fail "Docker Compose is not available."
     if [ "$DB_TYPE" = "postgresql" ] && [ "$NEED_DOCKER_DB" = true ]; then
         DB_URL_DOCKER="postgresql+psycopg2://$PG_USER:$PG_PASS_ENC@postgres:5432/$PG_DB"
     fi
@@ -186,8 +186,8 @@ fi
 } > .env
 
 if [ "$NEED_DOCKER_DB" = true ]; then
-    [ -n "$DOCKER_CMD" ] || fail "Docker Compose no esta disponible para crear la base de datos."
-    echo -e "${BLUE}Limpiando bases de datos Docker previas de este proyecto...${NC}"
+    [ -n "$DOCKER_CMD" ] || fail "Docker Compose is not available to create the database."
+    echo -e "${BLUE}Cleaning up previous Docker databases of this project...${NC}"
     $DOCKER_CMD --profile postgres --profile mysql down -v >/dev/null 2>&1 || true
 
     if [ "$DB_TYPE" = "postgresql" ]; then
@@ -197,7 +197,7 @@ if [ "$NEED_DOCKER_DB" = true ]; then
             echo "POSTGRES_DB=$PG_DB"
             echo "POSTGRES_PORT=$PG_PORT"
         } >> .env
-        echo -e "${BLUE}Levantando PostgreSQL en Docker...${NC}"
+        echo -e "${BLUE}Starting PostgreSQL in Docker...${NC}"
         $DOCKER_CMD --profile postgres up -d postgres
     fi
 
@@ -209,20 +209,20 @@ if [ "$NEED_DOCKER_DB" = true ]; then
             echo "MYSQL_ROOT_PASSWORD=${MY_PASS}_root"
             echo "MYSQL_PORT=$MY_PORT"
         } >> .env
-        echo -e "${BLUE}Levantando MySQL en Docker...${NC}"
+        echo -e "${BLUE}Starting MySQL in Docker...${NC}"
         $DOCKER_CMD --profile mysql up -d mysql
     fi
-    echo -e "${CYAN}Esperando a que la base de datos este lista...${NC}"
+    echo -e "${CYAN}Waiting for the database to be ready...${NC}"
     sleep 20
 fi
 
-echo -e "${BLUE}Inicializando base de datos...${NC}"
+echo -e "${BLUE}Initializing database...${NC}"
 cd backend
 export APIMAKER_DATABASE_URL="$DB_URL"
 ./.venv/bin/python app/scripts/seed_admin.py --username "$ADMIN_USER" --password "$ADMIN_PASS"
 cd ..
 
-read -r -p "Importar proyecto Pokedex? (y/n) [y]: " IMPORT_DEMO
+read -r -p "Import Pokedex project? (y/n) [y]: " IMPORT_DEMO
 IMPORT_DEMO="${IMPORT_DEMO:-y}"
 if [ "$IMPORT_DEMO" = "y" ]; then
     cd backend
@@ -237,25 +237,25 @@ if [ "$USE_DOCKER" = "y" ]; then
     if [ "$DB_TYPE" = "postgresql" ] && [ "$NEED_DOCKER_DB" = true ]; then PROFILES="--profile postgres"; fi
     if [ "$DB_TYPE" = "mysql" ] && [ "$NEED_DOCKER_DB" = true ]; then PROFILES="--profile mysql"; fi
     export APIMAKER_DATABASE_URL="$DB_URL_DOCKER"
-    echo -e "${BLUE}Levantando servicios con Docker...${NC}"
+    echo -e "${BLUE}Starting services with Docker...${NC}"
     $DOCKER_CMD $PROFILES up -d --build
 fi
 
 echo ""
 echo -e "${GREEN}=======================================${NC}"
-echo -e "${GREEN}INSTALACION COMPLETADA${NC}"
+echo -e "${GREEN}INSTALLATION COMPLETE${NC}"
 echo -e "${GREEN}=======================================${NC}"
-echo -e "Acceso:       ${BLUE}http://localhost:5173${NC}"
-echo -e "Usuario:      ${YELLOW}$ADMIN_USER${NC}"
+echo -e "URL:          ${BLUE}http://localhost:5173${NC}"
+echo -e "User:         ${YELLOW}$ADMIN_USER${NC}"
 echo -e "Password:     ${YELLOW}$ADMIN_PASS${NC}"
-echo -e "Base Datos:   ${CYAN}$DB_TYPE${NC}"
+echo -e "Database:     ${CYAN}$DB_TYPE${NC}"
 if [ "$NEED_DOCKER_DB" = true ]; then
-    echo -e "${CYAN}BD ejecutandose en Docker.${NC}"
+    echo -e "${CYAN}DB running in Docker.${NC}"
 fi
 
 if [ "$USE_DOCKER" != "y" ]; then
     echo ""
-    echo -e "${YELLOW}Para arrancar la aplicacion, abre dos terminales:${NC}"
+    echo -e "${YELLOW}To start the application, open two terminals:${NC}"
     echo -e "  Terminal 1 (Backend):  ${CYAN}cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000${NC}"
     echo -e "  Terminal 2 (Frontend): ${CYAN}cd frontend && npm run dev${NC}"
 fi

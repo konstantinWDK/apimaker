@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { LoginParticles } from './LoginParticles'
 
 interface Props {
@@ -7,6 +8,7 @@ interface Props {
 }
 
 export function LoginScreen({ onLogin, error }: Props) {
+  const { t } = useTranslation()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [localError, setLocalError] = useState<string | null>(null)
@@ -17,7 +19,7 @@ export function LoginScreen({ onLogin, error }: Props) {
     setLoading(true)
     const ok = await onLogin(username, password)
     if (!ok) {
-      setLocalError('Credenciales incorrectas')
+      setLocalError(t('login.error'))
     } else {
       setLocalError(null)
       if (typeof window !== 'undefined') {
@@ -37,36 +39,36 @@ export function LoginScreen({ onLogin, error }: Props) {
             <path d="M20 12v16m-6-10l6-6 6 6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
-        <h1>API Maker</h1>
-        <p className="login-desc">Constructor visual de APIs. Disena, simula y despliega en minutos.</p>
+        <h1>{t('login.title')}</h1>
+        <p className="login-desc">{t('login.subtitle')}</p>
         <form onSubmit={handleSubmit} className="login-form">
           <label className="label" htmlFor="login-username">
-            Usuario
+            {t('login.username')}
           </label>
           <input
             id="login-username"
             type="text"
             value={username}
             onChange={(event) => setUsername(event.target.value)}
-            placeholder="admin"
+            placeholder={t('login.usernamePlaceholder')}
           />
           <label className="label" htmlFor="login-password">
-            Contrasena
+            {t('login.password')}
           </label>
           <input
             id="login-password"
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            placeholder="admin"
+            placeholder={t('login.passwordPlaceholder')}
           />
           {error || localError ? <p className="error-text">{error ?? localError}</p> : null}
           <button type="submit" className="btn primary login-button" disabled={loading}>
-            {loading ? 'Entrando...' : 'Entrar'}
+            {loading ? t('login.loggingIn') : t('login.login')}
           </button>
         </form>
         <p className="muted-text login-hint">
-          Credenciales por defecto: <code>admin</code> / <code>admin</code>
+          {t('login.defaultCredentials')} <code>admin</code> / <code>admin</code>
         </p>
       </div>
     </div>

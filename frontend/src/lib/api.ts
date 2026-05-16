@@ -4,7 +4,7 @@ import { readBackendConfig } from './backendConfig'
 const cleanBaseUrl = (value: string) => value.replace(/\/$/, '')
 
 export const readToken = (): string | null =>
-  typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
+  typeof window !== 'undefined' ? window.sessionStorage.getItem('doapi-jwt-token') : null
 
 export const apiFetch = async (path: string, init?: RequestInit) => {
   const token = readToken()
@@ -45,7 +45,7 @@ const buildHeaders = (): HeadersInit => {
   const headers: HeadersInit = { 'Content-Type': 'application/json' }
   // Prefer JWT token over API key
   if (typeof window !== 'undefined') {
-    const token = window.sessionStorage.getItem('apimaker-jwt-token')
+    const token = window.sessionStorage.getItem('doapi-jwt-token')
     if (token) {
       headers['Authorization'] = `Bearer ${token}`
     } else if (apiKey) {
@@ -60,7 +60,7 @@ const buildHeaders = (): HeadersInit => {
 const ensureAuthToken = async (): Promise<string | null> => {
   // Check if we already have a JWT token
   if (typeof window !== 'undefined') {
-    const existing = window.sessionStorage.getItem('apimaker-jwt-token')
+    const existing = window.sessionStorage.getItem('doapi-jwt-token')
     if (existing) return existing
   }
   // No token — user needs to login manually

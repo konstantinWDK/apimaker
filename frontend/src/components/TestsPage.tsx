@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useProjectBuilder } from '../hooks/useProjectBuilder'
 import { readBackendConfig } from '../lib/backendConfig'
 import { TestRunnerPanel } from './TestRunnerPanel'
@@ -10,12 +11,13 @@ interface TestResult {
 }
 
 export function TestsPage() {
+  const { t } = useTranslation()
   const { project, mockRunning, checkMockStatus } = useProjectBuilder()
   const [results, setResults] = useState<TestResult[]>([
-    { name: 'Conexión con Backend', status: 'pending' },
-    { name: 'Estado del Mock Server', status: 'pending' },
-    { name: 'Integridad de Datasets', status: 'pending' },
-    { name: 'Respuesta de Endpoints (Smoke Test)', status: 'pending' },
+    { name: t('tests.test1Name'), status: 'pending' },
+    { name: t('tests.test2Name'), status: 'pending' },
+    { name: t('tests.test3Name'), status: 'pending' },
+    { name: t('tests.test4Name'), status: 'pending' },
   ])
   const [isRunning, setIsRunning] = useState(false)
 
@@ -26,51 +28,51 @@ export function TestsPage() {
     const baseUrl = config.baseUrl?.replace(/\/$/, '')
 
     // 1. Backend Connection
-    newResults[0] = { name: 'Conexión con Backend', status: 'running' }
+    newResults[0] = { name: t('tests.test1Name'), status: 'running' }
     setResults([...newResults])
     try {
       const res = await fetch(`${baseUrl}/health`)
       newResults[0] = { 
-        name: 'Conexión con Backend', 
+        name: t('tests.test1Name'), 
         status: res.ok ? 'passed' : 'failed',
-        message: res.ok ? 'Conexión establecida correctamente' : 'El backend devolvió un error'
+        message: res.ok ? t('tests.test1Pass') : t('tests.test1Fail')
       }
     } catch (e) {
-      newResults[0] = { name: 'Conexión con Backend', status: 'failed', message: 'No se pudo contactar con el servidor' }
+      newResults[0] = { name: t('tests.test1Name'), status: 'failed', message: t('tests.test1Error') }
     }
     setResults([...newResults])
 
     // 2. Mock Server Status
-    newResults[1] = { name: 'Estado del Mock Server', status: 'running' }
+    newResults[1] = { name: t('tests.test2Name'), status: 'running' }
     setResults([...newResults])
     await checkMockStatus()
     newResults[1] = { 
-      name: 'Estado del Mock Server', 
+      name: t('tests.test2Name'), 
       status: mockRunning ? 'passed' : 'failed',
-      message: mockRunning ? 'El servidor de mocks está activo' : 'El servidor de mocks está apagado o no responde'
+      message: mockRunning ? t('tests.test2Pass') : t('tests.test2Fail')
     }
     setResults([...newResults])
 
     // 3. Datasets Integrity
-    newResults[2] = { name: 'Integridad de Datasets', status: 'running' }
+    newResults[2] = { name: t('tests.test3Name'), status: 'running' }
     setResults([...newResults])
     const hasDatasets = project.datasets.length > 0
     const hasFields = project.datasets.every(ds => ds.fields.length > 0)
     newResults[2] = { 
-      name: 'Integridad de Datasets', 
+      name: t('tests.test3Name'), 
       status: (hasDatasets && hasFields) ? 'passed' : 'failed',
       message: hasDatasets 
-        ? (hasFields ? 'Todos los datasets tienen campos definidos' : 'Hay datasets sin campos') 
-        : 'No hay datasets definidos en el proyecto'
+        ? (hasFields ? t('tests.test3Pass') : t('tests.test3FailNoFields')) 
+        : t('tests.test3NoDatasets')
     }
     setResults([...newResults])
 
     // 4. Smoke Test (End-to-End lite)
     if (mockRunning && project.datasets.length > 0) {
-      newResults[3] = { name: 'Respuesta de Endpoints (Smoke Test)', status: 'running' }
+      newResults[3] = { name: t('tests.test4Name'), status: 'running' }
       setResults([...newResults])
       try {
-        const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
+        const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('doapi-jwt-token') : null
         const headers: Record<string, string> = {}
         if (token) headers['Authorization'] = `Bearer ${token}`
         const projectId = project.remoteId || project.slug || project.id
@@ -79,27 +81,27 @@ export function TestsPage() {
           const testRes = await fetch(`${baseUrl}/api/mock/${projectId}${firstEp.path}`, { headers })
           const body = testRes.ok ? '' : await testRes.text().catch(() => '')
           newResults[3] = { 
-            name: 'Respuesta de Endpoints (Smoke Test)', 
+            name: t('tests.test4Name'), 
             status: testRes.ok ? 'passed' : 'failed',
             message: testRes.ok
-              ? `El endpoint ${firstEp.method} ${firstEp.path} respondió con ${testRes.status}`
-              : `Error ${testRes.status} en ${firstEp.method} ${firstEp.path}${body ? ': ' + body.slice(0, 200) : ''}`
+              ? t('tests.test4Pass').replace('{method}', firstEp.method).replace('{path}', firstEp.path).replace('{status}', String(testRes.status))
+              : t('tests.test4Fail').replace('{status}', String(testRes.status)).replace('{method}', firstEp.method).replace('{path}', firstEp.path).replace('{body}', body ? ': ' + body.slice(0, 200) : '')
           }
         } else {
           newResults[3] = {
-            name: 'Respuesta de Endpoints (Smoke Test)',
+            name: t('tests.test4Name'),
             status: 'failed',
-            message: 'No hay endpoints definidos en el proyecto'
+            message: t('tests.test4NoEndpoints')
           }
         }
       } catch (e) {
-        newResults[3] = { name: 'Respuesta de Endpoints (Smoke Test)', status: 'failed', message: 'Error de red al contactar el mock' }
+        newResults[3] = { name: t('tests.test4Name'), status: 'failed', message: t('tests.test4NetworkError') }
       }
     } else {
       newResults[3] = { 
-        name: 'Respuesta de Endpoints (Smoke Test)', 
+        name: t('tests.test4Name'), 
         status: 'failed', 
-        message: 'Requiere que el Live Mode esté activo y existan datasets' 
+        message: t('tests.test4Requirement') 
       }
     }
     setResults([...newResults])
@@ -110,15 +112,15 @@ export function TestsPage() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Centro de Pruebas (Health Check)</h1>
-          <p className="page-subtitle">Verifica el estado de salud de tu proyecto y los servicios asociados.</p>
+          <h1 className="page-title">{t('tests.pageTitle')}</h1>
+          <p className="page-subtitle">{t('tests.pageSubtitle')}</p>
         </div>
         <button 
           className={`btn primary ${isRunning ? 'loading' : ''}`} 
           onClick={runTests}
           disabled={isRunning}
         >
-          {isRunning ? 'Ejecutando...' : 'Ejecutar Diagnóstico'}
+          {isRunning ? t('tests.running') : t('tests.runDiagnostic')}
         </button>
       </div>
 
@@ -127,10 +129,10 @@ export function TestsPage() {
           <div key={i} className={`test-card ${test.status}`}>
             <div className="test-header">
               <span className={`test-badge ${test.status}`}>
-                {test.status === 'passed' && 'PASSED'}
-                {test.status === 'failed' && 'FAILED'}
-                {test.status === 'running' && 'RUNNING'}
-                {test.status === 'pending' && 'PENDING'}
+                {test.status === 'passed' && t('tests.passed')}
+                {test.status === 'failed' && t('tests.failed')}
+                {test.status === 'running' && t('tests.runningBadge')}
+                {test.status === 'pending' && t('tests.pending')}
               </span>
               <h3 className="test-name">{test.name}</h3>
             </div>
@@ -140,16 +142,14 @@ export function TestsPage() {
       </div>
 
       <div className="info-card" style={{ marginTop: '2rem' }}>
-        <h3>Tests del Sistema (Backend)</h3>
+        <h3>{t('tests.backendTests')}</h3>
         <TestRunnerPanel />
       </div>
 
       <div className="info-card" style={{ marginTop: '2rem' }}>
-        <h3>Acerca de los Tests</h3>
+        <h3>{t('tests.aboutTitle')}</h3>
         <p>
-          Esta pantalla realiza pruebas funcionales sobre el estado actual de tu entorno. 
-          Los <strong>Unit Tests</strong> del código fuente (Vitest) se ejecutan de forma independiente 
-          desde la terminal para asegurar la integridad del core de la aplicación.
+          {t('tests.aboutDesc')}
         </p>
         <div className="code-block">
           <code>cd frontend && npm run test</code>

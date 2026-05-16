@@ -260,6 +260,28 @@ body {
   fill: currentColor;
 }
 
+.language-switcher {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  padding: 0.4rem 0.65rem;
+  background: #0f172a;
+  color: #94a3b8;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: 0.5px;
+}
+
+.language-switcher:hover {
+  color: #f8fafc;
+  border-color: rgba(148, 163, 184, 0.5);
+}
+
 .dataset-badge {
   font-size: 0.8rem;
   color: #64748b;

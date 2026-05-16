@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
 import { SectionCard } from './SectionCard'
 import { useProjectBuilder } from '../hooks/useProjectBuilder'
@@ -39,6 +40,7 @@ const tabs: Array<{ id: Tab; label: string }> = [
 const prettyDate = (value?: string) => value ? new Date(value).toLocaleString() : ''
 
 export function ProductOpsPage() {
+  const { t } = useTranslation()
   const { project, saveProject } = useProjectBuilder()
   const projectId = project.remoteId || project.id
   const [activeTab, setActiveTab] = useState<Tab>('datasources')
@@ -75,7 +77,7 @@ export function ProductOpsPage() {
   const ensureRemoteProject = useCallback(async () => {
     if (project.remoteId) return project.remoteId
     const savedId = await saveProject()
-    if (!savedId) throw new Error('Guarda o sincroniza el proyecto antes de usar operaciones.')
+    if (!savedId) throw new Error(t('productOps.saveFirst'))
     return savedId
   }, [project.remoteId, saveProject])
 
@@ -102,7 +104,7 @@ export function ProductOpsPage() {
       setProviders(prov)
       setPlugins(plug)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudieron cargar las operaciones')
+      setError(err instanceof Error ? err.message : t('productOps.loadError'))
     } finally {
       setLoading(false)
     }
@@ -119,7 +121,7 @@ export function ProductOpsPage() {
       setSuccess(message)
       await refresh(id)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error ejecutando la accion')
+      setError(err instanceof Error ? err.message : t('productOps.actionError'))
     }
   }
 
@@ -128,7 +130,7 @@ export function ProductOpsPage() {
   )), [datasources])
 
   return (
-    <SectionCard title="Operaciones" subtitle="Datasources, queries, logs, releases, automations e imports" fullWidth>
+    <SectionCard title={t('productOps.title')} subtitle={t('productOps.subtitle')} fullWidth>
       <div className="ops-page">
         <div className="ops-tabs">
           {tabs.map((tab) => (
@@ -145,15 +147,15 @@ export function ProductOpsPage() {
 
         {error && <p className="error-text">{error}</p>}
         {success && <p className="success-text">{success}</p>}
-        {loading && <p className="muted-text">Cargando operaciones...</p>}
+        {loading && <p className="muted-text">{t('productOps.loading')}</p>}
 
         {activeTab === 'datasources' && (
           <div className="ops-grid">
             <div className="ops-panel">
-              <h3>Nueva datasource</h3>
-              <label>Nombre</label>
+              <h3>{t('productOps.newDatasource')}</h3>
+              <label>{t('productOps.name')}</label>
               <input value={datasourceForm.name} onChange={e => setDatasourceForm({ ...datasourceForm, name: e.target.value })} />
-              <label>Tipo</label>
+              <label>{t('productOps.type')}</label>
               <select value={datasourceForm.source_type} onChange={e => setDatasourceForm({ ...datasourceForm, source_type: e.target.value })}>
                 <option value="manual">Manual</option>
                 <option value="csv">CSV</option>
@@ -162,11 +164,11 @@ export function ProductOpsPage() {
               </select>
               <button className="btn primary btn-sm" type="button" onClick={() => runAction(async (id) => {
                 await createDatasource(id, { ...datasourceForm, config: {} })
-              }, 'Datasource creada')}>
-                Crear datasource
+              }, t('productOps.datasourceCreated'))}>
+                {t('productOps.createDatasource')}
               </button>
             </div>
-            <ListPanel title="Datasources" items={datasources} render={(item) => (
+            <ListPanel title={t('productOps.datasources')} items={datasources} render={(item) => (
               <>
                 <strong>{item.name}</strong>
                 <span>{item.source_type}</span>
@@ -178,12 +180,12 @@ export function ProductOpsPage() {
         {activeTab === 'queries' && (
           <div className="ops-grid">
             <div className="ops-panel">
-              <h3>Nueva query</h3>
-              <label>Nombre</label>
+              <h3>{t('productOps.newQuery')}</h3>
+              <label>{t('productOps.name')}</label>
               <input value={queryForm.name} onChange={e => setQueryForm({ ...queryForm, name: e.target.value })} />
-              <label>Datasource</label>
+              <label>{t('productOps.datasource')}</label>
               <select value={queryForm.datasource_id} onChange={e => setQueryForm({ ...queryForm, connection_id: '', datasource_id: e.target.value })}>
-                <option value="">Sin datasource</option>
+                <option value="">{t('productOps.noDatasource')}</option>
                 {datasourceOptions}
               </select>
               <label>SQL</label>
@@ -196,14 +198,14 @@ export function ProductOpsPage() {
                   query_type: 'sql',
                   bindings: {},
                 })
-              }, 'Query guardada')}>
-                Guardar query
+              }, t('productOps.querySaved'))}>
+                {t('productOps.saveQuery')}
               </button>
             </div>
             <div className="ops-panel">
-              <h3>Queries</h3>
+              <h3>{t('productOps.queries')}</h3>
               <div className="ops-list">
-                {queries.length === 0 ? <p className="muted-text">No hay queries.</p> : queries.map((item) => (
+                {queries.length === 0 ? <p className="muted-text">{t('productOps.noQueries')}</p> : queries.map((item) => (
                   <div className="ops-row" key={item.id}>
                     <div>
                       <strong>{item.name}</strong>
@@ -212,8 +214,8 @@ export function ProductOpsPage() {
                     <button className="btn ghost btn-sm" type="button" onClick={() => runAction(async (id) => {
                       const result = await runSavedQuery(id, item.id)
                       setQueryResult(result)
-                    }, 'Query ejecutada')}>
-                      Ejecutar
+                    }, t('productOps.queryExecuted'))}>
+                      {t('productOps.execute')}
                     </button>
                   </div>
                 ))}
@@ -226,7 +228,7 @@ export function ProductOpsPage() {
         )}
 
         {activeTab === 'logs' && (
-          <ListPanel title="Runtime logs" items={logs} render={(item) => (
+          <ListPanel title={t('productOps.runtimeLogs')} items={logs} render={(item) => (
             <>
               <strong>{item.event_type}</strong>
               <span>{[item.method, item.path, item.status_code].filter(Boolean).join(' ') || item.message}</span>
@@ -238,20 +240,20 @@ export function ProductOpsPage() {
         {activeTab === 'releases' && (
           <div className="ops-grid">
             <div className="ops-panel">
-              <h3>Publicar release</h3>
-              <label>Mensaje</label>
-              <input value={releaseMessage} onChange={e => setReleaseMessage(e.target.value)} placeholder="Cambios principales" />
+              <h3>{t('productOps.publishRelease')}</h3>
+              <label>{t('productOps.message')}</label>
+              <input value={releaseMessage} onChange={e => setReleaseMessage(e.target.value)} placeholder={t('productOps.releasePlaceholder')} />
               <button className="btn primary btn-sm" type="button" onClick={() => runAction(async (id) => {
                 await createRelease(id, releaseMessage)
                 setReleaseMessage('')
-              }, 'Release publicado')}>
-                Publicar
+              }, t('productOps.releasePublished'))}>
+                {t('productOps.publish')}
               </button>
             </div>
-            <ListPanel title="Releases" items={releases} render={(item) => (
+            <ListPanel title={t('productOps.releases')} items={releases} render={(item) => (
               <>
-                <strong>v{item.version} {item.is_active ? 'Actual' : ''}</strong>
-                <span>{item.message || 'Sin mensaje'}</span>
+                <strong>v{item.version} {item.is_active ? t('productOps.current') : ''}</strong>
+                <span>{item.message || t('productOps.noMessage')}</span>
                 <small>{prettyDate(item.created_at)}</small>
               </>
             )} />
@@ -261,10 +263,10 @@ export function ProductOpsPage() {
         {activeTab === 'automations' && (
           <div className="ops-grid">
             <div className="ops-panel">
-              <h3>Nueva automation</h3>
-              <label>Nombre</label>
+              <h3>{t('productOps.newAutomation')}</h3>
+              <label>{t('productOps.name')}</label>
               <input value={automationForm.name} onChange={e => setAutomationForm({ ...automationForm, name: e.target.value })} />
-              <label>Trigger</label>
+              <label>{t('productOps.trigger')}</label>
               <select value={automationForm.trigger_event} onChange={e => setAutomationForm({ ...automationForm, trigger_event: e.target.value })}>
                 <option value="endpoint.called">endpoint.called</option>
                 <option value="record.created">record.created</option>
@@ -272,18 +274,18 @@ export function ProductOpsPage() {
                 <option value="record.deleted">record.deleted</option>
                 <option value="manual">manual</option>
               </select>
-              <label>Actions JSON</label>
+              <label>{t('productOps.actionsJson')}</label>
               <textarea rows={6} value={automationForm.actions} onChange={e => setAutomationForm({ ...automationForm, actions: e.target.value })} />
               <button className="btn primary btn-sm" type="button" onClick={() => runAction(async (id) => {
                 await createAutomation(id, { ...automationForm, actions: JSON.parse(automationForm.actions) })
-              }, 'Automation creada')}>
-                Crear automation
+              }, t('productOps.automationCreated'))}>
+                {t('productOps.createAutomation')}
               </button>
             </div>
-            <ListPanel title="Automations" items={automations} render={(item) => (
+            <ListPanel title={t('productOps.automations')} items={automations} render={(item) => (
               <>
                 <strong>{item.name}</strong>
-                <span>{item.trigger_event} - {item.is_active ? 'activa' : 'pausada'}</span>
+                <span>{item.trigger_event} - {item.is_active ? t('productOps.active') : t('productOps.paused')}</span>
               </>
             )} />
           </div>
@@ -291,32 +293,32 @@ export function ProductOpsPage() {
 
         {activeTab === 'imports' && (
           <div className="ops-panel">
-            <h3>Importar contrato</h3>
-            <label>Formato</label>
+            <h3>{t('productOps.importContract')}</h3>
+            <label>{t('productOps.format')}</label>
             <select value={importForm.format} onChange={e => setImportForm({ ...importForm, format: e.target.value })}>
               <option value="openapi">OpenAPI</option>
               <option value="postman">Postman</option>
             </select>
-            <label>Documento JSON</label>
+            <label>{t('productOps.documentJson')}</label>
             <textarea rows={12} value={importForm.document} onChange={e => setImportForm({ ...importForm, document: e.target.value })} />
             <button className="btn primary btn-sm" type="button" onClick={() => runAction(async (id) => {
               await importContract(id, { format: importForm.format, document: JSON.parse(importForm.document) })
-            }, 'Contrato importado')}>
-              Importar endpoints
+            }, t('productOps.contractImported'))}>
+              {t('productOps.importEndpoints')}
             </button>
           </div>
         )}
 
         {activeTab === 'platform' && (
           <div className="ops-grid">
-            <ListPanel title="Deploy providers" items={providers} render={(item) => (
+            <ListPanel title={t('productOps.deployProviders')} items={providers} render={(item) => (
               <>
                 <strong>{item.name}</strong>
                 <span>{item.status}</span>
               </>
             )} />
             <div className="ops-panel">
-              <h3>Plugins registrados</h3>
+              <h3>{t('productOps.registeredPlugins')}</h3>
               <pre className="ops-pre">{JSON.stringify(plugins, null, 2)}</pre>
             </div>
           </div>
@@ -350,11 +352,12 @@ export function ProductOpsPage() {
 }
 
 function ListPanel({ title, items, render }: { title: string; items: any[]; render: (item: any) => ReactNode }) {
+  const { t } = useTranslation()
   return (
     <div className="ops-panel">
       <h3>{title}</h3>
       <div className="ops-list">
-        {items.length === 0 ? <p className="muted-text">No hay registros.</p> : items.map((item) => (
+        {items.length === 0 ? <p className="muted-text">{t('productOps.noRecords')}</p> : items.map((item) => (
           <div className="ops-row" key={item.id || item.name}>
             <div>{render(item)}</div>
           </div>

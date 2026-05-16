@@ -1,4 +1,4 @@
-"""CLI entry point for API Maker.
+"""CLI entry point for DoApi.
 
 Commands:
   deploy  <file.json>   Deploy an exported project as a standalone API
@@ -46,7 +46,7 @@ def _deploy_via_ssh(json_path: Path, ssh_target: str, port: int, db_url: str) ->
     """Deploy project to a remote server via SSH + Docker."""
     print(f" Deploying to {ssh_target}...")
 
-    remote_dir = f"/opt/apimaker/{json_path.stem}"
+    remote_dir = f"/opt/doapi/{json_path.stem}"
 
     # Read project name
     project_data = json.loads(json_path.read_text(encoding="utf-8"))
@@ -73,8 +73,8 @@ services:
     ports:
       - "{port}:{port}"
     command: >
-      sh -c "pip install apimaker-backend -q &&
-             apimaker deploy project.json --port {port} --host 0.0.0.0"
+      sh -c "pip install doapi-backend -q &&
+             doapi deploy project.json --port {port} --host 0.0.0.0"
     volumes:
       - ./project.json:/app/project.json
       - data:/app/data
@@ -97,7 +97,7 @@ volumes:
     )
 
     print(f"\n{'='*50}")
-    print(f"   '{project_name}' desplegado en {ssh_target}")
+    print(f"   '{project_name}' deployed at {ssh_target}")
     print(f"   http://{ssh_target.split('@')[-1]}:{port}/api")
     print(f"{'='*50}\n")
 
@@ -189,8 +189,8 @@ def cmd_init(args: argparse.Namespace) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        prog="apimaker",
-        description="API Maker — Deploy and manage your APIs from the command line.",
+        prog="doapi",
+        description="DoApi — Deploy and manage your APIs from the command line.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 

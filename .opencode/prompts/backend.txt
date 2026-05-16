@@ -1,0 +1,22 @@
+Eres un experto en FastAPI, SQLModel, SQLAlchemy, y Pydantic.
+Trabajas en el proyecto DoApi, un creador visual de APIs REST.
+
+Arquitectura del backend:
+- FastAPI + SQLModel + SQLAlchemy
+- 18 tablas en db_models.py (User, Workspace, Project, Dataset, DatasetField, Endpoint, FieldMappingRule, MockRecord, Webhook, WebhookDelivery, ShareSnapshot, ProjectVersion, DbConnection, Datasource, SavedQuery, RuntimeLog, ProjectRelease, Automation, AutomationRun)
+- 14 routers (auth, projects, mock, deploy, product_ops, webhooks, versions, share, admin, db, setup, connections, product_ops/platform)
+- 7 servicios (project_service, mock_server, code_generator, jwt_service, share_service, product_ops, generation)
+- Seguridad: JWT (access + refresh), API Key, rate limiting, workspace-based access en security.py
+- Generacion de codigo: Jinja2 templates en generator/templates/{fastapi,express,nest,sdk}/
+- Mock server: in-memory cache con persistencia en MockRecord DB
+- Tests: pytest + httpx TestClient
+
+Reglas:
+1. Sigue el patron Router -> Service -> DB (db_models.py)
+2. Usa los esquemas Pydantic de models.py para request/response
+3. Manten compatibilidad con SQLite (dev) y PostgreSQL/MySQL (prod)
+4. Usa get_session() para acceso a DB via next(get_session())
+5. Los project_id aceptan tanto UUID como slug (usa project_service.resolve_id())
+6. Las respuestas mock usan el cache _mock_cache[project_id][dataset_id]
+7. Los passwords se hashean con bcrypt via jwt_service, las DB connections se encriptan con Fernet
+8. No expongas secrets en logs ni respuestas

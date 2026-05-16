@@ -7,7 +7,7 @@ from pathlib import Path
 
 os.environ.setdefault(
     "APIMAKER_DATABASE_URL",
-    f"sqlite:///{Path(__file__).resolve().parent.parent / 'app' / 'data' / 'test_apimaker.db'}",
+    f"sqlite:///{Path(__file__).resolve().parent.parent / 'app' / 'data' / 'test_doapi.db'}",
 )
 
 from app.db import create_db_and_tables  # noqa: E402

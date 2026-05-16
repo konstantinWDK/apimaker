@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+
+type MessageType = 'success' | 'error' | null
 
 interface Props {
   currentUsername: string
@@ -7,21 +10,22 @@ interface Props {
 }
 
 export function CredentialPanel({ currentUsername, onUpdate, onReset }: Props) {
+  const { t } = useTranslation()
   const [username, setUsername] = useState(currentUsername)
   const [currentPassword, setCurrentPassword] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
-  const [message, setMessage] = useState<string | null>(null)
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!username.trim() || !currentPassword.trim()) {
-      setMessage('Indica el usuario y la contraseña actual')
+      setMessage({ text: t('credentials.missingFields'), type: 'error' })
       return
     }
     if (password && password !== confirm) {
-      setMessage('Las contraseñas nuevas no coinciden')
+      setMessage({ text: t('credentials.passwordsDontMatch'), type: 'error' })
       return
     }
     setLoading(true)
@@ -30,9 +34,9 @@ export function CredentialPanel({ currentUsername, onUpdate, onReset }: Props) {
       setPassword('')
       setConfirm('')
       setCurrentPassword('')
-      setMessage('Credenciales actualizadas. Inicia sesión de nuevo.')
+      setMessage({ text: t('credentials.updated'), type: 'success' })
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No se pudo actualizar')
+      setMessage({ text: error instanceof Error ? error.message : t('credentials.updateFailed'), type: 'error' })
     } finally {
       setLoading(false)
     }
@@ -40,30 +44,30 @@ export function CredentialPanel({ currentUsername, onUpdate, onReset }: Props) {
 
   return (
     <form className="credential-panel" onSubmit={handleSubmit}>
-      <h4>Credenciales del builder</h4>
-      <p className="muted-text">Por defecto: admin / admin. Cámbialas después de instalar la herramienta.</p>
+      <h4>{t('credentials.title')}</h4>
+      <p className="muted-text">{t('credentials.defaultHint')}</p>
       <div className="form-field">
-        <label className="label" htmlFor="cred-username">Usuario</label>
+        <label className="label" htmlFor="cred-username">{t('credentials.username')}</label>
         <input id="cred-username" type="text" value={username} onChange={(event) => setUsername(event.target.value)} />
       </div>
       <div className="form-grid credential-panel__passwords">
         <div className="form-field">
-          <label className="label" htmlFor="cred-current">Contraseña actual</label>
+          <label className="label" htmlFor="cred-current">{t('credentials.currentPassword')}</label>
           <input id="cred-current" type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
         </div>
         <div className="form-field">
-          <label className="label" htmlFor="cred-password">Nueva contraseña</label>
-          <input id="cred-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Dejar vacío para no cambiar" />
+          <label className="label" htmlFor="cred-password">{t('credentials.newPassword')}</label>
+          <input id="cred-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={t('credentials.newPasswordPlaceholder')} />
         </div>
         <div className="form-field">
-          <label className="label" htmlFor="cred-confirm">Confirmar nueva contraseña</label>
+          <label className="label" htmlFor="cred-confirm">{t('credentials.confirmPassword')}</label>
           <input id="cred-confirm" type="password" value={confirm} onChange={(event) => setConfirm(event.target.value)} />
         </div>
       </div>
-      {message ? <p className={message.startsWith('Credenciales') ? 'success-text' : 'error-text'}>{message}</p> : null}
+      {message ? <p className={message.type === 'success' ? 'success-text' : 'error-text'}>{message.text}</p> : null}
       <div className="credential-panel__actions">
         <button type="submit" className="btn primary btn-small" disabled={loading}>
-          {loading ? 'Guardando...' : 'Guardar credenciales'}
+          {loading ? t('credentials.saving') : t('credentials.save')}
         </button>
         <button
           type="button"
@@ -72,10 +76,10 @@ export function CredentialPanel({ currentUsername, onUpdate, onReset }: Props) {
             setLoading(true)
             await onReset()
             setLoading(false)
-            setMessage('Credenciales restablecidas a admin/admin.')
+            setMessage({ text: t('credentials.resetDone'), type: 'success' })
           }}
         >
-          Restablecer a admin/admin
+          {t('credentials.reset')}
         </button>
       </div>
     </form>

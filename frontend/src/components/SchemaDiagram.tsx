@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { DatasetMeta } from '../types/schemas'
 
 interface Props {
@@ -28,10 +29,12 @@ const TYPE_ICONS: Record<string, string> = {
 }
 
 export function SchemaDiagram({ datasets, onDatasetClick, onDeleteDataset, activeDatasetId }: Props) {
+  const { t } = useTranslation()
+
   if (datasets.length === 0) {
     return (
       <div className="schema-diagram__empty">
-        <p>No hay datasets definidos</p>
+        <p>{t('schemaDiagram.noDatasets')}</p>
       </div>
     )
   }
@@ -47,13 +50,13 @@ export function SchemaDiagram({ datasets, onDatasetClick, onDeleteDataset, activ
           {/* Table header */}
           <div className="schema-diagram__header">
             <span className="schema-diagram__name">{dataset.name}</span>
-            <span className="schema-diagram__count">{dataset.fields.length} campos</span>
+            <span className="schema-diagram__count">{dataset.fields.length} {t('schemaDiagram.fields')}</span>
             {onDeleteDataset && (
               <button
                 type="button"
                 className="schema-diagram__delete"
                 onClick={(e) => { e.stopPropagation(); onDeleteDataset(dataset.id); }}
-                title="Eliminar dataset"
+                title={t('schemaDiagram.deleteDataset')}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
               </button>
@@ -68,7 +71,7 @@ export function SchemaDiagram({ datasets, onDatasetClick, onDeleteDataset, activ
                   className="schema-diagram__type-badge"
                   style={{ backgroundColor: TYPE_COLORS[field.type] ?? '#94a3b8' }}
                 >
-                  {TYPE_ICONS[field.type] ?? '·'}
+                  {TYPE_ICONS[field.type] ?? '\u00B7'}
                 </span>
                 <span className="schema-diagram__field-name">
                   {field.name}
@@ -79,7 +82,7 @@ export function SchemaDiagram({ datasets, onDatasetClick, onDeleteDataset, activ
               </div>
             ))}
             {dataset.fields.length > 12 && (
-              <div className="schema-diagram__more">+{dataset.fields.length - 12} más...</div>
+              <div className="schema-diagram__more">+{dataset.fields.length - 12} {t('schemaDiagram.more')}</div>
             )}
           </div>
 
@@ -87,7 +90,7 @@ export function SchemaDiagram({ datasets, onDatasetClick, onDeleteDataset, activ
           {dataset.sampleRows.length > 0 && (
             <div className="schema-diagram__preview">
               <div className="schema-diagram__preview-header">
-                {dataset.sampleRows.length} filas
+                {dataset.sampleRows.length} {t('schemaDiagram.rows')}
               </div>
               <table className="schema-diagram__preview-table">
                 <thead>

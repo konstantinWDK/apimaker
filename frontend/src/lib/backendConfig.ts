@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-const STORAGE_KEY = 'apimaker-backend-config'
+const STORAGE_KEY = 'doapi-backend-config'
 
 export interface BackendConfig {
   baseUrl: string

@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { readBackendConfig } from '../lib/backendConfig'
 
-const TOKEN_STORAGE_KEY = 'apimaker-jwt-token'
-const USER_STORAGE_KEY = 'apimaker-jwt-user'
+const TOKEN_STORAGE_KEY = 'doapi-jwt-token'
+const USER_STORAGE_KEY = 'doapi-jwt-user'
 
 const buildUrl = (path: string) => {
   const config = readBackendConfig()

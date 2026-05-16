@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { readBackendConfig } from '../lib/backendConfig'
 
 interface TestResult {
@@ -16,6 +17,7 @@ const TEST_FILES = [
 ]
 
 export function TestRunnerPanel() {
+  const { t } = useTranslation()
   const [results, setResults] = useState<Record<string, TestResult | 'running' | null>>({})
   const [running, setRunning] = useState<string | null>(null)
 
@@ -23,7 +25,7 @@ export function TestRunnerPanel() {
     setRunning(testId)
     setResults(prev => ({ ...prev, [testId]: 'running' }))
     try {
-      const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
+      const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('doapi-jwt-token') : null
       const baseUrl = readBackendConfig().baseUrl?.replace(/\/$/, '') || 'http://localhost:8000'
       const res = await fetch(`${baseUrl}/admin/run-tests`, {
         method: 'POST',
@@ -45,18 +47,18 @@ export function TestRunnerPanel() {
   }
 
   const runAll = async () => {
-    for (const t of TEST_FILES) {
-      await runTest(t.id)
+    for (const tf of TEST_FILES) {
+      await runTest(tf.id)
     }
   }
 
-  const allDone = TEST_FILES.every(t => results[t.id] && results[t.id] !== 'running')
-  const totalPassed = TEST_FILES.reduce((acc, t) => {
-    const r = results[t.id]
+  const allDone = TEST_FILES.every(tf => results[tf.id] && results[tf.id] !== 'running')
+  const totalPassed = TEST_FILES.reduce((acc, tf) => {
+    const r = results[tf.id]
     return acc + (r && r !== 'running' ? (r as TestResult).passed : 0)
   }, 0)
-  const totalFailed = TEST_FILES.reduce((acc, t) => {
-    const r = results[t.id]
+  const totalFailed = TEST_FILES.reduce((acc, tf) => {
+    const r = results[tf.id]
     return acc + (r && r !== 'running' ? (r as TestResult).failed : 0)
   }, 0)
 
@@ -64,41 +66,40 @@ export function TestRunnerPanel() {
     <div className="test-runner">
       <div className="test-runner__header">
         <p className="test-runner__desc">
-          Ejecuta los tests del backend para verificar que los componentes principales funcionan correctamente.
-          Cada archivo de prueba cubre un area especifica del sistema.
+          {t('testRunner.description')}
         </p>
       </div>
 
       {allDone && (
         <div className={`test-runner__global ${totalFailed === 0 ? 'pass' : 'fail'}`}>
-          <span className="test-runner__global-icon">{totalFailed === 0 ? '✓' : '✗'}</span>
-          <span>{totalFailed === 0 ? 'Todos los tests pasaron' : `${totalFailed} test(s) fallaron`}</span>
+          <span className="test-runner__global-icon">{totalFailed === 0 ? '\u2713' : '\u2717'}</span>
+          <span>{totalFailed === 0 ? t('testRunner.allPassed') : t('testRunner.someFailed').replace('{count}', String(totalFailed))}</span>
           <span className="test-runner__global-counts">{totalPassed} passed / {totalFailed} failed</span>
         </div>
       )}
 
       <button type="button" className="btn primary" onClick={runAll} disabled={running !== null}>
-        {running !== null ? 'Ejecutando...' : 'Ejecutar todos'}
+        {running !== null ? t('testRunner.running') : t('testRunner.runAll')}
       </button>
 
       <div className="test-runner__list">
-        {TEST_FILES.map((t) => {
-          const res = results[t.id]
+        {TEST_FILES.map((tf) => {
+          const res = results[tf.id]
           const isRunning = res === 'running'
           const done = res && res !== 'running'
 
           return (
-            <div key={t.id} className={`test-item ${done ? (res as TestResult).success ? 'pass' : 'fail' : ''} ${isRunning ? 'running' : ''}`}>
+            <div key={tf.id} className={`test-item ${done ? (res as TestResult).success ? 'pass' : 'fail' : ''} ${isRunning ? 'running' : ''}`}>
               <div className="test-item__head">
                 <div className="test-item__info">
-                  <span className="test-item__name">{t.name}</span>
-                  <span className="test-item__file">{t.file}</span>
+                  <span className="test-item__name">{tf.name}</span>
+                  <span className="test-item__file">{tf.file}</span>
                 </div>
                 <div className="test-item__status">
                   {isRunning && <span className="test-item__spinner" />}
                   {done && (
                     <span className={`test-item__badge ${(res as TestResult).success ? 'pass' : 'fail'}`}>
-                      {(res as TestResult).success ? 'PASÓ' : 'FALLÓ'}
+                      {(res as TestResult).success ? t('testRunner.passedLabel') : t('testRunner.failedLabel')}
                     </span>
                   )}
                   {done && (
@@ -107,16 +108,16 @@ export function TestRunnerPanel() {
                     </span>
                   )}
                   {!done && !isRunning && (
-                    <button type="button" className="btn ghost btn-sm" onClick={() => runTest(t.id)}>
-                      Ejecutar
+                    <button type="button" className="btn ghost btn-sm" onClick={() => runTest(tf.id)}>
+                      {t('testRunner.execute')}
                     </button>
                   )}
                 </div>
               </div>
-              <p className="test-item__desc">{t.desc}</p>
+              <p className="test-item__desc">{tf.desc}</p>
               {done && (res as TestResult).output && (
                 <details className="test-item__details">
-                  <summary>Ver salida</summary>
+                  <summary>{t('testRunner.viewOutput')}</summary>
                   <pre className="test-item__output">{(res as TestResult).output}</pre>
                 </details>
               )}

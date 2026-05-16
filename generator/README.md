@@ -1,10 +1,10 @@
 # Generator Module
 
-Este directorio alojará las plantillas y scripts encargados de traducir el modelo declarativo del usuario en código real:
+This directory will host the templates and scripts responsible for translating the user's declarative model into real code:
 
-- Plantillas Jinja2 para FastAPI, Express y Nest.
-- Configuraciones Docker y pipelines CI (GitHub Actions).
-- Generación de SDKs a partir de OpenAPI (utilizando `openapi-generator-cli`).
-- Empaquetado final en `.zip` y publicación opcional en un registry privado.
+- Jinja2 templates for FastAPI, Express, and Nest.
+- Docker configurations and CI pipelines (GitHub Actions).
+- SDK generation from OpenAPI (using `openapi-generator-cli`).
+- Final packaging into `.zip` and optional publication to a private registry.
 
-Pendiente: definir interfaz entre backend y generador (probablemente cola Celery + almacenamiento en S3).
+Pending: define the interface between backend and generator (likely Celery queue + S3 storage).

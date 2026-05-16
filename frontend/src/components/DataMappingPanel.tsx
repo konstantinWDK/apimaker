@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { DatasetMeta, MappingRule } from '../types/schemas'
 
 interface Props {
@@ -8,20 +9,24 @@ interface Props {
   onRemoveMapping: (mappingId: string) => void
 }
 
-const TRANSFORM_OPTIONS = [
-  { value: 'direct', label: 'Directa (1:1)' },
-  { value: 'cast', label: 'Conversión de tipo' },
-  { value: 'concat', label: 'Concatenar' },
-  { value: 'format', label: 'Formatear' },
-]
-
 export function DataMappingPanel({ datasets, mappings, onAddMapping, onRemoveMapping }: Props) {
+  const { t } = useTranslation()
   const [sourceDsId, setSourceDsId] = useState(datasets[0]?.id ?? '')
   const [targetDsId, setTargetDsId] = useState(datasets[1]?.id ?? datasets[0]?.id ?? '')
   const [selectedSource, setSelectedSource] = useState<string | null>(null)
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [lines, setLines] = useState<Array<{ id: string; x1: number; y1: number; x2: number; y2: number }>>([])
+
+  const TRANSFORM_OPTIONS = useMemo(
+    () => [
+      { value: 'direct', label: t('mapping.direct') },
+      { value: 'cast', label: t('mapping.typeConversion') },
+      { value: 'concat', label: t('mapping.concatenate') },
+      { value: 'format', label: t('mapping.format') },
+    ],
+    [t],
+  )
 
   const sourceDataset = useMemo(() => datasets.find(d => d.id === sourceDsId), [datasets, sourceDsId])
   const targetDataset = useMemo(() => datasets.find(d => d.id === targetDsId), [datasets, targetDsId])
@@ -106,16 +111,16 @@ export function DataMappingPanel({ datasets, mappings, onAddMapping, onRemoveMap
   return (
     <div className="data-mapping">
       <div className="data-mapping__header">
-        <h3 className="data-mapping__title">Mapeo de Campos</h3>
+        <h3 className="data-mapping__title">{t('mapping.title')}</h3>
         <p className="data-mapping__subtitle">
-          Selecciona un campo origen y luego un campo destino para crear una conexión
+          {t('mapping.description')}
         </p>
       </div>
 
       {/* Dataset selectors */}
       <div className="data-mapping__selectors">
         <div className="data-mapping__selector">
-          <label>Dataset Origen</label>
+          <label>{t('mapping.sourceDataset')}</label>
           <select value={sourceDsId} onChange={e => { setSourceDsId(e.target.value); setSelectedSource(null); setSelectedTarget(null) }}>
             {datasets.map(d => (
               <option key={d.id} value={d.id}>{d.name}</option>
@@ -124,7 +129,7 @@ export function DataMappingPanel({ datasets, mappings, onAddMapping, onRemoveMap
         </div>
         <div className="data-mapping__arrow">→</div>
         <div className="data-mapping__selector">
-          <label>Dataset Destino</label>
+          <label>{t('mapping.targetDataset')}</label>
           <select value={targetDsId} onChange={e => { setTargetDsId(e.target.value); setSelectedSource(null); setSelectedTarget(null) }}>
             {datasets.map(d => (
               <option key={d.id} value={d.id}>{d.name}</option>
@@ -135,7 +140,7 @@ export function DataMappingPanel({ datasets, mappings, onAddMapping, onRemoveMap
 
       {sourceDsId === targetDsId && (
         <div className="data-mapping__warning">
-          Selecciona dos datasets diferentes para crear un mapeo
+          {t('mapping.selectDatasets')}
         </div>
       )}
 
@@ -166,7 +171,7 @@ export function DataMappingPanel({ datasets, mappings, onAddMapping, onRemoveMap
           <div className="data-mapping__column data-mapping__column--source">
             <div className="data-mapping__column-header">
               <span className="data-mapping__column-title">{sourceDataset?.name}</span>
-              <span className="data-mapping__column-count">{sourceFieldList.length} campos</span>
+              <span className="data-mapping__column-count">{sourceFieldList.length} {t('mapping.noFields')}</span>
             </div>
             <div className="data-mapping__fields">
               {sourceFieldList.map(f => {
@@ -194,7 +199,7 @@ export function DataMappingPanel({ datasets, mappings, onAddMapping, onRemoveMap
                 )
               })}
               {sourceFieldList.length === 0 && (
-                <div className="data-mapping__empty">Sin campos</div>
+                <div className="data-mapping__empty">{t('mapping.noFields')}</div>
               )}
             </div>
           </div>
@@ -203,7 +208,7 @@ export function DataMappingPanel({ datasets, mappings, onAddMapping, onRemoveMap
           <div className="data-mapping__column data-mapping__column--target">
             <div className="data-mapping__column-header">
               <span className="data-mapping__column-title">{targetDataset?.name}</span>
-              <span className="data-mapping__column-count">{targetFieldList.length} campos</span>
+              <span className="data-mapping__column-count">{targetFieldList.length} {t('mapping.noFields')}</span>
             </div>
             <div className="data-mapping__fields">
               {targetFieldList.map(f => {
@@ -231,7 +236,7 @@ export function DataMappingPanel({ datasets, mappings, onAddMapping, onRemoveMap
                 )
               })}
               {targetFieldList.length === 0 && (
-                <div className="data-mapping__empty">Sin campos</div>
+                <div className="data-mapping__empty">{t('mapping.noFields')}</div>
               )}
             </div>
           </div>
@@ -241,7 +246,7 @@ export function DataMappingPanel({ datasets, mappings, onAddMapping, onRemoveMap
       {/* Existing mappings list */}
       {mappings.length > 0 && (
         <div className="data-mapping__list">
-          <h4>Conexiones ({mappings.length})</h4>
+          <h4>{t('mapping.connections', { count: mappings.length })}</h4>
           <div className="data-mapping__list-items">
             {mappings.map(m => {
               const srcField = getFieldById(m.sourceDatasetId, m.sourceFieldId)
@@ -266,7 +271,7 @@ export function DataMappingPanel({ datasets, mappings, onAddMapping, onRemoveMap
                     type="button"
                     className="data-mapping__list-remove"
                     onClick={() => onRemoveMapping(m.id)}
-                    title="Eliminar conexión"
+                    title={t('mapping.deleteConnection')}
                   >
                     ✕
                   </button>

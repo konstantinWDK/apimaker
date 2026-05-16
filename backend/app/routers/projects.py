@@ -479,7 +479,7 @@ def project_docs(
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     spec_url = f"/projects/{project_id}/openapi.json"
-    return get_redoc_html(openapi_url=spec_url, title=f"Documentación · {db_project.name}")
+    return get_redoc_html(openapi_url=spec_url, title=f"Documentation · {db_project.name}")
 
 
 @router.get("/{project_id}/download")

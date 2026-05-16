@@ -49,8 +49,8 @@ interface BuilderState {
   setGlobalDeployState: (state: 'idle' | 'deploying' | 'success' | 'error', status?: string) => void
 }
 
-const STORAGE_KEY = 'apimaker-project'
-export const PROJECTS_STORAGE_KEY = 'apimaker-projects'
+const STORAGE_KEY = 'doapi-project'
+export const PROJECTS_STORAGE_KEY = 'doapi-projects'
 const createId = () => crypto.randomUUID()
 
 export const createDefaultProject = (): ProjectDraft => {
@@ -459,7 +459,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
 
   saveProject: async () => {
     const { project, refreshProjects } = get()
-    const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
+    const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('doapi-jwt-token') : null
     if (!token) {
       fireToast('No hay sesión activa. Inicia sesión primero.', 'error')
       return null

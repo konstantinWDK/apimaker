@@ -61,7 +61,7 @@ async def test_connection(
                     conn.execute(sqlalchemy.text("SELECT 1"))
                 engine.dispose()
                 os.unlink(tmp_path)  # Clean up temp file
-                return {"ok": True, "message": "Conexión exitosa"}
+                return {"ok": True, "message": "Connection successful"}
             except Exception:
                 os.unlink(tmp_path)  # Clean up on error
                 raise
@@ -77,11 +77,11 @@ async def test_connection(
         with engine.connect() as conn:
             conn.execute(sqlalchemy.text("SELECT 1"))
         engine.dispose()
-        return {"ok": True, "message": "Conexión exitosa"}
+        return {"ok": True, "message": "Connection successful"}
     except HTTPException:
         raise
     except Exception as e:
-        return {"ok": False, "message": "No se pudo establecer la conexión. Verifica las credenciales."}
+        return {"ok": False, "message": "Could not establish connection. Check the credentials."}
 
 
 @router.post("/introspect")

@@ -1,7 +1,7 @@
-# Script to start the API Maker backend on Windows (PowerShell)
+# Script to start the DoApi backend on Windows (PowerShell)
 
 $BACKEND_DIR = Get-Location
-Write-Host "Starting API Maker Backend..."
+Write-Host "Starting DoApi Backend..."
 
 # Check if .venv exists
 if (!(Test-Path ".venv")) {

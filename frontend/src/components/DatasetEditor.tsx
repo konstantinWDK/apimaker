@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { read, utils } from 'xlsx'
 
 import type { DatasetMeta, FieldSchema, FakerCategory } from '../types/schemas'
@@ -11,42 +12,9 @@ interface Props {
   otherDatasets?: { id: string; name: string; fields: FieldSchema[] }[]
 }
 
-const FIELD_TYPES: Array<{ value: FieldSchema['type']; label: string; icon: string }> = [
-  { value: 'string', label: 'Texto', icon: 'Aa' },
-  { value: 'integer', label: 'Entero', icon: '123' },
-  { value: 'float', label: 'Decimal', icon: '1.5' },
-  { value: 'boolean', label: 'Booleano', icon: 'B' },
-  { value: 'datetime', label: 'Fecha', icon: 'DT' },
-  { value: 'email', label: 'Email', icon: '@' },
-  { value: 'uuid', label: 'UUID', icon: 'ID' },
-]
-
-const FAKER_CATEGORIES: Array<{ value: FakerCategory; label: string }> = [
-  { value: 'auto', label: 'Automático' },
-  { value: 'name', label: 'Nombre' },
-  { value: 'email', label: 'Email' },
-  { value: 'company', label: 'Empresa' },
-  { value: 'address', label: 'Dirección' },
-  { value: 'phone', label: 'Teléfono' },
-  { value: 'product', label: 'Producto' },
-  { value: 'date', label: 'Fecha' },
-  { value: 'number', label: 'Número' },
-  { value: 'boolean', label: 'Booleano' },
-  { value: 'text', label: 'Texto' },
-  { value: 'uuid', label: 'UUID' },
-]
-
-const emptyField = (): FieldSchema => ({
-  id: crypto.randomUUID(),
-  name: '',
-  type: 'string',
-  required: true,
-  description: '',
-  fakerCategory: 'auto',
-})
-
 export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets = [] }: Props) {
-  const [name, setName] = useState(dataset?.name ?? 'Dataset principal')
+  const { t } = useTranslation()
+  const [name, setName] = useState(dataset?.name ?? t('datasetEditor.defaultName'))
   const [description, setDescription] = useState(dataset?.description ?? '')
   const [sourceType, setSourceType] = useState<DatasetMeta['sourceType']>(dataset?.sourceType ?? 'manual')
   const [fields, setFields] = useState<FieldSchema[]>(dataset?.fields ?? [])
@@ -56,6 +24,37 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
   const [expandedFieldId, setExpandedFieldId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
+  const FIELD_TYPES: Array<{ value: FieldSchema['type']; label: string; icon: string }> = useMemo(
+    () => [
+      { value: 'string', label: t('datasetEditor.text'), icon: 'Aa' },
+      { value: 'integer', label: t('datasetEditor.integer'), icon: '123' },
+      { value: 'float', label: t('datasetEditor.decimal'), icon: '1.5' },
+      { value: 'boolean', label: t('datasetEditor.boolean'), icon: 'B' },
+      { value: 'datetime', label: t('datasetEditor.date'), icon: 'DT' },
+      { value: 'email', label: t('datasetEditor.email'), icon: '@' },
+      { value: 'uuid', label: t('datasetEditor.uuid'), icon: 'ID' },
+    ],
+    [t],
+  )
+
+  const FAKER_CATEGORIES: Array<{ value: FakerCategory; label: string }> = useMemo(
+    () => [
+      { value: 'auto', label: t('datasetEditor.auto') },
+      { value: 'name', label: t('datasetEditor.name') },
+      { value: 'email', label: t('datasetEditor.email') },
+      { value: 'company', label: t('datasetEditor.company') },
+      { value: 'address', label: t('datasetEditor.address') },
+      { value: 'phone', label: t('datasetEditor.phone') },
+      { value: 'product', label: t('datasetEditor.product') },
+      { value: 'date', label: t('datasetEditor.date') },
+      { value: 'number', label: t('datasetEditor.number') },
+      { value: 'boolean', label: t('datasetEditor.boolean') },
+      { value: 'text', label: t('datasetEditor.text') },
+      { value: 'uuid', label: t('datasetEditor.uuid') },
+    ],
+    [t],
+  )
+
   const hasValidFields = useMemo(() => fields.every((f) => f.name.trim().length > 0), [fields])
 
   // Sync when dataset prop changes
@@ -63,7 +62,7 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
     if (dataset?.id) {
       setFields(dataset.fields ?? [])
       setSampleRows(dataset.sampleRows ?? [])
-      setName(dataset.name ?? 'Dataset principal')
+      setName(dataset.name ?? t('datasetEditor.defaultName'))
       setDescription(dataset.description ?? '')
       setSourceType(dataset.sourceType ?? 'manual')
     }
@@ -76,6 +75,15 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
       return () => clearTimeout(timer)
     }
   }, [fields, name, description, sourceType])
+
+  const emptyField = (): FieldSchema => ({
+    id: crypto.randomUUID(),
+    name: '',
+    type: 'string',
+    required: true,
+    description: '',
+    fakerCategory: 'auto',
+  })
 
   // ─── Field operations ──────────────────────────────────────
   const addField = () => {
@@ -177,9 +185,9 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
       const buffer = await file.arrayBuffer()
       const workbook = read(buffer, { type: 'array' })
       const sheetName = workbook.SheetNames[0]
-      if (!sheetName) throw new Error('El archivo no tiene contenido')
+      if (!sheetName) throw new Error(t('datasetUploader.emptyFile'))
       const jsonRows = utils.sheet_to_json<Record<string, string>>(workbook.Sheets[sheetName], { defval: '' })
-      if (!jsonRows.length) throw new Error('El archivo está vacío')
+      if (!jsonRows.length) throw new Error(t('datasetUploader.fileEmpty'))
 
       const headers = new Set<string>()
       jsonRows.forEach(row => Object.keys(row).forEach(key => headers.add(key)))
@@ -198,7 +206,7 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
       setSourceType('upload')
       setActiveSubTab('schema')
     } catch (error) {
-      setUploadError(error instanceof Error ? error.message : 'Error al procesar archivo')
+      setUploadError(error instanceof Error ? error.message : t('datasetUploader.processError'))
     }
   }
 
@@ -226,7 +234,7 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
             className="dataset-editor__name"
             value={name}
             onChange={e => setName(e.target.value)}
-            placeholder="Nombre del dataset"
+            placeholder={t('datasetEditor.namePlaceholder')}
           />
         </div>
         <input
@@ -234,7 +242,7 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
           className="dataset-editor__desc"
           value={description}
           onChange={e => setDescription(e.target.value)}
-          placeholder="Descripción (opcional) — ej: 'Usuarios registrados en la plataforma'"
+          placeholder={t('datasetEditor.descPlaceholder')}
         />
       </div>
 
@@ -245,7 +253,7 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
           className={activeSubTab === 'schema' ? 'active' : ''}
           onClick={() => setActiveSubTab('schema')}
         >
-          Esquema
+          {t('datasetEditor.schema')}
           <span className="badge">{fields.length}</span>
         </button>
         <button
@@ -253,7 +261,7 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
           className={activeSubTab === 'data' ? 'active' : ''}
           onClick={() => setActiveSubTab('data')}
         >
-          Datos
+          {t('datasetEditor.data')}
           <span className="badge">{sampleRows.length}</span>
         </button>
         <button
@@ -261,7 +269,7 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
           className={activeSubTab === 'import' ? 'active' : ''}
           onClick={() => setActiveSubTab('import')}
         >
-          Importar
+          {t('datasetEditor.import')}
         </button>
       </div>
 
@@ -271,7 +279,7 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
           <div className="schema-editor">
             <div className="schema-editor__toolbar">
               <button type="button" className="btn ghost btn-sm" onClick={addField}>
-                + Campo
+                {t('datasetEditor.addField')}
               </button>
             </div>
 
@@ -287,7 +295,7 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
                       <input
                         type="text"
                         className="schema-field__name"
-                        placeholder="nombre_campo"
+                        placeholder={t('datasetEditor.fieldNamePlaceholder')}
                         value={field.name}
                         onChange={e => updateField(field.id, { name: e.target.value })}
                         onFocus={() => setExpandedFieldId(field.id)}
@@ -308,26 +316,26 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
                           <option key={t.value} value={t.value}>{t.icon} {t.label}</option>
                         ))}
                       </select>
-                      <label className="schema-field__required" title="Campo obligatorio">
+                      <label className="schema-field__required" title={t('datasetEditor.req')}>
                         <input
                           type="checkbox"
                           checked={field.required}
                           onChange={e => updateField(field.id, { required: e.target.checked })}
                         />
-                        <span>Req</span>
+                        <span>{t('datasetEditor.req')}</span>
                       </label>
-                      <label className="schema-field__pk" title="Clave primaria">
+                      <label className="schema-field__pk" title={t('datasetEditor.pk')}>
                         <input
                           type="checkbox"
                           checked={field.isPrimaryKey ?? false}
                           onChange={e => updateField(field.id, { isPrimaryKey: e.target.checked })}
                         />
-                        <span>PK</span>
+                        <span>{t('datasetEditor.pk')}</span>
                       </label>
                       <button type="button" className="schema-field__expand" onClick={() => setExpandedFieldId(isExpanded ? null : field.id)}>
                         {isExpanded ? '▾' : '▸'}
                       </button>
-                      <button type="button" className="schema-field__dup" onClick={() => duplicateField(field.id)} title="Duplicar">⧉</button>
+                      <button type="button" className="schema-field__dup" onClick={() => duplicateField(field.id)} title={t('datasetEditor.duplicate')}>⧉</button>
                       <button type="button" className="schema-field__remove" onClick={() => removeField(field.id)} disabled={fields.length === 1}>✕</button>
                     </div>
 
@@ -335,16 +343,16 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
                     {isExpanded && (
                       <div className="schema-field__details">
                         <label className="schema-field__detail">
-                          <span>Descripción</span>
+                          <span>{t('datasetEditor.description')}</span>
                           <input
                             type="text"
                             value={field.description ?? ''}
                             onChange={e => updateField(field.id, { description: e.target.value })}
-                            placeholder="Qué representa este campo..."
+                            placeholder={t('datasetEditor.descFieldPlaceholder')}
                           />
                         </label>
                         <label className="schema-field__detail">
-                          <span>Generador de datos</span>
+                          <span>{t('datasetEditor.dataGenerator')}</span>
                           <select
                             value={field.fakerCategory ?? 'auto'}
                             onChange={e => updateField(field.id, { fakerCategory: e.target.value as FakerCategory })}
@@ -355,29 +363,29 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
                           </select>
                           {field.fakerCategory !== 'auto' && (
                             <span className="schema-field__hint">
-                              Ejemplo: {generateFakeValue({ ...field, fakerCategory: field.fakerCategory as FakerCategory }, 0)}
+                              {generateFakeValue({ ...field, fakerCategory: field.fakerCategory as FakerCategory }, 0)}
                             </span>
                           )}
                         </label>
                         <label className="schema-field__detail">
-                          <span>Valores permitidos (enum)</span>
+                          <span>{t('datasetEditor.enumValues')}</span>
                           <input
                             type="text"
                             value={(field.enum ?? []).join(', ')}
                             onChange={e => updateField(field.id, {
                               enum: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
                             })}
-                            placeholder="activo, pendiente, cancelado"
+                            placeholder={t('datasetEditor.enumPlaceholder')}
                           />
-                          <span className="schema-field__hint">Separados por coma</span>
+                          <span className="schema-field__hint">{t('datasetEditor.enumHint')}</span>
                         </label>
                         <label className="schema-field__detail">
-                          <span>Valor por defecto</span>
+                          <span>{t('datasetEditor.defaultValue')}</span>
                           <input
                             type="text"
                             value={field.defaultValue ?? ''}
                             onChange={e => updateField(field.id, { defaultValue: e.target.value })}
-                            placeholder="Valor inicial..."
+                            placeholder={t('datasetEditor.defaultPlaceholder')}
                           />
                         </label>
                       </div>
@@ -388,9 +396,9 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
 
               {fields.length === 0 && (
                 <div className="schema-editor__empty">
-                  <p>No hay campos definidos</p>
+                  <p>{t('datasetEditor.noFields')}</p>
                   <button type="button" className="btn primary" onClick={addField}>
-                    + Añadir primer campo
+                    {t('datasetEditor.addFirstField')}
                   </button>
                 </div>
               )}
@@ -401,10 +409,10 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
         {activeSubTab === 'data' && (
           <div className="data-editor">
             <div className="data-editor__toolbar">
-              <span className="data-editor__count">{sampleRows.length} filas</span>
-              <button type="button" className="btn ghost btn-sm" onClick={addRow}>+ Fila</button>
-              <button type="button" className="btn ghost btn-sm" onClick={() => generateData(10)}>Regenerar 10</button>
-              <button type="button" className="btn ghost btn-sm" onClick={() => generateData(50)}>Regenerar 50</button>
+              <span className="data-editor__count">{t('datasetEditor.rows', { count: sampleRows.length })}</span>
+              <button type="button" className="btn ghost btn-sm" onClick={addRow}>{t('datasetEditor.addRow')}</button>
+              <button type="button" className="btn ghost btn-sm" onClick={() => generateData(10)}>{t('datasetEditor.regenerate10')}</button>
+              <button type="button" className="btn ghost btn-sm" onClick={() => generateData(50)}>{t('datasetEditor.regenerate50')}</button>
             </div>
             <DataEditor
               fields={fields}
@@ -419,11 +427,11 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
 
         {activeSubTab === 'import' && (
           <div className="import-panel">
-            <h3>Importar desde CSV / Excel</h3>
-            <p className="muted-text">Sube un archivo .csv, .xlsx o .xls y se inferirá el esquema automáticamente.</p>
+            <h3>{t('datasetEditor.importCsv')}</h3>
+            <p className="muted-text">{t('datasetEditor.importCsvDesc')}</p>
             <div className="import-panel__dropzone" onClick={() => fileInputRef.current?.click()}>
               <span className="import-panel__icon"></span>
-              <p>Arrastra un archivo o haz clic para seleccionar</p>
+              <p>{t('datasetEditor.importDrag')}</p>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -437,7 +445,7 @@ export function DatasetEditor({ dataset, onCommit, otherDatasets: _otherDatasets
             </div>
             {uploadError && <p className="error-text">{uploadError}</p>}
             <div className="import-panel__note">
-              <p><strong>Nota:</strong> Los tipos de datos se inferirán automáticamente del contenido del archivo.</p>
+              <p>{t('datasetEditor.importNote')}</p>
             </div>
           </div>
         )}

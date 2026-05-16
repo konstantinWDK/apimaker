@@ -1,0 +1,124 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "build": {
+      "mode": "primary",
+      "model": "deepseek/deepseek-v4-flash",
+      "permission": {
+        "edit": "allow",
+        "bash": "allow"
+      }
+    },
+    "plan": {
+      "mode": "primary",
+      "model": "deepseek/deepseek-v4-flash",
+      "permission": {
+        "edit": "deny",
+        "bash": "deny"
+      }
+    },
+    "backend": {
+      "description": "Develops the FastAPI backend: routers, services, db_models, security, mock server",
+      "mode": "subagent",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt": "{file:.opencode/prompts/backend.txt}",
+      "color": "#3b82f6",
+      "permission": {
+        "edit": "allow",
+        "bash": {
+          "*": "ask",
+          "pytest *": "allow",
+          "uvicorn *": "allow",
+          "alembic *": "allow",
+          "pip install *": "allow"
+        }
+      }
+    },
+    "frontend": {
+      "description": "Develops the React frontend: components, hooks, styles, API client, types",
+      "mode": "subagent",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt": "{file:.opencode/prompts/frontend.txt}",
+      "color": "#10b981",
+      "permission": {
+        "edit": "allow",
+        "bash": {
+          "*": "ask",
+          "npm run dev": "allow",
+          "npm run lint": "allow",
+          "npm run build": "allow",
+          "npm test": "allow",
+          "npm install": "allow"
+        }
+      }
+    },
+    "generator": {
+      "description": "Manages Jinja2 templates for the code generator: FastAPI, Express, NestJS, SDKs",
+      "mode": "subagent",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt": "{file:.opencode/prompts/generator.txt}",
+      "color": "#f59e0b",
+      "permission": {
+        "edit": "allow",
+        "bash": {
+          "*": "ask",
+          "pytest * -k generator": "allow"
+        }
+      }
+    },
+    "tester": {
+      "description": "Writes and runs tests: pytest backend, vitest frontend",
+      "mode": "subagent",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt": "{file:.opencode/prompts/tester.txt}",
+      "color": "#8b5cf6",
+      "permission": {
+        "edit": "allow",
+        "bash": {
+          "pytest *": "allow",
+          "npm test": "allow",
+          "npm run test": "allow"
+        }
+      }
+    },
+    "deploy": {
+      "description": "Manages Docker, docker-compose, local and remote deploys, and infrastructure",
+      "mode": "subagent",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt": "{file:.opencode/prompts/deploy.txt}",
+      "color": "#ef4444",
+      "permission": {
+        "edit": "allow",
+        "bash": {
+          "docker *": "allow",
+          "docker-compose *": "allow",
+          "docker compose *": "allow"
+        }
+      }
+    },
+    "docs": {
+      "description": "Maintains project documentation: README, API.md, ROADMAP, guides",
+      "mode": "subagent",
+      "model": "deepseek/deepseek-v4-flash",
+      "color": "#06b6d4",
+      "permission": {
+        "edit": "allow",
+        "bash": "deny"
+      }
+    },
+    "reviewer": {
+      "description": "Reviews code for security, performance, and maintainability issues",
+      "mode": "subagent",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt": "{file:.opencode/prompts/review.txt}",
+      "color": "#f97316",
+      "permission": {
+        "edit": "deny",
+        "bash": "deny"
+      }
+    }
+  },
+  "rules": [
+    "{file:.opencode/rules/project-rules.md}"
+  ]
+}

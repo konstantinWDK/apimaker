@@ -2,7 +2,7 @@
   {
     "id": "demo-project-001",
     "name": "Pok\u00e9dex demo",
-    "description": "API en memoria para listar, registrar y actualizar Pok\u00e9mon y entrenadores favoritos",
+    "description": "In-memory API to list, register, and update favorite Pok\u00e9mon and trainers",
     "authMethod": "none",
     "targetStack": "fastapi",
     "datasets": [
@@ -54,17 +54,17 @@
       }
     ],
     "endpoints": [
-      { "id": "ep-1", "name": "List pokemon", "method": "GET", "path": "/pokemon", "summary": "Lista paginada de Pok\u00e9mon", "operationType": "list" },
-      { "id": "ep-2", "name": "Search pokemon", "method": "GET", "path": "/pokemon/search", "summary": "Filtra por nombre, regi\u00f3n o tipo", "operationType": "custom" },
-      { "id": "ep-3", "name": "Pokemon detail", "method": "GET", "path": "/pokemon/{id}", "summary": "Obtiene el detalle de un Pok\u00e9mon", "operationType": "get" },
-      { "id": "ep-4", "name": "Create pokemon", "method": "POST", "path": "/pokemon", "summary": "Registra un nuevo Pok\u00e9mon descubierto", "operationType": "create" },
-      { "id": "ep-5", "name": "Update pokemon", "method": "PUT", "path": "/pokemon/{id}", "summary": "Actualiza stats o metadatos de un Pok\u00e9mon", "operationType": "update" },
-      { "id": "ep-6", "name": "Delete pokemon", "method": "DELETE", "path": "/pokemon/{id}", "summary": "Elimina registros duplicados o err\u00f3neos", "operationType": "delete" },
-      { "id": "ep-7", "name": "List trainers", "method": "GET", "path": "/trainers", "summary": "Lista paginada de entrenadores", "operationType": "list" },
-      { "id": "ep-8", "name": "Trainer detail", "method": "GET", "path": "/trainers/{id}", "summary": "Obtiene el detalle de un entrenador", "operationType": "get" },
-      { "id": "ep-9", "name": "Create trainer", "method": "POST", "path": "/trainers", "summary": "Registra un nuevo entrenador", "operationType": "create" },
-      { "id": "ep-10", "name": "Update trainer", "method": "PUT", "path": "/trainers/{id}", "summary": "Actualiza los datos de un entrenador", "operationType": "update" },
-      { "id": "ep-11", "name": "Delete trainer", "method": "DELETE", "path": "/trainers/{id}", "summary": "Elimina un entrenador", "operationType": "delete" }
+      { "id": "ep-1", "name": "List pokemon", "method": "GET", "path": "/pokemon", "summary": "Paginated list of Pok\u00e9mon", "operationType": "list" },
+      { "id": "ep-2", "name": "Search pokemon", "method": "GET", "path": "/pokemon/search", "summary": "Filter by name, region, or type", "operationType": "custom" },
+      { "id": "ep-3", "name": "Pokemon detail", "method": "GET", "path": "/pokemon/{id}", "summary": "Get Pok\u00e9mon details", "operationType": "get" },
+      { "id": "ep-4", "name": "Create pokemon", "method": "POST", "path": "/pokemon", "summary": "Register a newly discovered Pok\u00e9mon", "operationType": "create" },
+      { "id": "ep-5", "name": "Update pokemon", "method": "PUT", "path": "/pokemon/{id}", "summary": "Update Pok\u00e9mon stats or metadata", "operationType": "update" },
+      { "id": "ep-6", "name": "Delete pokemon", "method": "DELETE", "path": "/pokemon/{id}", "summary": "Delete duplicate or erroneous records", "operationType": "delete" },
+      { "id": "ep-7", "name": "List trainers", "method": "GET", "path": "/trainers", "summary": "Paginated list of trainers", "operationType": "list" },
+      { "id": "ep-8", "name": "Trainer detail", "method": "GET", "path": "/trainers/{id}", "summary": "Get trainer details", "operationType": "get" },
+      { "id": "ep-9", "name": "Create trainer", "method": "POST", "path": "/trainers", "summary": "Register a new trainer", "operationType": "create" },
+      { "id": "ep-10", "name": "Update trainer", "method": "PUT", "path": "/trainers/{id}", "summary": "Update trainer data", "operationType": "update" },
+      { "id": "ep-11", "name": "Delete trainer", "method": "DELETE", "path": "/trainers/{id}", "summary": "Delete a trainer", "operationType": "delete" }
     ]
   }
 ]

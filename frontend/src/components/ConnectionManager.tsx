@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { ColumnInfo, DbConnectionInfo, TableInfo } from '../lib/api'
 import { createConnection, deleteConnection, getTableSchema, listConnections, listTables, testConnection, updateConnection } from '../lib/api'
 import { useToast } from './Toast'
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export function ConnectionManager({ projectId, onImportTable }: Props) {
+  const { t } = useTranslation()
   const [connections, setConnections] = useState<DbConnectionInfo[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -36,7 +38,7 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
   }
 
   const handleSave = async () => {
-    if (!form.name.trim()) { toast('El nombre es obligatorio', 'error'); return }
+    if (!form.name.trim()) { toast(t('connectionManager.nameRequired'), 'error'); return }
     try {
       if (editingId) {
         const updates: any = { name: form.name }
@@ -46,10 +48,10 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
         if (form.password) updates.password = form.password
         if (form.database) updates.database = form.database
         await updateConnection(editingId, updates)
-        toast('Conexion actualizada', 'info')
+        toast(t('connectionManager.updated'), 'info')
       } else {
         await createConnection(projectId, form)
-        toast('Conexion creada', 'info')
+        toast(t('connectionManager.created'), 'info')
       }
       resetForm()
       load()
@@ -57,10 +59,10 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
   }
 
   const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Eliminar conexion "${name}"?`)) return
+    if (!window.confirm(t('connectionManager.confirmDelete').replace('{name}', name))) return
     try {
       await deleteConnection(id)
-      toast('Conexion eliminada', 'info')
+      toast(t('connectionManager.deleted'), 'info')
       load()
     } catch (e: any) { toast(e.message, 'error') }
   }
@@ -80,8 +82,8 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
     setExploringId(id)
     setSchemaView(null)
     try {
-      const t = await listTables(id)
-      setTables(t)
+      const tbls = await listTables(id)
+      setTables(tbls)
     } catch (e: any) { toast(e.message, 'error') }
     setExploringId(null)
   }
@@ -98,7 +100,7 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
     onImportTable(table, columns)
     setExploringId(null)
     setSchemaView(null)
-    toast(`Tabla "${table}" importada como dataset`, 'info')
+    toast(t('connectionManager.imported').replace('{table}', table), 'info')
   }
 
   const dbTypeLabel = (t: string) => ({ postgresql: 'PostgreSQL', mysql: 'MySQL', sqlite: 'SQLite', mssql: 'SQL Server' })[t] || t
@@ -106,9 +108,9 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
   return (
     <div className="conn-mgr">
       <div className="conn-mgr__header">
-        <p className="conn-mgr__title">Conexiones a Bases de Datos Externas</p>
+        <p className="conn-mgr__title">{t('connectionManager.title')}</p>
         <button type="button" className="btn primary btn-small" onClick={() => resetForm()}>
-          + Nueva conexion
+          + {t('connectionManager.newConnection')}
         </button>
       </div>
 
@@ -116,9 +118,9 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
       {showForm && (
         <div className="conn-mgr__form">
           <div className="conn-mgr__form-grid">
-            <label className="form-field"><span className="label">Nombre</span>
-              <input className="field" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Mi BD Produccion" /></label>
-            <label className="form-field"><span className="label">Tipo</span>
+            <label className="form-field"><span className="label">{t('connectionManager.name')}</span>
+              <input className="field" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder={t('connectionManager.namePlaceholder')} /></label>
+            <label className="form-field"><span className="label">{t('connectionManager.type')}</span>
               <select className="field" value={form.db_type} onChange={e => setForm({ ...form, db_type: e.target.value })}>
                 <option value="postgresql">PostgreSQL</option>
                 <option value="mysql">MySQL</option>
@@ -127,28 +129,28 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
               </select></label>
             {form.db_type !== 'sqlite' && (
               <>
-                <label className="form-field"><span className="label">Host</span>
+                <label className="form-field"><span className="label">{t('connectionManager.host')}</span>
                   <input className="field" value={form.host} onChange={e => setForm({ ...form, host: e.target.value })} placeholder="localhost" /></label>
-                <label className="form-field"><span className="label">Puerto</span>
+                <label className="form-field"><span className="label">{t('connectionManager.port')}</span>
                   <input className="field" type="number" value={form.port} onChange={e => setForm({ ...form, port: parseInt(e.target.value) || 5432 })} /></label>
-                <label className="form-field"><span className="label">Usuario</span>
+                <label className="form-field"><span className="label">{t('connectionManager.user')}</span>
                   <input className="field" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} placeholder="postgres" /></label>
-                <label className="form-field"><span className="label">Contraseña</span>
+                <label className="form-field"><span className="label">{t('connectionManager.password')}</span>
                   <input className="field" type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} /></label>
-                <label className="form-field"><span className="label">Base de datos</span>
+                <label className="form-field"><span className="label">{t('connectionManager.database')}</span>
                   <input className="field" value={form.database} onChange={e => setForm({ ...form, database: e.target.value })} placeholder="mi_db" /></label>
               </>
             )}
             {form.db_type === 'sqlite' && (
-              <label className="form-field" style={{ gridColumn: '1 / -1' }}><span className="label">Ruta del archivo</span>
+              <label className="form-field" style={{ gridColumn: '1 / -1' }}><span className="label">{t('connectionManager.filePath')}</span>
                 <input className="field" value={form.database} onChange={e => setForm({ ...form, database: e.target.value })} placeholder="/data/mi_bd.db" /></label>
             )}
           </div>
           <div className="conn-mgr__form-actions">
             <button type="button" className="btn primary btn-small" onClick={handleSave}>
-              {editingId ? 'Actualizar' : 'Guardar conexion'}
+              {editingId ? t('connectionManager.update') : t('connectionManager.save')}
             </button>
-            <button type="button" className="btn ghost btn-small" onClick={resetForm}>Cancelar</button>
+            <button type="button" className="btn ghost btn-small" onClick={resetForm}>{t('connectionManager.cancel')}</button>
           </div>
         </div>
       )}
@@ -169,49 +171,49 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
               </div>
               {testResults[conn.id] && (
                 <div className={`conn-mgr__test-result ${testResults[conn.id].success ? 'ok' : 'err'}`}>
-                  {testResults[conn.id].success ? '✓ ' : '✗ '}{testResults[conn.id].message}
+                  {testResults[conn.id].success ? '\u2713 ' : '\u2717 '}{testResults[conn.id].message}
                 </div>
               )}
             </div>
             <div className="conn-mgr__item-actions">
               <button type="button" className="btn ghost btn-small" onClick={() => handleTest(conn.id)} disabled={testingId === conn.id}>
-                {testingId === conn.id ? 'Probando...' : 'Probar'}
+                {testingId === conn.id ? t('connectionManager.testing') : t('connectionManager.test')}
               </button>
               <button type="button" className="btn ghost btn-small" onClick={() => handleExplore(conn.id)} disabled={exploringId === conn.id && exploringId !== conn.id}>
-                Explorar
+                {t('connectionManager.explore')}
               </button>
-              <button type="button" className="btn ghost btn-small" onClick={() => handleDelete(conn.id, conn.name)}>Eliminar</button>
+              <button type="button" className="btn ghost btn-small" onClick={() => handleDelete(conn.id, conn.name)}>{t('connectionManager.delete')}</button>
             </div>
 
             {/* Tables explorer */}
             {exploringId === conn.id && tables.length > 0 && (
               <div className="conn-mgr__explorer">
                 <div className="conn-mgr__explorer-header">
-                  <span className="conn-mgr__explorer-title">Tablas encontradas ({tables.length})</span>
-                  <button type="button" className="btn ghost btn-small" onClick={() => { setExploringId(null); setTables([]); setSchemaView(null) }}>Cerrar</button>
+                  <span className="conn-mgr__explorer-title">{t('connectionManager.tablesFound')} ({tables.length})</span>
+                  <button type="button" className="btn ghost btn-small" onClick={() => { setExploringId(null); setTables([]); setSchemaView(null) }}>{t('connectionManager.close')}</button>
                 </div>
                 <div className="conn-mgr__table-list">
-                  {tables.map(t => (
-                    <div key={t.name} className="conn-mgr__table-item">
-                      <span className="conn-mgr__table-name">{t.name}</span>
-                      {t.kind && <span className="conn-mgr__table-kind">{t.kind}</span>}
+                  {tables.map(tbl => (
+                    <div key={tbl.name} className="conn-mgr__table-item">
+                      <span className="conn-mgr__table-name">{tbl.name}</span>
+                      {tbl.kind && <span className="conn-mgr__table-kind">{tbl.kind}</span>}
                       <div className="conn-mgr__table-actions">
-                        <button type="button" className="btn ghost btn-small" onClick={() => handleViewSchema(t.name)}>Ver columnas</button>
-                        {schemaView?.table === t.name && (
-                          <button type="button" className="btn primary btn-small" onClick={() => handleImport(t.name, schemaView.columns)}>Importar como dataset</button>
+                        <button type="button" className="btn ghost btn-small" onClick={() => handleViewSchema(tbl.name)}>{t('connectionManager.viewColumns')}</button>
+                        {schemaView?.table === tbl.name && (
+                          <button type="button" className="btn primary btn-small" onClick={() => handleImport(tbl.name, schemaView.columns)}>{t('connectionManager.importAsDataset')}</button>
                         )}
                       </div>
-                      {schemaView?.table === t.name && (
+                      {schemaView?.table === tbl.name && (
                         <div className="conn-mgr__schema">
                           <table className="conn-mgr__schema-table">
-                            <thead><tr><th>Columna</th><th>Tipo</th><th>PK</th><th>Nulo</th><th>FK</th></tr></thead>
+                            <thead><tr><th>{t('connectionManager.column')}</th><th>{t('connectionManager.type')}</th><th>PK</th><th>{t('connectionManager.nullable')}</th><th>FK</th></tr></thead>
                             <tbody>
                               {schemaView.columns.map(col => (
                                 <tr key={col.name}>
                                   <td><strong>{col.name}</strong></td>
                                   <td>{col.type}</td>
-                                  <td>{col.is_primary_key ? '✓' : ''}</td>
-                                  <td>{col.nullable ? '✓' : ''}</td>
+                                  <td>{col.is_primary_key ? '\u2713' : ''}</td>
+                                  <td>{col.nullable ? '\u2713' : ''}</td>
                                   <td>{col.foreign_key || ''}</td>
                                 </tr>
                               ))}
@@ -226,14 +228,14 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
             )}
             {exploringId === conn.id && tables.length === 0 && (
               <div className="conn-mgr__explorer">
-                <p className="muted-text">No se encontraron tablas.</p>
+                <p className="muted-text">{t('connectionManager.noTables')}</p>
               </div>
             )}
           </div>
         ))}
         {connections.length === 0 && !showForm && (
           <p className="muted-text" style={{ textAlign: 'center', padding: '1rem' }}>
-            No hay conexiones configuradas. Crea una para empezar.
+            {t('connectionManager.noConnections')}
           </p>
         )}
       </div>

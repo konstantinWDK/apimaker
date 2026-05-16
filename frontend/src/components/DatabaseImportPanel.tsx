@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { DatasetMeta } from '../types/schemas'
 import { readBackendConfig } from '../lib/backendConfig'
 
@@ -47,6 +48,7 @@ function buildConnectionUrl(
 }
 
 export function DatabaseImportPanel({ onImport, onCancel }: Props) {
+  const { t } = useTranslation()
   // Connection form
   const [dialect, setDialect] = useState<Dialect>('postgresql')
   const [host, setHost] = useState('localhost')
@@ -122,14 +124,14 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
       const data = await res.json()
       if (data.ok) {
         setTestStatus('ok')
-        setTestMessage('Conexión exitosa')
+        setTestMessage(t('dbImport.connectionOk'))
       } else {
         setTestStatus('error')
-        setTestMessage(data.message || 'Error de conexión')
+        setTestMessage(data.message || t('dbImport.connectionError'))
       }
     } catch {
       setTestStatus('error')
-      setTestMessage('Error de red al intentar conectar')
+      setTestMessage(t('dbImport.networkError'))
     }
   }
 
@@ -164,10 +166,10 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
         setSelectedTables([])
         setStep('tables')
       } else {
-        setError(data.message || 'Error al introspeccionar la base de datos')
+        setError(data.message || t('dbImport.introspectError'))
       }
     } catch {
-      setError('Error de red al intentar conectar')
+      setError(t('dbImport.networkError'))
     } finally {
       setLoading(false)
     }
@@ -223,16 +225,16 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
       <div className="dbi">
         <div className="dbi__tables-header">
           <button type="button" className="btn ghost btn-sm dbi__back" onClick={() => setStep('connect')}>
-            ← Volver
+            {'\u2190'} {t('dbImport.back')}
           </button>
-          <p className="dbi__title">Tablas encontradas <span className="badge">{tables.length}</span></p>
+          <p className="dbi__title">{t('dbImport.tablesFound')} <span className="badge">{tables.length}</span></p>
           <button
             type="button"
             className="btn primary btn-sm"
             disabled={selectedTables.length === 0}
             onClick={handleFinalImport}
           >
-            Importar {selectedTables.length > 0 ? `${selectedTables.length} tabla${selectedTables.length > 1 ? 's' : ''}` : ''}
+            {t('dbImport.import')} {selectedTables.length > 0 ? `${selectedTables.length} ${t('dbImport.table')}${selectedTables.length > 1 ? 's' : ''}` : ''}
           </button>
         </div>
 
@@ -257,7 +259,7 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
                     className="btn ghost btn-xs dbi__table-expand"
                     onClick={() => setExpandedTable(isExpanded ? null : table.name)}
                   >
-                    {isExpanded ? '▲ Ocultar' : '▼ Ver campos'}
+                    {isExpanded ? t('dbImport.hide') : t('dbImport.viewFields')}
                   </button>
                 </div>
                 {isExpanded && (
@@ -267,7 +269,7 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
                         <span className="dbi__col-name">{col.name}</span>
                         <span className="dbi__col-type">{col.type}</span>
                         {col.is_primary && <span className="dbi__col-pk">PK</span>}
-                        {col.required && !col.is_primary && <span className="dbi__col-req">requerido</span>}
+                        {col.required && !col.is_primary && <span className="dbi__col-req">{t('dbImport.required')}</span>}
                       </div>
                     ))}
                   </div>
@@ -284,12 +286,12 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
 
   return (
     <div className="dbi">
-      <p className="dbi__title">Conectar base de datos externa</p>
-      <p className="dbi__subtitle">Introduce los datos de conexión. Soportamos PostgreSQL, MySQL y SQLite.</p>
+      <p className="dbi__title">{t('dbImport.connectDb')}</p>
+      <p className="dbi__subtitle">{t('dbImport.connectDbDesc')}</p>
 
       {/* Dialect selector */}
       <div className="dbi__field-group">
-        <label className="dbi__label">Motor</label>
+        <label className="dbi__label">{t('dbImport.engine')}</label>
         <div className="dbi__dialect-tabs">
           {(Object.keys(DIALECT_LABELS) as Dialect[]).map(d => (
             <button
@@ -309,21 +311,21 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
         <>
           <div className="dbi__row">
             <div className="dbi__field-group" style={{ flex: 3 }}>
-              <label className="dbi__label">Host</label>
+              <label className="dbi__label">{t('dbImport.host')}</label>
               <input className="field" value={host} onChange={e => setHost(e.target.value)} placeholder="localhost" />
             </div>
             <div className="dbi__field-group" style={{ flex: 1 }}>
-              <label className="dbi__label">Puerto</label>
+              <label className="dbi__label">{t('dbImport.port')}</label>
               <input className="field" value={port} onChange={e => setPort(e.target.value)} placeholder={DIALECT_DEFAULTS[dialect].port} />
             </div>
           </div>
           <div className="dbi__row">
             <div className="dbi__field-group" style={{ flex: 1 }}>
-              <label className="dbi__label">Usuario</label>
+              <label className="dbi__label">{t('dbImport.user')}</label>
               <input className="field" value={user} onChange={e => setUser(e.target.value)} placeholder="postgres" autoComplete="username" />
             </div>
             <div className="dbi__field-group" style={{ flex: 1 }}>
-              <label className="dbi__label">Contraseña</label>
+              <label className="dbi__label">{t('dbImport.password')}</label>
               <div className="dbi__password-row">
                 <input
                   className="field"
@@ -331,7 +333,7 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   autoComplete="current-password"
-                  placeholder="••••••••"
+                  placeholder={'\u2022'.repeat(8)}
                 />
                 <button type="button" className="dbi__show-pass" onClick={() => setShowPassword(v => !v)}>
                   {showPassword ? '' : ''}
@@ -340,13 +342,13 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
             </div>
           </div>
           <div className="dbi__field-group">
-            <label className="dbi__label">Base de datos</label>
+            <label className="dbi__label">{t('dbImport.database')}</label>
             <input className="field" value={dbname} onChange={e => setDbname(e.target.value)} placeholder={DIALECT_DEFAULTS[dialect].placeholder} />
           </div>
         </>
       ) : (
         <div className="dbi__field-group">
-          <label className="dbi__label">Archivo SQLite</label>
+          <label className="dbi__label">{t('dbImport.sqliteFile')}</label>
           <div className="dbi__file-selector">
             <input
               ref={fileInputRef}
@@ -360,11 +362,11 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
               className="btn ghost btn-sm dbi__file-btn"
               onClick={() => fileInputRef.current?.click()}
             >
-              Seleccionar archivo
+              {t('dbImport.selectFile')}
             </button>
             {sqliteFile && <span className="dbi__file-name">{sqliteFile.name}</span>}
           </div>
-          <p className="dbi__sqlite-hint">O escribe una ruta absoluta del servidor:</p>
+          <p className="dbi__sqlite-hint">{t('dbImport.sqliteHint')}</p>
           <input
             className="field"
             value={dbname.startsWith('upload:') ? '' : dbname}
@@ -377,8 +379,8 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
 
       {/* Connection URL preview */}
       <div className="dbi__url-preview">
-        <span className="dbi__url-label">URL generada</span>
-        <code className="dbi__url-value">{connectionUrl || '—'}</code>
+        <span className="dbi__url-label">{t('dbImport.generatedUrl')}</span>
+        <code className="dbi__url-value">{connectionUrl || '\u2014'}</code>
       </div>
 
       {/* Test connection */}
@@ -389,7 +391,7 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
           onClick={handleTestConnection}
           disabled={isConnectDisabled || testStatus === 'testing'}
         >
-          {testStatus === 'testing' ? 'Probando...' : 'Probar conexion'}
+          {testStatus === 'testing' ? t('dbImport.testing') : t('dbImport.testConnection')}
         </button>
         {testStatus === 'ok' && <span className="dbi__test-ok">OK: {testMessage}</span>}
         {testStatus === 'error' && <span className="dbi__test-error">ERR: {testMessage}</span>}
@@ -398,14 +400,14 @@ export function DatabaseImportPanel({ onImport, onCancel }: Props) {
       {error && <p className="error-text">{error}</p>}
 
       <div className="dbi__actions">
-        <button type="button" className="btn subtle" onClick={onCancel}>Cancelar</button>
+        <button type="button" className="btn subtle" onClick={onCancel}>{t('dbImport.cancel')}</button>
         <button
           type="button"
           className="btn primary"
           onClick={handleIntrospect}
           disabled={loading || isConnectDisabled}
         >
-          {loading ? 'Explorando...' : 'Explorar tablas →'}
+          {loading ? t('dbImport.exploring') : t('dbImport.exploreTables')}
         </button>
       </div>
 

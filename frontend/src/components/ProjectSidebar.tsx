@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { ProjectDraft } from '../types/schemas'
 import { readBackendConfig } from '../lib/backendConfig'
 
@@ -18,19 +19,20 @@ interface Props {
   isSyncing?: boolean
 }
 
-const formatDate = (value?: string) => {
-  if (!value) return 'Sin fecha'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return 'Sin fecha'
-  return date.toLocaleDateString()
-}
-
 export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, onDelete, onSync, mockRunning, mockLoading, mockError, onStartMock, onStopMock, isSyncing }: Props) {
+  const { t } = useTranslation()
   const [backendStatus, setBackendStatus] = useState<'online' | 'offline' | 'checking'>('checking')
   const [dbType, setDbType] = useState<string | null>(null)
   const [dockerAvail, setDockerAvail] = useState<{ available: boolean; version?: string; containers_running?: number } | null>(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  const formatDate = (value?: string) => {
+    if (!value) return t('sidebar.noDate')
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return t('sidebar.noDate')
+    return date.toLocaleDateString()
+  }
 
   useEffect(() => {
     const checkStatus = async () => {
@@ -101,7 +103,7 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
           onClick={() => setDropdownOpen(!dropdownOpen)}
         >
           <div className="sidebar__project-trigger-info">
-            <span className="sidebar__project-trigger-name">{project.name || 'Nuevo Proyecto'}</span>
+            <span className="sidebar__project-trigger-name">{project.name || t('sidebar.newProject')}</span>
             <span className="sidebar__project-trigger-meta">
               {project.targetStack} · {endpoints} endpoints · {datasetsCount} datasets
             </span>
@@ -122,14 +124,14 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
         {dropdownOpen && (
           <div className="sidebar__project-dropdown">
             <div className="sidebar__project-dropdown-header">
-              <span>Proyectos</span>
+              <span>{t('sidebar.projects')}</span>
               <button type="button" className="sidebar__project-dropdown-new" onClick={onCreate}>
-                + Nuevo
+                {t('sidebar.new')}
               </button>
             </div>
             <div className="sidebar__project-dropdown-list">
               {sortedProjects.length === 0 ? (
-                <p className="sidebar__project-dropdown-empty">Guarda tu proyecto para verlo aqui.</p>
+                <p className="sidebar__project-dropdown-empty">{t('sidebar.saveHint')}</p>
               ) : (
                 sortedProjects.map((item) => {
                   const isActive = item.id === project.id
@@ -158,7 +160,7 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
                           e.stopPropagation()
                           onDelete(item.id)
                         }}
-                        aria-label={`Eliminar ${item.name}`}
+                        aria-label={t('sidebar.delete', { name: item.name })}
                       >
                         ×
                       </button>
@@ -172,24 +174,24 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
       </div>
 
       <div className="sidebar__section">
-        <p className="sidebar__section-title">Informacion del Proyecto</p>
+        <p className="sidebar__section-title">{t('sidebar.projectInfo')}</p>
         <div className="sidebar__status-card" style={{ padding: '1rem' }}>
           <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #f1f5f9' }}>
-            <h1 className="sidebar__h1-title">{project.name || 'Nuevo Proyecto'}</h1>
-            <p className="sidebar__subtitle" style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: '#64748b' }}>Stack: {project.targetStack}</p>
+            <h1 className="sidebar__h1-title">{project.name || t('sidebar.newProject')}</h1>
+            <p className="sidebar__subtitle" style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: '#64748b' }}>{t('sidebar.stack')}: {project.targetStack}</p>
           </div>
 
           <dl className="sidebar__stats" style={{ margin: 0 }}>
             <div>
-              <dt>Tablas</dt>
+              <dt>{t('sidebar.tables')}</dt>
               <dd>{datasetsCount}</dd>
             </div>
             <div>
-              <dt>Campos</dt>
+              <dt>{t('sidebar.fields')}</dt>
               <dd>{fieldsCount}</dd>
             </div>
             <div>
-              <dt>Filas</dt>
+              <dt>{t('sidebar.rows')}</dt>
               <dd>{rowsCount}</dd>
             </div>
             <div>
@@ -197,7 +199,7 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
               <dd>{sizeKb}</dd>
             </div>
             <div>
-              <dt>Endpoints</dt>
+              <dt>{t('sidebar.endpoints')}</dt>
               <dd>{endpoints}</dd>
             </div>
           </dl>
@@ -206,13 +208,13 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
 
       {/* Monitoring & Status */}
       <div className="sidebar__section">
-        <p className="sidebar__section-title">Status</p>
+        <p className="sidebar__section-title">{t('sidebar.status')}</p>
 
         <div className="sidebar__status-card">
           <div className="sidebar__status-indicator">
             <span className={`sidebar__mock-dot ${backendStatus === 'online' ? 'on' : (backendStatus === 'offline' ? 'off' : 'checking')}`} />
             <span className="sidebar__status-text">
-              {backendStatus === 'online' ? 'Backend Online' : (backendStatus === 'offline' ? 'Backend Offline' : 'Comprobando...')}
+              {backendStatus === 'online' ? t('sidebar.backendOnline') : (backendStatus === 'offline' ? t('sidebar.backendOffline') : t('sidebar.checking'))}
             </span>
           </div>
 
@@ -221,7 +223,7 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
               <div className="sidebar__status-indicator">
                 <span className="sidebar__mock-dot on" />
                 <span className="sidebar__status-text">
-                  BD: {dbType === 'postgresql' ? 'PostgreSQL' : 'SQLite'}
+                  {dbType === 'postgresql' ? t('sidebar.dbPostgres') : t('sidebar.dbSqlite')}
                 </span>
               </div>
             </div>
@@ -234,7 +236,7 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
                 <span className="sidebar__status-text">
                   Docker v{dockerAvail.version}
                 </span>
-                <span className="sidebar__status-tag">{dockerAvail.containers_running} contenedores</span>
+                <span className="sidebar__status-tag">{dockerAvail.containers_running} {t('sidebar.containers')}</span>
               </div>
             </div>
           )}
@@ -243,10 +245,10 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
         <div className="sidebar__card sidebar__card--status">
           <div className="sidebar__status-item">
             <div className="sidebar__status-bar">
-              <span className="sidebar__status-label">Live Mode</span>
+              <span className="sidebar__status-label">{t('sidebar.liveMode')}</span>
               <span className={`sidebar__mock-dot ${mockRunning ? 'on' : 'off'}`} />
               <span className="sidebar__mock-label">
-                {mockRunning ? 'Activo' : 'Inactivo'}
+                {mockRunning ? t('sidebar.active') : t('sidebar.inactive')}
               </span>
             </div>
             <div className="sidebar__mock-actions">
@@ -257,7 +259,7 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
                   onClick={onStartMock}
                   disabled={mockLoading}
                 >
-                  {mockLoading ? 'Iniciando...' : 'Iniciar live'}
+                  {mockLoading ? t('sidebar.starting') : t('sidebar.startLive')}
                 </button>
               ) : (
                 <button
@@ -266,7 +268,7 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
                   onClick={onStopMock}
                   disabled={mockLoading}
                 >
-                  {mockLoading ? 'Parando...' : 'Parar live'}
+                  {mockLoading ? t('sidebar.stopping') : t('sidebar.stopLive')}
                 </button>
               )}
             </div>
@@ -281,7 +283,7 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
             <div className="sidebar__mock-bar">
               <span className={`sidebar__mock-dot ${project.remoteId ? 'on' : 'off'}`} />
               <span className="sidebar__mock-label">
-                {project.remoteId ? 'Sincronizado' : 'Pendiente'}
+                {project.remoteId ? t('sidebar.synced') : t('sidebar.pending')}
               </span>
             </div>
 
@@ -291,17 +293,17 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
                 className="btn primary btn-small btn-full"
                 onClick={onSync}
               >
-            {project.remoteId ? 'Actualizar en backend' : 'Sincronizar con backend'}
+            {project.remoteId ? t('sidebar.syncToBackend') : t('sidebar.syncToBackend')}
               </button>
             </div>
             {isSyncing && (
               <p className="sidebar__description" style={{ color: '#6366f1', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span className="sidebar__mock-dot checking" /> Sincronizando cambios...
+                <span className="sidebar__mock-dot checking" /> {t('sidebar.syncing')}
               </p>
             )}
             {project.remoteId && !isSyncing && (
               <p className="success-text" style={{ fontSize: '0.75rem', marginTop: '0.5rem' }}>
-                Proyecto sincronizado con el backend
+                {t('sidebar.syncedWithBackend')}
               </p>
             )}
           </div>

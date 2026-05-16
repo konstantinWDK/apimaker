@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { readBackendConfig } from '../lib/backendConfig'
 
 export function SyncPanel() {
+  const { t } = useTranslation()
   const [syncing, setSyncing] = useState(false)
   const [result, setResult] = useState<{
     success: boolean
@@ -18,7 +20,7 @@ export function SyncPanel() {
     }
   } | null>(null)
 
-  const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
+  const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('doapi-jwt-token') : null
   const { baseUrl: backendBaseUrl } = readBackendConfig()
 
   const authHeaders = {
@@ -27,7 +29,7 @@ export function SyncPanel() {
   }
 
   const handleSync = async () => {
-    if (!confirm('¿Sincronizar todos los datos de SQLite a PostgreSQL? Los registros existentes se omitirán.')) return
+    if (!confirm(t('syncPanel.confirmSync'))) return
     setSyncing(true)
     setResult(null)
     try {
@@ -36,7 +38,7 @@ export function SyncPanel() {
         headers: authHeaders,
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.detail || 'Error en la sincronización')
+      if (!res.ok) throw new Error(data.detail || t('syncPanel.syncError'))
       setResult({
         success: data.success,
         message: data.message,
@@ -45,7 +47,7 @@ export function SyncPanel() {
     } catch (err) {
       setResult({
         success: false,
-        message: err instanceof Error ? err.message : 'Error desconocido',
+        message: err instanceof Error ? err.message : t('syncPanel.unknownError'),
       })
     } finally {
       setSyncing(false)
@@ -54,15 +56,14 @@ export function SyncPanel() {
 
   return (
     <div className="sync-panel">
-      <h3>Sincronizar bases de datos</h3>
+      <h3>{t('syncPanel.title')}</h3>
       <p className="sync-panel__desc">
-        Transfiere todos los datos de SQLite a PostgreSQL con un clic.
-        Los registros que ya existen en PostgreSQL se omiten automáticamente.
+        {t('syncPanel.description')}
       </p>
 
       <div className="sync-panel__flow">
         <div className="sync-panel__badge sqlite">SQLite</div>
-        <div className="sync-panel__arrow">→</div>
+        <div className="sync-panel__arrow">{'\u2192'}</div>
         <div className="sync-panel__badge postgres">PostgreSQL</div>
       </div>
 
@@ -72,7 +73,7 @@ export function SyncPanel() {
         onClick={handleSync}
         disabled={syncing}
       >
-        {syncing ? 'Sincronizando...' : 'Sincronizar ahora'}
+        {syncing ? t('syncPanel.syncing') : t('syncPanel.syncNow')}
       </button>
 
       {result && (
@@ -81,25 +82,25 @@ export function SyncPanel() {
           {result.success && result.counts && (
             <div className="sync-panel__details">
               {result.counts.users_synced > 0 && (
-                <span className="sync-badge">{result.counts.users_synced} usuarios</span>
+                <span className="sync-badge">{result.counts.users_synced} {t('syncPanel.users')}</span>
               )}
               {result.counts.projects_synced > 0 && (
-                <span className="sync-badge">{result.counts.projects_synced} proyectos</span>
+                <span className="sync-badge">{result.counts.projects_synced} {t('syncPanel.projects')}</span>
               )}
               {result.counts.datasets_synced > 0 && (
-                <span className="sync-badge">{result.counts.datasets_synced} datasets</span>
+                <span className="sync-badge">{result.counts.datasets_synced} {t('syncPanel.datasets')}</span>
               )}
               {result.counts.fields_synced > 0 && (
-                <span className="sync-badge">{result.counts.fields_synced} campos</span>
+                <span className="sync-badge">{result.counts.fields_synced} {t('syncPanel.fields')}</span>
               )}
               {result.counts.endpoints_synced > 0 && (
-                <span className="sync-badge">{result.counts.endpoints_synced} endpoints</span>
+                <span className="sync-badge">{result.counts.endpoints_synced} {t('syncPanel.endpoints')}</span>
               )}
               {result.counts.shares_synced > 0 && (
-                <span className="sync-badge">{result.counts.shares_synced} shares</span>
+                <span className="sync-badge">{result.counts.shares_synced} {t('syncPanel.shares')}</span>
               )}
               {result.counts.skipped > 0 && (
-                <span className="sync-badge skipped">{result.counts.skipped} omitidos</span>
+                <span className="sync-badge skipped">{result.counts.skipped} {t('syncPanel.skipped')}</span>
               )}
             </div>
           )}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { DatabaseImportPanel } from './DatabaseImportPanel'
 import { DataMappingPanel } from './DataMappingPanel'
@@ -20,6 +21,7 @@ import { readBackendConfig } from '../lib/backendConfig'
 import { fetchMappings, createMapping, deleteMapping } from '../lib/api'
 
 export function BuilderPage() {
+  const { t } = useTranslation()
   const toast = useToast()
   const {
     project,
@@ -49,22 +51,22 @@ export function BuilderPage() {
 
   const tabs = useMemo(
     () => [
-      { id: 'datasets', label: 'Datasets' },
-      { id: 'endpoints', label: 'Endpoints' },
-      { id: 'mappings', label: 'Mappings' },
-      { id: 'connections', label: 'Fuentes de Datos' },
-      { id: 'webhooks', label: 'Webhooks' },
-      { id: 'versions', label: 'Versiones' },
-      { id: 'result', label: 'API generada' },
+      { id: 'datasets', label: t('builder.datasets') },
+      { id: 'endpoints', label: t('builder.endpoints') },
+      { id: 'mappings', label: t('builder.mappings') },
+      { id: 'connections', label: t('builder.dataSources') },
+      { id: 'webhooks', label: t('builder.webhooks') },
+      { id: 'versions', label: t('builder.versions') },
+      { id: 'result', label: t('builder.generatedApi') },
     ],
-    [],
+    [t],
   )
 
   const normalizePath = (path: string) => (path.startsWith('/') ? path : `/${path}`)
 
   const handleGenerate = async () => {
     if (project.endpoints.length === 0) {
-      setGenerationWarning('Añade al menos un endpoint antes de generar la API')
+      setGenerationWarning(t('builder.addEndpointFirst'))
       setActiveTab('endpoints')
       return
     }
@@ -78,11 +80,11 @@ export function BuilderPage() {
 
       const effectiveProjectId = await saveProject()
       if (!effectiveProjectId) {
-        toast('Error al guardar el proyecto. Asegúrate de estar autenticado.', 'error')
+        toast(t('app.saveError'), 'error')
         return
       }
 
-      const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
+      const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('doapi-jwt-token') : null
       const gr = await fetch(`${backendBaseUrl}/projects/${effectiveProjectId}/generate`, {
         method: 'POST',
         headers: {
@@ -102,8 +104,8 @@ export function BuilderPage() {
       }
 
       const generationResult: GenerationResult = {
-        message: 'API generada con éxito',
-        retentionNotice: 'Pulsa "Descargar bundle (.zip)" en la API generada para obtener el código.',
+        message: t('builder.bundleSuccess'),
+        retentionNotice: t('builder.bundleSuccessHint'),
         apiUrl: `${localBaseUrl}/api/mock/${effectiveProjectId}${endpoints[0]?.path ?? '/records'}`,
         docsUrl: `${backendBaseUrl}/projects/${effectiveProjectId}/docs`,
         endpoints,
@@ -134,9 +136,9 @@ export function BuilderPage() {
 
   useEffect(() => {
     if (project.name) {
-      document.title = `${project.name} | API Maker Studio`
+      document.title = `${project.name} | DoApi Studio`
     } else {
-      document.title = 'API Maker Studio'
+      document.title = 'DoApi Studio'
     }
   }, [project.name])
 
@@ -152,7 +154,7 @@ export function BuilderPage() {
   const handleAddMapping = useCallback(async (sourceFieldId: string, targetFieldId: string) => {
     const pid = project.slug || project.remoteId
     if (!pid) {
-      toast('Guarda el proyecto primero antes de crear mappings', 'error')
+      toast(t('builder.saveFirst'), 'error')
       return
     }
     const sourceDatasetId = project.datasets.find(d => d.fields.some(f => f.id === sourceFieldId))?.id
@@ -169,15 +171,15 @@ export function BuilderPage() {
     } catch (err) {
       toast(`Error al crear mapping: ${err instanceof Error ? err.message : 'desconocido'}`, 'error')
     }
-  }, [project.slug, project.remoteId, project.datasets, toast])
+  }, [project.slug, project.remoteId, project.datasets, toast, t])
 
   const handleImportTable = useCallback((tableName: string, columns: any[]) => {
     const dsId = crypto.randomUUID()
     const inferType = (dbType: string): FieldType => {
-      const t = dbType.toLowerCase()
-      if (t.includes('int')) return 'integer'
-      if (t.includes('float') || t.includes('double') || t.includes('numeric') || t.includes('decimal') || t.includes('real')) return 'float'
-      if (t.includes('bool')) return 'boolean'
+      const dt = dbType.toLowerCase()
+      if (dt.includes('int')) return 'integer'
+      if (dt.includes('float') || dt.includes('double') || dt.includes('numeric') || dt.includes('decimal') || dt.includes('real')) return 'float'
+      if (dt.includes('bool')) return 'boolean'
       return 'string'
     }
     const fields = columns.map((col: any) => ({
@@ -245,12 +247,12 @@ export function BuilderPage() {
             <div className="datasets-tab-new">
               <div className="dataset-breadcrumb">
                 <button type="button" className="dataset-breadcrumb__link" onClick={() => setIsImportingDB(false)}>
-                  Volver atras a Datasets
+                  {t('builder.backToDatasets')}
                 </button>
                 <span className="dataset-breadcrumb__sep">&gt;</span>
-                <span className="dataset-breadcrumb__current">Importar desde BD</span>
+                <span className="dataset-breadcrumb__current">{t('builder.importFromDb')}</span>
               </div>
-              <SectionCard title="Importar desde Base de Datos" subtitle="Conecta e introspecciona tablas" accent="sky" fullWidth>
+              <SectionCard title={t('builder.importDbTitle')} subtitle={t('builder.importDbSubtitle')} accent="sky" fullWidth>
                 <DatabaseImportPanel
                   onImport={(newDatasets) => {
                     newDatasets.forEach((ds) => {
@@ -277,12 +279,12 @@ export function BuilderPage() {
             <div className="datasets-tab-new">
               <div className="dataset-breadcrumb">
                 <button type="button" className="dataset-breadcrumb__link" onClick={() => { setEditingDatasetId(null); setIsImportingDB(false); }}>
-                  Volver atras a Datasets
+                  {t('builder.backToDatasets')}
                 </button>
                 <span className="dataset-breadcrumb__sep">&gt;</span>
-                <span className="dataset-breadcrumb__current">Edicion: {currentDataset.name}</span>
+                <span className="dataset-breadcrumb__current">{t('builder.editingDataset', { name: currentDataset.name })}</span>
               </div>
-              <SectionCard title={currentDataset.name} subtitle="Editar esquema y datos" accent="sky" fullWidth>
+              <SectionCard title={currentDataset.name} subtitle={t('builder.editSchema')} accent="sky" fullWidth>
                 <DatasetEditor
                   dataset={currentDataset}
                   onCommit={upsertDataset}
@@ -300,26 +302,26 @@ export function BuilderPage() {
                 const newId = crypto.randomUUID()
                 upsertDataset({
                   id: newId,
-                  name: `Tabla ${project.datasets.length + 1}`,
+                  name: t('builder.newDatasetTable', { n: project.datasets.length + 1 }),
                   sourceType: 'manual',
                   fields: [{ id: crypto.randomUUID(), name: 'id', type: 'integer', required: true, isPrimaryKey: true }],
                   sampleRows: []
                 })
                 setEditingDatasetId(newId)
               }}>
-                + Nuevo dataset
+                {t('builder.newDataset')}
               </button>
               <button type="button" className="btn ghost" onClick={() => setIsImportingDB(true)}>
-                Importar desde BD
+                {t('builder.importFromDb')}
               </button>
             </div>
 
-            <SectionCard title="Modelo de Datos" subtitle={`${project.datasets.length} dataset(s) — Vista general del esquema`} accent="emerald" fullWidth>
+            <SectionCard title={t('builder.dataModel')} subtitle={t('builder.dataModelDesc', { count: project.datasets.length })} accent="emerald" fullWidth>
               <SchemaDiagram
                 datasets={project.datasets}
                 onDatasetClick={(id) => { setSelectedDatasetId(id); setEditingDatasetId(id); setIsImportingDB(false); }}
                 onDeleteDataset={(id) => {
-                  if (confirm('Eliminar este dataset? Esta accion no se puede deshacer.')) {
+                  if (confirm(t('builder.deleteDatasetConfirm'))) {
                     removeDataset(id)
                     if (selectedDatasetId === id) setSelectedDatasetId(project.datasets.filter(d => d.id !== id)[0]?.id || null)
                   }
@@ -329,9 +331,9 @@ export function BuilderPage() {
             </SectionCard>
 
             {project.datasets.length === 0 && (
-              <SectionCard title="Datasets" subtitle="Crea tu primer dataset" accent="sky" fullWidth>
+              <SectionCard title={t('builder.datasets')} subtitle={t('builder.createFirstDataset')} accent="sky" fullWidth>
                 <div className="empty-state">
-                  <p className="muted-text">Aun no hay datasets. Usa "+ Nuevo dataset" para empezar.</p>
+                  <p className="muted-text">{t('builder.noDatasetsHint')}</p>
                 </div>
               </SectionCard>
             )}
@@ -340,7 +342,7 @@ export function BuilderPage() {
         )
       case 'endpoints':
         return (
-          <SectionCard title="Endpoints REST" subtitle="CRUD base + rutas personalizadas" fullWidth>
+          <SectionCard title={t('builder.restEndpoints')} subtitle={t('builder.crudBase')} fullWidth>
             <EndpointDesigner
               project={project}
               endpoints={project.endpoints.filter((ep) => !selectedDatasetId || !ep.targetDatasetId || ep.targetDatasetId === selectedDatasetId)}
@@ -357,7 +359,7 @@ export function BuilderPage() {
           <SectionCard title="" accent="sky" fullWidth>
             {project.datasets.length < 2 ? (
               <div className="empty-state">
-                <p className="muted-text">Necesitas al menos 2 datasets para crear un mapeo de datos.</p>
+                <p className="muted-text">{t('builder.needsTwoDatasets')}</p>
               </div>
             ) : (
               <DataMappingPanel
@@ -371,7 +373,7 @@ export function BuilderPage() {
         )
       case 'connections':
         return (
-          <SectionCard title="Fuentes de Datos" subtitle="Conecta bases de datos externas e importa sus esquemas" accent="sky" fullWidth>
+          <SectionCard title={t('builder.dataSources')} subtitle={t('builder.externalSourcesDesc')} accent="sky" fullWidth>
             <ConnectionManager
               projectId={project.slug || project.remoteId || project.id}
               onImportTable={handleImportTable}
@@ -380,30 +382,30 @@ export function BuilderPage() {
         )
       case 'webhooks':
         return (
-          <SectionCard title="Webhooks" subtitle="Notifica a URLs externas cuando cambian los datos en el mock server" accent="sky" fullWidth>
+          <SectionCard title={t('builder.webhooks')} subtitle={t('builder.webhooksDesc')} accent="sky" fullWidth>
             <WebhookPanel projectId={project.slug || project.remoteId || project.id} />
           </SectionCard>
         )
       case 'versions':
         return (
-          <SectionCard title="Versiones" subtitle="Historial de cambios del proyecto" accent="sky" fullWidth>
+          <SectionCard title={t('builder.versions')} subtitle={t('builder.versionsDesc')} accent="sky" fullWidth>
             <VersionPanel projectId={project.slug || project.remoteId || project.id} />
           </SectionCard>
         )
       case 'result':
         return (
-          <SectionCard title="Proyecto Generado" subtitle={effectiveResult ? "Descarga el código fuente completo listo para producción" : "Configura las opciones y genera tu API"} accent="emerald" fullWidth>
+          <SectionCard title={t('builder.title')} subtitle={effectiveResult ? t('builder.bundleContains') : t('builder.generateHint')} accent="emerald" fullWidth>
             <div className="generation-result-flow">
               <div className="gen-options">
-                <p className="gen-options__title">Opciones de generación</p>
+                <p className="gen-options__title">{t('builder.generationOptions')}</p>
                 <div className="gen-options__checks">
                   <label className="checkbox-label">
                     <input type="checkbox" checked={project.includeData !== false} onChange={(e) => updateProject({ includeData: e.target.checked })} />
-                    Incluir datos de ejemplo (seeds)
+                    {t('builder.includeSeeds')}
                   </label>
                   <label className="checkbox-label">
                     <input type="checkbox" checked={project.includeSdk !== false} onChange={(e) => updateProject({ includeSdk: e.target.checked })} />
-                    Generar SDK (TypeScript + Python)
+                    {t('builder.generateSdk')}
                   </label>
                 </div>
               </div>
@@ -416,13 +418,13 @@ export function BuilderPage() {
                   />
 
                   <div className="deployment-notice">
-                    <p>Este bundle contiene la arquitectura completa (modelos, controladores, seguridad y Docker) para el stack <strong>{project.targetStack.toUpperCase()}</strong>.</p>
+                    <p>{t('builder.bundleContains', { stack: project.targetStack.toUpperCase() })}</p>
                   </div>
                 </>
               ) : (
                 <div className="empty-state">
-                  <p className="muted-text">Genera la API en la vista principal para ver los detalles.</p>
-                  <button type="button" className="btn ghost btn-small" onClick={handleGenerate}>Generar ahora</button>
+                  <p className="muted-text">{t('builder.generateHint')}</p>
+                  <button type="button" className="btn ghost btn-small" onClick={handleGenerate}>{t('builder.generateNow')}</button>
                 </div>
               )}
             </div>
@@ -439,10 +441,10 @@ export function BuilderPage() {
         <div className="app-header__main">
           <div className="app-header__hero">
             <div className="app-header__hero-top">
-              <h1 className="page-title">{project.name || 'Nuevo Proyecto'}</h1>
+              <h1 className="page-title">{project.name || t('builder.projectTitle')}</h1>
               {project.datasets.length > 0 && (
                 <div className="dataset-badge">
-                  Dataset activo: <span className="dataset-badge__name">
+                  {t('builder.activeDataset')}: <span className="dataset-badge__name">
                     {project.datasets.find(d => d.id === selectedDatasetId)?.name || project.datasets[0]?.name}
                   </span>
                 </div>
@@ -474,20 +476,20 @@ export function BuilderPage() {
       <div className="fab-container">
         {showSuccess && (
           <div className="fab-success-msg">
-            ¡API actualizada con éxito!
+            {t('builder.apiUpdated')}
           </div>
         )}
         <button type="button" className="fab" onClick={handleGenerate} disabled={isGenerating || isSyncing}>
           {isSyncing ? (
-            <span className="fab__loading">Sincronizando...</span>
+            <span className="fab__loading">{t('builder.syncing')}</span>
           ) : isGenerating ? (
-            <span className="fab__loading">Procesando...</span>
+            <span className="fab__loading">{t('builder.processing')}</span>
           ) : (
             <>
               <svg className="fab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              {project.remoteId ? 'Actualizar API' : 'Guardar y lanzar API'}
+              {project.remoteId ? t('builder.updateApi') : t('builder.saveAndLaunch')}
             </>
           )}
         </button>

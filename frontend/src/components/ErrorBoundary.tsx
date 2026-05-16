@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { withTranslation, type WithTranslation } from 'react-i18next'
 
-interface Props {
+interface Props extends WithTranslation {
   children: ReactNode
   fallback?: ReactNode
 }
@@ -10,7 +11,7 @@ interface State {
   error: Error | null
 }
 
-export class ErrorBoundary extends Component<Props, State> {
+class ErrorBoundaryClass extends Component<Props, State> {
   constructor(props: Props) {
     super(props)
     this.state = { hasError: false, error: null }
@@ -25,14 +26,15 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   render() {
+    const { t } = this.props
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback
       return (
         <div className="error-boundary">
           <div className="error-boundary__content">
-            <h2>Algo salió mal</h2>
+            <h2>{t('error.title')}</h2>
             <p className="muted-text">
-              Ocurrió un error inesperado. Recarga la página o intenta de nuevo.
+              {t('error.description')}
             </p>
             {this.state.error && (
               <pre className="error-boundary__detail">
@@ -44,7 +46,7 @@ export class ErrorBoundary extends Component<Props, State> {
               className="btn primary"
               onClick={() => window.location.reload()}
             >
-              Recargar página
+              {t('error.reload')}
             </button>
           </div>
         </div>
@@ -53,3 +55,5 @@ export class ErrorBoundary extends Component<Props, State> {
     return this.props.children
   }
 }
+
+export const ErrorBoundary = withTranslation()(ErrorBoundaryClass)

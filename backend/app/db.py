@@ -27,7 +27,7 @@ def _get_database_url() -> str:
     if settings.database_url:
         return settings.database_url
 
-    default_sqlite = f"sqlite:///{Path(__file__).resolve().parent / 'data' / 'apimaker.db'}"
+    default_sqlite = f"sqlite:///{Path(__file__).resolve().parent / 'data' / 'doapi.db'}"
 
     # Check admin config file (Legacy)
     if ADMIN_CONFIG_PATH.exists():

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { ProjectDraft } from '../types/schemas'
 import { readBackendConfig } from '../lib/backendConfig'
 
@@ -47,6 +48,7 @@ function buildDefaultBody(project: ProjectDraft, method: string, datasetId?: str
 }
 
 export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, selectedDatasetId, deploymentBaseUrl }: Props) {
+  const { t } = useTranslation()
   const backendConfig = readBackendConfig()
   const backendBaseUrl = backendConfig.baseUrl?.replace(/\/$/, '') || 'http://localhost:8000'
   const effectiveId = project.slug || project.remoteId || project.id
@@ -111,7 +113,7 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
 
     if (targetBody.trim() && targetMethod !== 'GET' && targetMethod !== 'DELETE') {
       try { JSON.parse(targetBody) } catch {
-        setBodyError('JSON invalido')
+        setBodyError(t('playground.invalidJson'))
         setLoading(false)
         return
       }
@@ -137,7 +139,7 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
       setResponse(entry)
       setHistory(prev => [entry, ...prev].slice(0, 20))
     } catch {
-      setResponse({ url: targetUrl, status: 0, body: { error: 'Error de conexion' }, method: targetMethod, time: 0, size: 0 })
+      setResponse({ url: targetUrl, status: 0, body: { error: t('playground.connectionError') }, method: targetMethod, time: 0, size: 0 })
     } finally {
       setLoading(false)
     }
@@ -178,13 +180,13 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
     <div className="pg">
       {deploymentBaseUrl ? (
         <div className="pg__banner pg__banner--deploy">
-          <span>Probando contra <strong>{deploymentBaseUrl}</strong></span>
+          <span>{t('playground.testingAgainst', { url: deploymentBaseUrl })}</span>
         </div>
       ) : !mockRunning ? (
         <div className="pg__banner">
-          <span>El mock server esta detenido. Inicialo para probar endpoints.</span>
+          <span>{t('playground.mockServerStopped')}</span>
           <button className="btn primary btn-small" onClick={onStartMock} disabled={mockLoading}>
-            {mockLoading ? 'Iniciando...' : 'Iniciar Mock Server'}
+            {mockLoading ? t('playground.starting') : t('playground.startMockServer')}
           </button>
         </div>
       ) : null}
@@ -220,20 +222,20 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
               onClick={handleSend}
               disabled={loading}
             >
-              {loading ? 'Enviando...' : 'Send'}
+              {loading ? t('playground.sending') : t('playground.send')}
             </button>
           </div>
 
           {/* Tabs: Params | Headers | Body */}
           <div className="pg__tabs">
             <button className={`pg__tab ${activeTab === 'params' ? 'active' : ''}`} onClick={() => setActiveTab('params')}>
-              Params {queryParams.filter(p => p.key).length > 0 && <span className="pg__tab-count">{queryParams.filter(p => p.key).length}</span>}
+              {t('playground.params')} {queryParams.filter(p => p.key).length > 0 && <span className="pg__tab-count">{queryParams.filter(p => p.key).length}</span>}
             </button>
             <button className={`pg__tab ${activeTab === 'headers' ? 'active' : ''}`} onClick={() => setActiveTab('headers')}>
-              Headers {headers.filter(h => h.key).length > 0 && <span className="pg__tab-count">{headers.filter(h => h.key).length}</span>}
+              {t('playground.headers')} {headers.filter(h => h.key).length > 0 && <span className="pg__tab-count">{headers.filter(h => h.key).length}</span>}
             </button>
             <button className={`pg__tab ${activeTab === 'body' ? 'active' : ''}`} onClick={() => setActiveTab('body')}>
-              Body
+              {t('playground.body')}
             </button>
           </div>
 
@@ -251,20 +253,20 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
                     />
                     <input
                       className="pg__kv-input"
-                      placeholder="Key"
+                      placeholder={t('playground.key')}
                       value={p.key}
                       onChange={e => updateQueryParam(i, 'key', e.target.value)}
                     />
                     <input
                       className="pg__kv-input"
-                      placeholder="Value"
+                      placeholder={t('playground.value')}
                       value={p.value}
                       onChange={e => updateQueryParam(i, 'value', e.target.value)}
                     />
                     <button className="pg__kv-remove" onClick={() => removeQueryParam(i)}>&times;</button>
                   </div>
                 ))}
-                <button className="pg__kv-add" onClick={addQueryParam}>+ Add param</button>
+                <button className="pg__kv-add" onClick={addQueryParam}>+ {t('playground.addParam')}</button>
               </div>
             )}
 
@@ -272,7 +274,7 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
               <div className="pg__kv-editor">
                 {project.authMethod !== 'none' && (
                   <p className="pg__auth-hint">
-                    Este proyecto tiene autenticación configurada. El header se añadió automáticamente. Puedeseditarlo o desactivarlo.
+                    {t('playground.authHeaderHint')}
                   </p>
                 )}
                 {headers.map((h, i) => (
@@ -285,20 +287,20 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
                     />
                     <input
                       className="pg__kv-input"
-                      placeholder="Header name"
+                      placeholder={t('playground.headerName')}
                       value={h.key}
                       onChange={e => updateHeader(i, 'key', e.target.value)}
                     />
                     <input
                       className="pg__kv-input"
-                      placeholder="Header value"
+                      placeholder={t('playground.headerValue')}
                       value={h.value}
                       onChange={e => updateHeader(i, 'value', e.target.value)}
                     />
                     <button className="pg__kv-remove" onClick={() => removeHeader(i)}>&times;</button>
                   </div>
                 ))}
-                <button className="pg__kv-add" onClick={addHeader}>+ Add header</button>
+                <button className="pg__kv-add" onClick={addHeader}>+ {t('playground.addHeader')}</button>
               </div>
             )}
 
@@ -308,7 +310,7 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
                   className={`pg__body-textarea ${bodyError ? 'pg__body-textarea--err' : ''}`}
                   value={body}
                   onChange={e => { setBody(e.target.value); setBodyError(null) }}
-                  placeholder={method === 'GET' || method === 'DELETE' ? 'Body not available for ' + method : '{\n  \n}'}
+                  placeholder={method === 'GET' || method === 'DELETE' ? t('playground.bodyNotAvailable').replace('{method}', method) : '{\n  \n}'}
                   disabled={method === 'GET' || method === 'DELETE'}
                   spellCheck={false}
                 />
@@ -334,7 +336,7 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
               </>
             ) : (
               <div className="pg__response-empty">
-                Pulsa <strong>Send</strong> o <strong>Cmd+Enter</strong> para ejecutar la peticion
+                {t('playground.promptSend')}
               </div>
             )}
           </div>
@@ -343,9 +345,9 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
         {/* Sidebar: endpoints + history */}
         <div className="pg__sidebar">
           <div className="pg__sidebar-section">
-            <div className="pg__sidebar-label">Endpoints</div>
+            <div className="pg__sidebar-label">{t('playground.endpoints')}</div>
             {endpoints.length === 0 ? (
-              <p className="pg__empty">Sin endpoints</p>
+              <p className="pg__empty">{t('playground.noEndpoints')}</p>
             ) : (
               endpoints.map(ep => (
                 <button
@@ -362,7 +364,7 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
 
           {history.length > 0 && (
             <div className="pg__sidebar-section">
-              <div className="pg__sidebar-label">Historial</div>
+              <div className="pg__sidebar-label">{t('playground.history')}</div>
               {history.slice(0, 10).map((h, i) => (
                 <button
                   key={i}

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { FieldSchema } from '../types/schemas'
 
 interface Props {
@@ -23,12 +24,13 @@ const TYPE_BADGE: Record<string, string> = {
 const PAGE_SIZE = 10
 
 export function DataEditor({ fields, rows, onUpdateRow, onRemoveRow, onRegenerateRow }: Props) {
+  const { t } = useTranslation()
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
   if (fields.length === 0) {
     return (
       <div className="data-editor__empty">
-        <p>Define campos en la pestaña "Esquema" primero</p>
+        <p>{t('dataEditor.defineFieldsFirst')}</p>
       </div>
     )
   }
@@ -36,7 +38,7 @@ export function DataEditor({ fields, rows, onUpdateRow, onRemoveRow, onRegenerat
   if (rows.length === 0) {
     return (
       <div className="data-editor__empty">
-        <p>No hay datos. Usa "Regenerar" en la barra de herramientas para generar filas de prueba.</p>
+        <p>{t('dataEditor.noData')}</p>
       </div>
     )
   }
@@ -69,7 +71,7 @@ export function DataEditor({ fields, rows, onUpdateRow, onRemoveRow, onRegenerat
                   type="button"
                   className="data-editor__cell-btn"
                   onClick={() => onRegenerateRow(rowIndex)}
-                  title="Regenerar fila"
+                  title={t('dataEditor.regenerateRow')}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.4-3.9L23 10M1 14l5.1 4.9a9 9 0 0 0 14.4-3.9"/></svg>
                 </button>
@@ -77,7 +79,7 @@ export function DataEditor({ fields, rows, onUpdateRow, onRemoveRow, onRegenerat
                   type="button"
                   className="data-editor__cell-btn data-editor__cell-btn--danger"
                   onClick={() => onRemoveRow(rowIndex)}
-                  title="Eliminar fila"
+                  title={t('dataEditor.deleteRow')}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                 </button>
@@ -115,7 +117,7 @@ export function DataEditor({ fields, rows, onUpdateRow, onRemoveRow, onRegenerat
       {hasMore && (
         <div className="data-editor__more">
           <button type="button" className="btn ghost btn-sm" onClick={() => setVisibleCount(v => v + PAGE_SIZE)}>
-            Mostrar siguientes {Math.min(PAGE_SIZE, rows.length - visibleCount)} filas ({rows.length - visibleCount} restantes)
+            {t('dataEditor.showMore', { count: Math.min(PAGE_SIZE, rows.length - visibleCount), remaining: rows.length - visibleCount })}
           </button>
         </div>
       )}

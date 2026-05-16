@@ -1,82 +1,82 @@
 # Roadmap
 
-## Hecho
+## Done
 
-- Builder visual React/Vite.
-- Backend FastAPI con SQLModel.
-- Autenticacion de usuarios con JWT.
-- Workspaces basicos.
-- CRUD de proyectos, datasets y endpoints.
-- Mock server persistente con validacion de tipos.
-- Seguridad por proyecto: publica, API Key y JWT.
-- OpenAPI 3.1 y Redoc por proyecto.
-- Generacion de bundles FastAPI, Express y NestJS.
-- SDK TypeScript y Python.
-- Descarga ZIP del servidor generado.
-- CLI `apimaker init`, `deploy` y `serve`.
-- Deploy local Docker desde UI.
-- Deploy con SQLite, PostgreSQL y MySQL.
-- Redeploy / aplicar cambios sobre deployment existente.
-- Webhooks con historial de entregas.
-- Versiones y releases.
+- React/Vite visual builder.
+- FastAPI backend with SQLModel.
+- User authentication with JWT.
+- Basic workspaces.
+- CRUD for projects, datasets, and endpoints.
+- Persistent mock server with type validation.
+- Per-project security: public, API Key, and JWT.
+- OpenAPI 3.1 and Redoc per project.
+- FastAPI, Express, and NestJS bundle generation.
+- TypeScript and Python SDKs.
+- ZIP download of generated server.
+- `doapi init`, `deploy`, and `serve` CLI.
+- Local Docker deploy from UI.
+- Deploy with SQLite, PostgreSQL, and MySQL.
+- Redeploy / apply changes to existing deployment.
+- Webhooks with delivery history.
+- Versions and releases.
 - Share links.
-- Datasources, saved queries, runtime logs, imports y automations.
-- Instaladores Windows/Linux y uninstallers.
+- Datasources, saved queries, runtime logs, imports, and automations.
+- Windows/Linux installers and uninstallers.
 
-## Siguiente sprint recomendado
+## Next sprint recommended
 
-1. **UX de deploy**
-   - Mostrar diferencias entre proyecto actual y deployment.
-   - Aviso "hay cambios pendientes por aplicar".
-   - Historial de redeploys.
+1. **Deploy UX**
+   - Show differences between current project and deployment.
+   - "Pending changes to apply" warning.
+   - Redeploy history.
 
-2. **Seguridad avanzada**
-   - Endpoint para emitir JWT de prueba por proyecto.
-   - Rotacion guiada de API Key/JWT secret.
-   - CORS por proyecto.
-   - Auditoria de cambios sensibles.
+2. **Advanced security**
+   - Endpoint to issue test JWT per project.
+   - Guided API Key/JWT secret rotation.
+   - Per-project CORS.
+   - Sensitive change audit.
 
 3. **Automations**
-   - Editor visual de actions.
-   - Retries y backoff para HTTP/webhook.
+   - Visual action editor.
+   - Retries and backoff for HTTP/webhook.
    - Scheduler/cron.
-   - Variables seguras por proyecto.
+   - Secure per-project variables.
 
 4. **Datasources**
-   - Introspeccion REST/SQL mas completa.
-   - Query bindings desde path/query/body.
-   - Preview de resultados.
-   - Transformaciones entre datasource y endpoint.
+   - More complete REST/SQL introspection.
+   - Query bindings from path/query/body.
+   - Result preview.
+   - Datasource-to-endpoint transformations.
 
-5. **Deploy remoto**
-   - Deploy SSH real desde UI con progreso.
-   - Logs streaming.
-   - Rollback al deployment anterior.
-   - Soporte Traefik/Nginx/HTTPS.
+5. **Remote deploy**
+   - Real SSH deploy from UI with progress.
+   - Log streaming.
+   - Rollback to previous deployment.
+   - Traefik/Nginx/HTTPS support.
 
-6. **Calidad de bundles**
-   - Tests end-to-end de ZIP generado por stack.
-   - Validacion de Docker build por stack.
-   - README generado mas completo.
-   - Plantillas de CI/CD parametrizables.
+6. **Bundle quality**
+   - End-to-end tests of generated ZIP per stack.
+   - Docker build validation per stack.
+   - More complete generated README.
+   - Parameterizable CI/CD templates.
 
-7. **Observabilidad**
-   - Dashboard de runtime logs.
-   - Metricas por endpoint.
-   - Errores por deployment.
-   - Export de logs.
+7. **Observability**
+   - Runtime logs dashboard.
+   - Per-endpoint metrics.
+   - Per-deployment errors.
+   - Log export.
 
-8. **Multiusuario**
-   - Permisos por workspace/proyecto.
-   - Invitaciones.
-   - Roles editor/viewer/admin.
-   - Auditoria por usuario.
+8. **Multi-user**
+   - Per-workspace/project permissions.
+   - Invitations.
+   - Editor/viewer/admin roles.
+   - Per-user audit.
 
-## Ideas futuras
+## Future ideas
 
-- Marketplace de plantillas.
-- Plugins instalables.
-- Conectores SaaS.
-- Deploy a Render/Railway/Fly con OAuth/API tokens.
-- Generacion de frontends administrativos sobre la API.
+- Template marketplace.
+- Installable plugins.
+- SaaS connectors.
+- Deploy to Render/Railway/Fly with OAuth/API tokens.
+- Admin frontend generation on top of the API.
 - Billing/multi-tenant SaaS.
