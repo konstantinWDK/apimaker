@@ -7,6 +7,33 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const path = require('path');
 const fs = require('fs');
 
+// ─── Telemetry ──────────────────────────────────────────────────
+const TELEMETRY_URL = process.env.TELEMETRY_URL || '';
+const TELEMETRY_API_KEY = process.env.TELEMETRY_API_KEY || '';
+const telemetryQueue = [];
+let telemetryTimer = null;
+
+function enqueueTelemetry(method, path, statusCode, durationMs) {
+  if (!TELEMETRY_URL) return;
+  telemetryQueue.push({ method, path, status_code: statusCode, duration_ms: durationMs });
+}
+
+function flushTelemetry() {
+  if (!TELEMETRY_URL || telemetryQueue.length === 0) return;
+  const batch = telemetryQueue.splice(0);
+  const body = { logs: batch };
+  {% if auth_method == "apikey" %}
+  body.api_key = TELEMETRY_API_KEY || '{{ api_key }}';
+  {% elif auth_method == "jwt" %}
+  if (TELEMETRY_API_KEY) body.api_key = TELEMETRY_API_KEY;
+  {% endif %}
+  fetch(TELEMETRY_URL.replace(/\/+$/, '') + '/ingest', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).catch(() => {});
+}
+
 // ─── Configuration ───────────────────────────────────────────────
 const PORT = process.env.PORT || 8000;
 const DATABASE_URL = process.env.DATABASE_URL || 'sqlite:./data.db';
@@ -98,6 +125,11 @@ if (RATE_LIMIT_MAX > 0) {
   }));
 }
 
+// Start telemetry flush timer
+if (TELEMETRY_URL) {
+  telemetryTimer = setInterval(flushTelemetry, 30000);
+}
+
 // ─── Auth Middleware ─────────────────────────────────────────────
 function verifyAuth(req, res, next) {
   if (AUTH_METHOD === 'none') return next();
@@ -138,6 +170,20 @@ function errorHandler(err, req, res, next) {
   }
   res.status(500).json({ error: 'Internal Server Error', detail: err.message || 'Unexpected error' });
 }
+
+// ─── Telemetry Middleware ──────────────────────────────────────
+app.use((req, res, next) => {
+  const start = Date.now();
+  const originalEnd = res.end;
+  res.end = function(...args) {
+    const duration = Date.now() - start;
+    if (!['/health', '/docs', '/redoc', '/openapi.json'].includes(req.path)) {
+      enqueueTelemetry(req.method, req.path, res.statusCode, duration);
+    }
+    return originalEnd.apply(this, args);
+  };
+  next();
+});
 
 // ─── CRUD Route Builder ────────────────────────────────────────
 function buildCrudRoutes(model, modelName, basePath, operationTypes, opts = {}) {

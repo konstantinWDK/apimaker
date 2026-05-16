@@ -6,9 +6,12 @@ import json
 import logging
 import os
 import sys
+import time
 import uuid
 from pathlib import Path
+from urllib.parse import urljoin
 
+import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -157,6 +160,40 @@ def create_app_for_project(
     )
     from sqlmodel import Session, select
 
+    # ─── Telemetry ──────────────────────────────────────────────
+    TELEMETRY_URL = os.environ.get("TELEMETRY_URL", "")
+    TELEMETRY_API_KEY = os.environ.get("TELEMETRY_API_KEY", "")
+    _telemetry_queue: list[dict] = []
+
+    def _enqueue_telemetry(method: str, path: str, status_code: int, duration_ms: int):
+        if not TELEMETRY_URL:
+            return
+        _telemetry_queue.append({
+            "method": method, "path": path,
+            "status_code": status_code, "duration_ms": duration_ms,
+        })
+
+    def _flush_telemetry():
+        if not TELEMETRY_URL or not _telemetry_queue:
+            return
+        batch = _telemetry_queue[:]
+        _telemetry_queue.clear()
+        try:
+            payload: dict = {"logs": batch}
+            if TELEMETRY_API_KEY:
+                payload["api_key"] = TELEMETRY_API_KEY
+            else:
+                with Session(engine) as s:
+                    p = s.get(Project, project_id)
+                    if p and p.api_key:
+                        payload["api_key"] = p.api_key
+            httpx.post(
+                urljoin(TELEMETRY_URL.rstrip("/") + "/", "ingest"),
+                json=payload, timeout=5,
+            )
+        except Exception:
+            pass
+
     app = FastAPI(title=title or f"DoApi - {project_id}")
 
     app.add_middleware(
@@ -166,11 +203,30 @@ def create_app_for_project(
         allow_headers=["*"],
     )
 
+    # Telemetry middleware
+    @app.middleware("http")
+    async def telemetry_middleware(request: Request, call_next):
+        start = time.time()
+        response = await call_next(request)
+        duration_ms = int((time.time() - start) * 1000)
+        if request.url.path not in ("/health",):
+            _enqueue_telemetry(request.method, request.url.path, response.status_code, duration_ms)
+        return response
+
     @app.on_event("startup")
     def init_data():
         with Session(engine) as session:
             resolved = _resolve_project_id(session, project_id)
             start_mock_server_fn(session, resolved)
+        import threading
+        if TELEMETRY_URL:
+            threading.Thread(target=lambda: None, daemon=True).start()
+            def _telemetry_worker():
+                while True:
+                    time.sleep(30)
+                    _flush_telemetry()
+            t = threading.Thread(target=_telemetry_worker, daemon=True)
+            t.start()
 
     async def _check_auth(request: Request):
         """Verify auth headers based on the project's configured auth method."""

@@ -6,6 +6,11 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // ─── Telemetry ──────────────────────────────────────────────
+  const TELEMETRY_URL = process.env.TELEMETRY_URL || '';
+  const TELEMETRY_API_KEY = process.env.TELEMETRY_API_KEY || '';
+  const telemetryQueue: any[] = [];
+
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   const config = new DocumentBuilder()
@@ -21,6 +26,44 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
+
+  // ─── Telemetry: periodic flush ──────────────────────────────
+  if (TELEMETRY_URL) {
+    setInterval(() => {
+      if (telemetryQueue.length === 0) return;
+      const batch = telemetryQueue.splice(0);
+      const body: any = { logs: batch };
+{% if auth_method == 'apikey' %}
+      body.api_key = TELEMETRY_API_KEY || '{{ api_key }}';
+{% elif auth_method == 'jwt' %}
+      if (TELEMETRY_API_KEY) body.api_key = TELEMETRY_API_KEY;
+{% endif %}
+      fetch(TELEMETRY_URL.replace(/\/+$/, '') + '/ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).catch(() => {});
+    }, 30000);
+  }
+
+  // ─── Telemetry: request middleware ──────────────────────────
+  app.use((req: any, res: any, next: any) => {
+    const start = Date.now();
+    const originalEnd = res.end;
+    res.end = function (...args: any[]) {
+      const duration = Date.now() - start;
+      if (!['/health', '/docs', '/redoc', '/openapi.json'].includes(req.path)) {
+        telemetryQueue.push({
+          method: req.method,
+          path: req.path,
+          status_code: res.statusCode,
+          duration_ms: duration,
+        });
+      }
+      return originalEnd.apply(this, args);
+    };
+    next();
+  });
 
   const port = process.env.PORT || 8000;
   await app.listen(port);

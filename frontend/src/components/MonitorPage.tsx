@@ -12,6 +12,7 @@ interface LogEntry {
   status_code: number
   duration_ms: number
   message: string
+  source: string
   created_at: string
 }
 
@@ -218,26 +219,34 @@ export function MonitorPage() {
                     key={log.id}
                     className="monitor-console__line"
                     style={{
-                      padding: '0.1rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem',
+                      padding: '0.1rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem',
                       whiteSpace: 'nowrap',
                     }}
                     onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
-                    <span style={{ color: '#475569', minWidth: '4.5rem', flexShrink: 0, fontSize: '0.72rem' }}>
+                    <span style={{ color: log.source === 'telemetry' ? '#6366f1' : '#475569', minWidth: '4.5rem', flexShrink: 0, fontSize: '0.72rem' }}>
                       {fmtTime(log.created_at)}
                     </span>
                     <span style={{
-                      fontWeight: 700, fontSize: '0.72rem', minWidth: '3.2rem', textAlign: 'center',
+                      fontWeight: 700, fontSize: '0.72rem', minWidth: '3rem', textAlign: 'center',
                       color: methodColor(log.method), flexShrink: 0,
                     }}>
                       {log.method}
                     </span>
-                    <span style={{ color: statusColor(log.status_code), fontWeight: 700, minWidth: '2rem', textAlign: 'right', flexShrink: 0 }}>
+                    <span style={{ color: statusColor(log.status_code), fontWeight: 700, minWidth: '1.8rem', textAlign: 'right', flexShrink: 0 }}>
                       {log.status_code}
                     </span>
                     <span style={{ color: '#e2e8f0', minWidth: '3.5rem', textAlign: 'right', flexShrink: 0, fontSize: '0.72rem' }}>
                       {log.duration_ms}ms
+                    </span>
+                    <span style={{
+                      fontSize: '0.6rem', fontWeight: 600, padding: '0.08rem 0.3rem', borderRadius: 3,
+                      background: log.source === 'telemetry' ? 'rgba(99,102,241,0.2)' : 'rgba(34,197,94,0.2)',
+                      color: log.source === 'telemetry' ? '#818cf8' : '#4ade80',
+                      flexShrink: 0, textTransform: 'uppercase',
+                    }}>
+                      {log.source === 'telemetry' ? 'RMT' : 'LCL'}
                     </span>
                     <span style={{ color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {log.path}
@@ -283,6 +292,7 @@ export function MonitorPage() {
                 <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <th style={{ padding: '0.4rem 0.5rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600 }}>{t('monitor.source')}</th>
                       <th style={{ padding: '0.4rem 0.5rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600 }}>{t('monitor.method')}</th>
                       <th style={{ padding: '0.4rem 0.5rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600 }}>{t('monitor.path')}</th>
                       <th style={{ padding: '0.4rem 0.5rem', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600 }}>{t('monitor.status')}</th>
@@ -293,6 +303,15 @@ export function MonitorPage() {
                   <tbody>
                     {logs.map(log => (
                       <tr key={log.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '0.4rem 0.5rem' }}>
+                          <span style={{
+                            fontSize: '0.65rem', fontWeight: 700, padding: '0.1rem 0.3rem', borderRadius: 3,
+                            background: log.source === 'telemetry' ? 'rgba(99,102,241,0.15)' : 'rgba(34,197,94,0.15)',
+                            color: log.source === 'telemetry' ? '#818cf8' : '#4ade80',
+                          }}>
+                            {log.source === 'telemetry' ? t('monitor.remote') : t('monitor.local')}
+                          </span>
+                        </td>
                         <td style={{ padding: '0.4rem 0.5rem' }}>
                           <span style={{
                             fontSize: '0.7rem', fontWeight: 700, padding: '0.15rem 0.35rem', borderRadius: 3,

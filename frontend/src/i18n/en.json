@@ -1360,5 +1360,8 @@
   "monitor.lastHour": "Last hour",
   "monitor.last6hours": "Last 6 hours",
   "monitor.last24hours": "Last 24 hours",
-  "monitor.consoleLog": "Request Log"
+  "monitor.consoleLog": "Request Log",
+  "monitor.source": "Source",
+  "monitor.local": "LCL",
+  "monitor.remote": "RMT"
 }

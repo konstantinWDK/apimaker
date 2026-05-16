@@ -3,16 +3,74 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
+from pydantic import BaseModel
 from sqlmodel import Session, func, select
 
+from ..config import get_settings
 from ..db import get_session
-from ..db_models import RuntimeLog
+from ..db_models import Project, RuntimeLog
 from ..security import CurrentUser, get_current_user_from_header
 from ..services.project_service import project_service
+from ..services.product_ops import create_runtime_log
 
 router = APIRouter(prefix="/projects/{project_id}/monitor", tags=["monitor"])
+
+
+class IngestLogEntry(BaseModel):
+    method: str
+    path: str
+    status_code: int
+    duration_ms: int
+    timestamp: str | None = None
+
+
+class IngestRequest(BaseModel):
+    logs: list[IngestLogEntry]
+    api_key: str | None = None
+
+
+# ─── Remote telemetry ingestion ────────
+@router.post("/ingest", include_in_schema=False)
+def ingest_logs(
+    project_id: str,
+    payload: IngestRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> dict:
+    """Ingest log entries from a deployed API via telemetry."""
+    resolved = project_service.resolve_id(session, project_id)
+    project = session.get(Project, resolved)
+    if not project:
+        raise HTTPException(404, "Project not found")
+
+    # Authenticate: require matching API key
+    if project.auth_method == "apikey":
+        if not payload.api_key or payload.api_key != project.api_key:
+            raise HTTPException(401, "Invalid API key")
+    elif project.auth_method == "jwt":
+        auth = request.headers.get("Authorization", "")
+        if not auth.startswith("Bearer "):
+            raise HTTPException(401, "Missing Bearer token")
+
+    ingested = 0
+    for entry in payload.logs:
+        create_runtime_log(
+            session,
+            resolved,
+            "endpoint.called",
+            method=entry.method.upper(),
+            path=entry.path,
+            status_code=entry.status_code,
+            duration_ms=entry.duration_ms,
+            message="telemetry",
+        )
+        ingested += 1
+    session.commit()
+
+    return {"ingested": ingested, "project_id": resolved}
 
 
 @router.get("/logs")
@@ -57,6 +115,7 @@ def get_monitor_logs(
                 "status_code": log.status_code,
                 "duration_ms": log.duration_ms,
                 "message": log.message,
+                "source": "telemetry" if log.message == "telemetry" else "mock",
                 "created_at": log.created_at.isoformat(),
             }
             for log in logs

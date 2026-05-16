@@ -1361,5 +1361,8 @@
   "monitor.lastHour": "Última hora",
   "monitor.last6hours": "Últimas 6 horas",
   "monitor.last24hours": "Últimas 24 horas",
-  "monitor.consoleLog": "Registro de Peticiones"
+  "monitor.consoleLog": "Registro de Peticiones",
+  "monitor.source": "Origen",
+  "monitor.local": "LCL",
+  "monitor.remote": "RMT"
 }
