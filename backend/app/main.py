@@ -91,14 +91,24 @@ def on_startup() -> None:
         logging.error(f"Database initialization failed: {e}")
         raise
 
-    # Auto-seed demo data if DB has no projects and projects.json exists
+    # Auto-seed demo data if DB has no projects
     try:
         from pathlib import Path
+        import json
         from sqlmodel import Session, select
         from .db import engine
         from .db_models import Project
 
         projects_json = Path(__file__).resolve().parent / "data" / "projects.json"
+        frontend_demo = Path(__file__).resolve().parent.parent.parent / "frontend" / "public" / "demo-project.json"
+        # Copy from frontend demo if backend file doesn't exist
+        if not projects_json.exists() and frontend_demo.exists():
+            projects_json.parent.mkdir(parents=True, exist_ok=True)
+            content = json.loads(frontend_demo.read_text(encoding="utf-8"))
+            if isinstance(content, dict):
+                content = [content]
+            projects_json.write_text(json.dumps(content, indent=2), encoding="utf-8")
+            logging.info("Copied demo data from frontend demo-project.json")
         with Session(engine) as session:
             existing = session.exec(select(Project)).first()
             if not existing and projects_json.exists():
