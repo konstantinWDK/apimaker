@@ -107,16 +107,10 @@ export function App() {
     if (!project.remoteId || !isAuthenticated) return
     let cancelled = false
 
-    const checkAndStart = async () => {
+    const syncFromBackend = async () => {
       try {
         const res = await apiFetch(`/projects/${project.remoteId}/mock/status`).then(r => r.json())
-        if (cancelled) return
-        if (res.status !== 'running') {
-          await apiFetch(`/projects/${project.remoteId}/mock/start`, { method: 'POST' })
-          if (!cancelled) checkMockStatus()
-        } else {
-          if (!cancelled) checkMockStatus()
-        }
+        if (!cancelled) checkMockStatus()
       } catch {
         if (!cancelled) checkMockStatus()
       }
@@ -127,7 +121,7 @@ export function App() {
     }
     prevRemoteIdRef.current = project.remoteId
 
-    checkAndStart()
+    syncFromBackend()
     const interval = setInterval(checkMockStatus, 10000)
 
     return () => {
@@ -284,7 +278,7 @@ export function App() {
 
           <div key={location.key} className="page-enter">
             <ErrorBoundary>
-              <Routes>
+              <Routes location={location}>
                 <Route path="/" element={<BuilderPage />} />
                 <Route path="/simulator" element={<SimulatorPage />} />
                 <Route path="/info" element={<InfoPage />} />

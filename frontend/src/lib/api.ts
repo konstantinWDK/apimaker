@@ -424,8 +424,9 @@ export const stopMockServer = async (projectId: string): Promise<boolean> => {
  */
 export const getMockStatus = async (projectId: string): Promise<'running' | 'stopped'> => {
   const baseUrl = ensureBaseUrl()
+  const headers = buildHeaders()
   try {
-    const response = await fetch(`${baseUrl}/projects/${projectId}/mock/status`)
+    const response = await fetch(`${baseUrl}/projects/${projectId}/mock/status`, { headers })
     if (!response.ok) return 'stopped'
     const data = await response.json()
     return data.status === 'running' ? 'running' : 'stopped'

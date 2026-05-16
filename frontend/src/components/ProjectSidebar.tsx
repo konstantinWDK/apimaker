@@ -36,7 +36,6 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
     const checkStatus = async () => {
       try {
         const config = readBackendConfig()
-        const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('apimaker-jwt-token') : null
         const baseUrl = config.baseUrl?.replace(/\/$/, '')
 
         const [healthRes, dockerRes] = await Promise.allSettled([
@@ -56,14 +55,11 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
           setDockerAvail(null)
         }
 
-        if (token) {
+        if (healthRes.status === 'fulfilled' && healthRes.value.ok) {
           try {
-            const adminRes = await fetch(`${baseUrl}/admin/config`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            })
-            if (adminRes.ok) {
-              const adminData = await adminRes.json()
-              setDbType(adminData.current_database_info?.database_type || adminData.dev?.database_type || 'sqlite')
+            const healthData = await healthRes.value.json()
+            if (healthData.database) {
+              setDbType(healthData.database)
             }
           } catch { /* ignore */ }
         }

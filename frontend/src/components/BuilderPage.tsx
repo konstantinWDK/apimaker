@@ -223,16 +223,15 @@ export function BuilderPage() {
     }))
     setResult((prev) => {
       if (!prev) return prev
-      const updated: GenerationResult = {
+      return {
         ...prev,
         endpoints: updatedEndpoints,
         apiUrl: `${localBaseUrl}/api/mock/${project.id}${updatedEndpoints[0]?.path ?? '/records'}`,
         docsUrl: `${backendBaseUrl}/projects/${project.id}/docs`,
         projectName: project.name,
       }
-      return updated
     })
-  }, [project.endpoints, project.name, project.id, localBaseUrl, result, backendBaseUrl])
+  }, [project.endpoints, project.name, project.id, localBaseUrl])
 
   const effectiveResult = result ?? project.lastGeneration ?? null
 
