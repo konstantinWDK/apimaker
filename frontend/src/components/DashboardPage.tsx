@@ -104,6 +104,9 @@ export function DashboardPage() {
   const token = readToken()
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (token) headers['Authorization'] = `Bearer ${token}`
+  if (project.authMethod === 'apikey' && project.apiKey) {
+    headers['X-API-Key'] = project.apiKey
+  }
   const mockBase = `${baseUrl}/api/mock/${project.remoteId || project.slug || project.id}`
 
   const saveWidgets = (w: WidgetConfig[]) => {

@@ -122,19 +122,35 @@ async def verify_mock_auth(
     request: Request,
     session: Session = Depends(get_session)
 ):
-    """Verify auth headers if the project has authentication enabled."""
+    """Verify auth headers if the project has authentication enabled.
+    
+    Also accepts the builder's admin JWT to allow internal tools (Dashboard, Admin Panel)
+    to access the mock server without the project's specific API key or JWT secret.
+    """
     resolved_id = project_service.resolve_id(session, project_id)
     project = session.get(Project, resolved_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Skip project-level auth if the request is authenticated as a builder admin
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        builder_token = auth_header.split(" ", 1)[1]
+        try:
+            from ..services.jwt_service import decode_token
+            from ..config import get_settings
+            payload = decode_token(builder_token, secret=get_settings().jwt_secret_key)
+            if payload.get("role") == "admin":
+                return True
+        except Exception:
+            pass  # Not a valid builder token, fall through to project auth
 
     if project.auth_method == "apikey":
         api_key = request.headers.get("X-API-Key")
         if not api_key or api_key != project.api_key:
             raise HTTPException(status_code=401, detail="Invalid or missing API Key")
     elif project.auth_method == "jwt":
-        auth_header = request.headers.get("Authorization")
-        if not auth_header or not auth_header.startswith("Bearer "):
+        if not auth_header.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="Missing or invalid Bearer Token")
         token = auth_header.split(" ", 1)[1] if " " in auth_header else ""
         if project.jwt_secret:
