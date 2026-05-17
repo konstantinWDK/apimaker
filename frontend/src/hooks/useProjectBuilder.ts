@@ -403,15 +403,16 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
 
   startMock: async () => {
     const project = get().project
-    if (!project.remoteId) {
-      set({ mockError: 'Debes guardar el proyecto primero (clic en "Actualizar API")' })
+    const pid = project.remoteId || project.slug || project.id
+    if (!pid) {
+      set({ mockError: 'Save the project first.' })
       return
     }
     set({ mockLoading: true, mockError: null })
-    const result = await startMockServer(project.remoteId)
+    const result = await startMockServer(pid)
     set({ mockLoading: false })
     if (!result.ok) {
-      set({ mockRunning: false, mockError: result.msg || 'Error desconocido' })
+      set({ mockRunning: false, mockError: result.msg || 'Unknown error' })
     } else {
       set({ mockRunning: true, mockError: null })
     }
@@ -419,9 +420,10 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
 
   stopMock: async () => {
     const project = get().project
-    if (!project.remoteId) return
+    const pid = project.remoteId || project.slug || project.id
+    if (!pid) return
     set({ mockLoading: true })
-    const ok = await stopMockServer(project.remoteId)
+    const ok = await stopMockServer(pid)
     set({ mockLoading: false, mockRunning: !ok, mockError: null })
   },
 

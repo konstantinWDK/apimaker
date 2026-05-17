@@ -112,6 +112,7 @@ export function DashboardPage() {
   }
 
   const fetchWidget = useCallback(async (w: WidgetConfig) => {
+    if (!mockRunning) return
     const ep = findEndpoint(project.datasets, project.endpoints, w.datasetId)
     if (!ep) return
 
@@ -120,7 +121,7 @@ export function DashboardPage() {
       const path = ep.path.startsWith('/') ? ep.path : `/${ep.path}`
       const limit = w.type === 'table' ? 10 : 200
       const res = await fetch(`${mockBase}${path}?limit=${limit}`, { headers })
-      if (!res.ok) return
+      if (!res.ok) { setLoading(prev => ({ ...prev, [w.id]: false })); return }
       const json = await res.json()
       const items = json.data ?? json ?? []
       const rows = Array.isArray(items) ? items : []
@@ -150,15 +151,22 @@ export function DashboardPage() {
     setLoading(prev => ({ ...prev, [w.id]: false }))
   }, [project.datasets, project.endpoints, mockBase, headers])
 
+  // Fetch widgets when mock server state changes
   useEffect(() => {
+    if (!mockRunning) return
+    widgets.forEach(w => fetchWidget(w))
+  }, [mockRunning])
+
+  // Set up periodic refresh intervals
+  useEffect(() => {
+    if (!mockRunning) return () => { Object.values(intervals.current).forEach(clearInterval) }
     widgets.forEach(w => {
-      fetchWidget(w)
       if (w.refresh && w.refresh > 0) {
         intervals.current[w.id] = setInterval(() => fetchWidget(w), w.refresh * 1000)
       }
     })
     return () => { Object.values(intervals.current).forEach(clearInterval) }
-  }, [widgets, fetchWidget])
+  }, [mockRunning, widgets, fetchWidget])
 
   const addWidget = () => {
     const dsId = project.datasets[0]?.id
@@ -230,8 +238,8 @@ export function DashboardPage() {
               {!loading[w.id] && w.type === 'metric' && renderMetric(data[w.id] as MetricData)}
               {!loading[w.id] && w.type === 'table' && renderTable(data[w.id] as TableData)}
               {!loading[w.id] && w.type === 'chart' && renderChart(data[w.id] as ChartData)}
-              {!loading[w.id] && !data[w.id] && (
-                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.82rem' }}>{t('dash.noData')}</div>
+              {!loading[w.id] && !data[w.id] && !mockRunning && (
+                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.82rem' }}>{t('dash.mockRequired')}</div>
               )}
             </div>
           </div>
