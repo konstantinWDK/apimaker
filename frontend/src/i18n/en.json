@@ -1454,5 +1454,8 @@
   "playground.raw": "Raw",
   "playground.savedQueries": "Saved Queries",
   "playground.noSaved": "No saved queries yet.",
-  "playground.noHistory": "No requests yet."
+  "playground.noHistory": "No requests yet.",
+  "dash.mockRequired": "Start the Mock Server to see dashboard data.",
+  "dash.startMock": "Start Mock",
+  "dash.starting": "Starting..."
 }

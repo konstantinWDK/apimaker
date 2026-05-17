@@ -21,40 +21,78 @@ interface ChartData { labels: string[]; values: number[] }
 
 const DS_KEY = 'doapi-dashboard'
 
-function defaultWidgets(projectName: string): WidgetConfig[] {
-  if (projectName.toLowerCase().includes('pok')) {
-    return [
-      { id: 'w-pokemon-count', type: 'metric', title: 'Total Pokémon', field: 'pokedex_id', aggregate: 'count', datasetId: 'dataset-demo-001' },
-      { id: 'w-trainer-count', type: 'metric', title: 'Total Trainers', field: 'trainer_id', aggregate: 'count', datasetId: 'dataset-demo-002' },
-      { id: 'w-avg-level', type: 'metric', title: 'Avg Level', field: 'level', aggregate: 'avg', datasetId: 'dataset-demo-001' },
-      { id: 'w-types', type: 'chart', title: 'Pokémon by Type', field: 'type', datasetId: 'dataset-demo-001' },
-      { id: 'w-regions', type: 'chart', title: 'Pokémon by Region', field: 'region', datasetId: 'dataset-demo-001' },
-      { id: 'w-pokemon', type: 'table', title: 'Pokémon List', datasetId: 'dataset-demo-001' },
-      { id: 'w-trainers', type: 'table', title: 'Trainer List', datasetId: 'dataset-demo-002' },
-    ]
-  }
-  return []
+function defaultWidgets(projectName: string, datasets?: DatasetMeta[]): WidgetConfig[] {
+  if (!projectName.toLowerCase().includes('pok') || !datasets?.length) return []
+  const pokemon = datasets.find(d => d.name.toLowerCase() === 'pokemon')
+  const trainers = datasets.find(d => d.name.toLowerCase() === 'trainers')
+  if (!pokemon) return []
+
+  return [
+    { id: 'w-pokemon-count', type: 'metric' as WidgetType, title: 'Total Pokémon', field: 'pokedex_id', aggregate: 'count' as Aggregate, datasetId: pokemon.id },
+    { id: 'w-avg-level', type: 'metric' as WidgetType, title: 'Avg Level', field: 'level', aggregate: 'avg' as Aggregate, datasetId: pokemon.id },
+    { id: 'w-types', type: 'chart' as WidgetType, title: 'Pokémon by Type', field: 'type', datasetId: pokemon.id },
+    { id: 'w-regions', type: 'chart' as WidgetType, title: 'Pokémon by Region', field: 'region', datasetId: pokemon.id },
+    { id: 'w-pokemon', type: 'table' as WidgetType, title: 'Pokémon List', datasetId: pokemon.id },
+    ...(trainers ? [
+      { id: 'w-trainer-count', type: 'metric' as WidgetType, title: 'Total Trainers', field: 'trainer_id', aggregate: 'count' as Aggregate, datasetId: trainers.id },
+      { id: 'w-trainers', type: 'table' as WidgetType, title: 'Trainer List', datasetId: trainers.id },
+    ] : []),
+  ]
 }
 
 function findEndpoint(datasets: DatasetMeta[], endpoints: ApiEndpoint[], dsId?: string, opType = 'list'): { method: string; path: string } | null {
   if (!dsId) return null
-  const ep = endpoints.find(e => e.targetDatasetId === dsId && e.operationType === opType)
-  if (ep) return { method: ep.method, path: ep.path }
   const ds = datasets.find(d => d.id === dsId)
-  if (ds) return { method: 'GET', path: `/${ds.name.toLowerCase()}` }
-  return null
+  if (!ds) return null
+
+  // Try exact match by targetDatasetId + operationType
+  const exact = endpoints.find(e => e.targetDatasetId === dsId && e.operationType === opType)
+  if (exact) return { method: exact.method, path: exact.path }
+
+  // Try matching by dataset name in path (e.g. ds.name="pokemon", endpoint path="/pokemon")
+  const byPath = endpoints.find(e => {
+    const cleanPath = e.path.replace(/^\/+/, '').split('/')[0]
+    return cleanPath.toLowerCase() === ds.name.toLowerCase() && (opType === 'list' ? e.operationType === 'list' || e.method === 'GET' : e.operationType === opType)
+  })
+  if (byPath) return { method: byPath.method, path: byPath.path }
+
+  // Fallback: construct from dataset name
+  return { method: 'GET', path: `/${ds.name.toLowerCase()}` }
 }
 
 export function DashboardPage() {
   const { t } = useTranslation()
-  const { project } = useProjectBuilder()
+  const { project, mockRunning, startMock, mockLoading } = useProjectBuilder()
   const [widgets, setWidgets] = useState<WidgetConfig[]>(() => {
     try {
       const saved = localStorage.getItem(DS_KEY)
-      if (saved) return JSON.parse(saved)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      }
     } catch {}
-    return defaultWidgets(project.name)
+    return []
   })
+
+  // Regenerate defaults once project + datasets are loaded
+  const defaultsGenerated = useRef(false)
+  useEffect(() => {
+    if (defaultsGenerated.current) return
+    if (!project.name || !project.datasets.length) return
+    const defaults = defaultWidgets(project.name, project.datasets)
+    if (defaults.length > 0) {
+      const saved = localStorage.getItem(DS_KEY)
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved)
+          if (Array.isArray(parsed) && parsed.length > 0) return
+        } catch {}
+      }
+      defaultsGenerated.current = true
+      setWidgets(defaults)
+      localStorage.setItem(DS_KEY, JSON.stringify(defaults))
+    }
+  }, [project.name, project.datasets.length])
   const [loading, setLoading] = useState<Record<string, boolean>>({})
   const [data, setData] = useState<Record<string, MetricData | TableData | ChartData>>({})
   const [editing, setEditing] = useState<WidgetConfig | null>(null)
@@ -124,7 +162,6 @@ export function DashboardPage() {
 
   const addWidget = () => {
     const dsId = project.datasets[0]?.id
-    const ep = findEndpoint(project.datasets, project.endpoints, dsId)
     const w: WidgetConfig = {
       id: crypto.randomUUID(), type: newType,
       title: `${newType.charAt(0).toUpperCase() + newType.slice(1)} ${widgets.length + 1}`,
@@ -163,6 +200,15 @@ export function DashboardPage() {
           </button>
         </div>
       </div>
+
+      {!mockRunning && (
+        <div className="info-card" style={{ background: '#fef3c7', border: '1px solid #f59e0b', padding: '0.75rem 1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: '0.85rem', color: '#92400e' }}>{t('dash.mockRequired')}</span>
+          <button type="button" className="btn primary btn-small" onClick={startMock} disabled={mockLoading}>
+            {mockLoading ? t('dash.starting') : t('dash.startMock')}
+          </button>
+        </div>
+      )}
 
       {widgets.length === 0 && (
         <div className="info-card" style={{ textAlign: 'center', padding: '3rem' }}>

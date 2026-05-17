@@ -1454,5 +1454,8 @@
   "playground.raw": "Crudo",
   "playground.savedQueries": "Consultas Guardadas",
   "playground.noSaved": "Aún no hay consultas guardadas.",
-  "playground.noHistory": "Aún no hay peticiones."
+  "playground.noHistory": "Aún no hay peticiones.",
+  "dash.mockRequired": "Inicia el Mock Server para ver los datos del dashboard.",
+  "dash.startMock": "Iniciar Mock",
+  "dash.starting": "Iniciando..."
 }
