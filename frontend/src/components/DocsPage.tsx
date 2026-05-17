@@ -462,6 +462,69 @@ npm install && npm start</pre>
           <li><span className="docs-checkmark">✓</span> <strong>{t('docs.checklistSdk')}:</strong> {t('docs.checklistSdkDesc')}</li>
         </ul>
       </div>
+
+      <div id="vps-arch" className="docs-section" style={{ marginTop: '2rem' }}>
+        <h2 className="docs-section__title">{t('docs.vpsArchTitle')}</h2>
+        <p className="docs-section__text">{t('docs.vpsArchDesc')}</p>
+        <pre className="docs-code">{`┌───── LOCAL ─────┐        ┌───── VPS PROD ─────┐
+│  DoApi Builder   │        │  Nginx/Caddy (SSL)  │
+│  - Editor UI     │  SSH   │  → API Docker       │
+│  - Mock server   │──────→ │  → PostgreSQL       │
+│  - Monitor       │  SCP   │  → Sin panel        │
+│  - SQLite local  │        │  → Firewall estricto│
+└──────────────────┘        └─────────────────────┘`}</pre>
+        <p className="docs-section__text">{t('docs.vpsArchTip')}</p>
+      </div>
+
+      <div id="vps-harden" className="docs-section">
+        <h2 className="docs-section__title">{t('docs.vpsHardeningTitle')}</h2>
+        <p className="docs-section__text">{t('docs.vpsHardeningDesc')}</p>
+        <div className="docs-section__subtitle">{t('docs.vpsHardenSsh')}</div>
+        <pre className="docs-code">sudo sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+sudo systemctl restart sshd
+ssh-keygen -t ed25519 -a 100
+ssh-copy-id -i ~/.ssh/id_ed25519.pub user@host</pre>
+        <div className="docs-section__subtitle">{t('docs.vpsHardenFirewall')}</div>
+        <pre className="docs-code">sudo ufw allow 22/tcp
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw enable</pre>
+        <div className="docs-section__subtitle">{t('docs.vpsHardenDocker')}</div>
+        <pre className="docs-code">sudo useradd -m doapi-deploy
+sudo usermod -aG docker doapi-deploy
+# Luego desplegar siempre con este usuario</pre>
+        <div className="docs-section__subtitle">{t('docs.vpsHardenResources')}</div>
+        <pre className="docs-code"># En el docker-compose.yml de la API desplegada:
+services:
+  api:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M</pre>
+      </div>
+
+      <div id="vps-telemetry" className="docs-section">
+        <h2 className="docs-section__title">{t('docs.telemetryTitle')}</h2>
+        <p className="docs-section__text">{t('docs.telemetryDesc')}</p>
+        <div className="docs-section__subtitle">{t('docs.telemetryTunnel')}</div>
+        <pre className="docs-code"># En local, crear túnel SSH para que el VPS llegue al builder
+ssh -R 8000:localhost:8000 user@tuvps.com</pre>
+        <div className="docs-section__subtitle">{t('docs.telemetryTailscale')}</div>
+        <pre className="docs-code"># Instalar Tailscale en local y VPS
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up
+
+# Usar la IP de Tailscale como TELEMETRY_URL
+TELEMETRY_URL=http://100.x.x.x:8000/projects/{'{id}'}/monitor/ingest</pre>
+      </div>
+
+      <div id="vps-secrets" className="docs-section">
+        <h2 className="docs-section__title">{t('docs.vpsSecretsTitle')}</h2>
+        <p className="docs-section__text">{t('docs.vpsSecretsDesc')}</p>
+        <pre className="docs-code">python -c "import secrets; print('JWT_SECRET:', secrets.token_hex(32))"
+python -c "import secrets; print('ENCRYPTION_KEY:', secrets.token_urlsafe(32))"</pre>
+      </div>
     </div>
   )
 
@@ -479,6 +542,10 @@ npm install && npm start</pre>
     ],
     desplegar: [
       { id: 'desplegar', label: t('docs.tabDeploy') },
+      { id: 'vps-arch', label: t('docs.vpsArchTitle') },
+      { id: 'vps-harden', label: t('docs.vpsHardeningTitle') },
+      { id: 'vps-telemetry', label: t('docs.telemetryTitle') },
+      { id: 'vps-secrets', label: t('docs.vpsSecretsTitle') },
     ],
   }
 

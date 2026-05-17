@@ -1363,5 +1363,20 @@
   "monitor.consoleLog": "Request Log",
   "monitor.source": "Source",
   "monitor.local": "LCL",
-  "monitor.remote": "RMT"
+  "monitor.remote": "RMT",
+  "docs.vpsArchTitle": "Recommended Architecture",
+  "docs.vpsArchDesc": "For production, keep the DoApi builder on your local machine and deploy only the generated API to your VPS. This minimizes the attack surface and keeps the builder's database and secrets off the internet.",
+  "docs.vpsArchTip": "The builder never needs to be exposed. Use SSH for deploys and a VPN tunnel (WireGuard/Tailscale) for telemetry.",
+  "docs.vpsHardeningTitle": "VPS Hardening",
+  "docs.vpsHardeningDesc": "Secure your production server with these essential steps:",
+  "docs.vpsHardenSsh": "1. SSH Key Only (no passwords)",
+  "docs.vpsHardenFirewall": "2. Firewall — only allow SSH, HTTP, HTTPS",
+  "docs.vpsHardenDocker": "3. Dedicated deploy user",
+  "docs.vpsHardenResources": "4. Limit container resources",
+  "docs.telemetryTitle": "Remote Telemetry (Monitor)",
+  "docs.telemetryDesc": "To see deployed API requests in the DoApi Monitor, the VPS needs to reach your local builder. Two secure options:",
+  "docs.telemetryTunnel": "SSH Tunnel",
+  "docs.telemetryTailscale": "Tailscale (Zero-config VPN)",
+  "docs.vpsSecretsTitle": "Secret Management",
+  "docs.vpsSecretsDesc": "Never use default secrets in production. Generate strong keys:"
 }
