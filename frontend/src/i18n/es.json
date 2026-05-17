@@ -1399,7 +1399,7 @@
   "admin.noRecords": "Aún no hay registros.",
   "admin.noSearchResults": "No hay registros que coincidan con tu búsqueda.",
   "admin.totalRecords": "registros",
-  "admin.mockRequired": "Inicia el Mock Server desde la barra lateral para gestionar registros.",
+  "admin.mockRequired": "Inicia el Mock Server para gestionar registros.",
   "nav.queries": "Consultas",
   "query.title": "Constructor de Consultas",
   "query.subtitle": "Construye y prueba peticiones visualmente. Guarda consultas para después.",
@@ -1457,5 +1457,7 @@
   "playground.noHistory": "Aún no hay peticiones.",
   "dash.mockRequired": "Inicia el Mock Server para ver los datos del dashboard.",
   "dash.startMock": "Iniciar Mock",
-  "dash.starting": "Iniciando..."
+  "dash.starting": "Iniciando...",
+  "admin.startMock": "Iniciar Mock",
+  "admin.starting": "Iniciando..."
 }

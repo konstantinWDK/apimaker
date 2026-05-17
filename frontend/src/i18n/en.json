@@ -1398,7 +1398,7 @@
   "admin.noRecords": "No records yet.",
   "admin.noSearchResults": "No records match your search.",
   "admin.totalRecords": "records",
-  "admin.mockRequired": "Start the Mock Server from the sidebar to manage records.",
+  "admin.mockRequired": "Start the Mock Server to manage records.",
   "nav.queries": "Queries",
   "query.title": "Query Builder",
   "query.subtitle": "Visually build and test API requests. Save queries for later.",
@@ -1457,5 +1457,7 @@
   "playground.noHistory": "No requests yet.",
   "dash.mockRequired": "Start the Mock Server to see dashboard data.",
   "dash.startMock": "Start Mock",
-  "dash.starting": "Starting..."
+  "dash.starting": "Starting...",
+  "admin.startMock": "Start Mock",
+  "admin.starting": "Starting..."
 }
