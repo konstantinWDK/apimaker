@@ -1,15 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ProjectDraft } from '../types/schemas'
 import { readBackendConfig } from '../lib/backendConfig'
 
 interface Props {
   project: ProjectDraft
-  projects: ProjectDraft[]
-  onSave: () => void
-  onCreate: () => void
-  onSwitchProject: (project: ProjectDraft) => void
-  onDelete: (id: string) => void
   onSync: () => void
   mockRunning: boolean
   mockLoading: boolean
@@ -19,20 +14,11 @@ interface Props {
   isSyncing?: boolean
 }
 
-export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, onDelete, onSync, mockRunning, mockLoading, mockError, onStartMock, onStopMock, isSyncing }: Props) {
+export function ProjectSidebar({ project, onSync, mockRunning, mockLoading, mockError, onStartMock, onStopMock, isSyncing }: Props) {
   const { t } = useTranslation()
   const [backendStatus, setBackendStatus] = useState<'online' | 'offline' | 'checking'>('checking')
   const [dbType, setDbType] = useState<string | null>(null)
   const [dockerAvail, setDockerAvail] = useState<{ available: boolean; version?: string; containers_running?: number } | null>(null)
-  const [dropdownOpen, setDropdownOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
-
-  const formatDate = (value?: string) => {
-    if (!value) return t('sidebar.noDate')
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return t('sidebar.noDate')
-    return date.toLocaleDateString()
-  }
 
   useEffect(() => {
     const checkStatus = async () => {
@@ -74,16 +60,6 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
     return () => clearInterval(interval)
   }, [])
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
   const datasetsCount = project.datasets.length
   const fieldsCount = project.datasets.reduce((acc, ds) => acc + ds.fields.length, 0)
   const rowsCount = project.datasets.reduce((acc, ds) => acc + (ds.sampleRows?.length ?? 0), 0)
@@ -91,87 +67,8 @@ export function ProjectSidebar({ project, projects, onCreate, onSwitchProject, o
   const sizeKb = sizeBytes > 0 ? `${Math.max(1, Math.round(sizeBytes / 1024))} KB` : '0 KB'
   const endpoints = project.endpoints.length
 
-  const sortedProjects = [...projects].sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
-
   return (
     <aside className="sidebar">
-      {/* Project selector dropdown */}
-      <div className="sidebar__project-selector" ref={dropdownRef}>
-        <button
-          type="button"
-          className="sidebar__project-trigger"
-          onClick={() => setDropdownOpen(!dropdownOpen)}
-        >
-          <div className="sidebar__project-trigger-info">
-            <span className="sidebar__project-trigger-name">{project.name || t('sidebar.newProject')}</span>
-            <span className="sidebar__project-trigger-meta">
-              {project.targetStack} · {endpoints} endpoints · {datasetsCount} datasets
-            </span>
-          </div>
-          <svg
-            viewBox="0 0 24 24"
-            width="16"
-            height="16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            className={`sidebar__project-chevron ${dropdownOpen ? 'open' : ''}`}
-          >
-            <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-
-        {dropdownOpen && (
-          <div className="sidebar__project-dropdown">
-            <div className="sidebar__project-dropdown-header">
-              <span>{t('sidebar.projects')}</span>
-              <button type="button" className="sidebar__project-dropdown-new" onClick={onCreate}>
-                {t('sidebar.new')}
-              </button>
-            </div>
-            <div className="sidebar__project-dropdown-list">
-              {sortedProjects.length === 0 ? (
-                <p className="sidebar__project-dropdown-empty">{t('sidebar.saveHint')}</p>
-              ) : (
-                sortedProjects.map((item) => {
-                  const isActive = item.id === project.id
-                  const epCount = item.endpoints?.length ?? 0
-                  const dsCount = item.datasets?.length ?? 0
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className={`sidebar__project-dropdown-item ${isActive ? 'active' : ''}`}
-                      onClick={() => {
-                        onSwitchProject(item)
-                        setDropdownOpen(false)
-                      }}
-                    >
-                      <div className="sidebar__project-dropdown-item-main">
-                        <span className="sidebar__project-dropdown-item-name">{item.name}</span>
-                        <span className="sidebar__project-dropdown-item-meta">
-                          {item.targetStack} · {epCount} endp · {dsCount} ds · {formatDate(item.updatedAt)}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        className="sidebar__project-dropdown-delete"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onDelete(item.id)
-                        }}
-                        aria-label={t('sidebar.delete', { name: item.name })}
-                      >
-                        ×
-                      </button>
-                    </button>
-                  )
-                })
-              )}
-            </div>
-          </div>
-        )}
-      </div>
 
       <div className="sidebar__section">
         <p className="sidebar__section-title">{t('sidebar.projectInfo')}</p>

@@ -26,6 +26,7 @@ import { DashboardPage } from './components/DashboardPage'
 import { LanguageSwitcher } from './components/LanguageSwitcher'
 import { ThemeToggle } from './components/ThemeToggle'
 import { NavDropdown } from './components/NavDropdown'
+import { ProjectSelector } from './components/ProjectSelector'
 import { useProjectBuilder, createDefaultProject } from './hooks/useProjectBuilder'
 import { useAuth } from './hooks/useAuth'
 import { useToast } from './components/Toast'
@@ -176,6 +177,20 @@ export function App() {
         </div>
       ) : null}
       <div className="top-nav">
+        <ProjectSelector
+          project={project}
+          projects={projects}
+          onCreate={() => replaceProject(createDefaultProject())}
+          onSwitchProject={replaceProject}
+          onDelete={async (id: string) => {
+            const p = projects.find(p => p.id === id)
+            const name = p?.name || t('sidebar.newProject')
+            if (window.confirm(t('app.deleteConfirm', { name }))) {
+              await deleteProject(id)
+              toast(t('app.deleted', { name }), 'info')
+            }
+          }}
+        />
         <div className="nav-buttons">
           <NavLink
             to="/"
@@ -214,10 +229,22 @@ export function App() {
               { label: t('nav.admin'), path: '/admin', icon: <LayoutList size={14} /> },
               { label: t('nav.operations'), path: '/operations', icon: <Database size={14} /> },
               { label: t('nav.tests'), path: '/tests', icon: <TestTube size={14} /> },
-              { label: t('nav.docs'), path: '/docs', icon: <BookOpen size={14} /> },
-              { label: t('nav.info'), path: '/info', icon: <Info size={14} /> },
             ]}
           />
+          <NavLink
+            to="/docs"
+            className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+          >
+            <BookOpen size={16} />
+            {t('nav.docs')}
+          </NavLink>
+          <NavLink
+            to="/info"
+            className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+          >
+            <Info size={16} />
+            {t('nav.info')}
+          </NavLink>
         </div>
         <div className="nav-actions">
           <LanguageSwitcher />
@@ -240,27 +267,13 @@ export function App() {
           />
           <ProjectSidebar
             project={project}
-            projects={projects}
-            onSave={handleGenerate}
-            onCreate={() => {
-              replaceProject(createDefaultProject())
-            }}
+            onSync={saveProject}
+            isSyncing={isSyncing}
             mockRunning={mockRunning}
             mockLoading={mockLoading}
             mockError={mockError}
             onStartMock={startMock}
             onStopMock={stopMock}
-            onSwitchProject={replaceProject}
-            onSync={saveProject}
-            isSyncing={isSyncing}
-            onDelete={async (id: string) => {
-              const p = projects.find(p => p.id === id)
-              const name = p?.name || t('sidebar.newProject')
-              if (window.confirm(t('app.deleteConfirm', { name }))) {
-                await deleteProject(id)
-                toast(t('app.deleted', { name }), 'info')
-              }
-            }}
           />
         </div>
         <div className="app-content">
