@@ -11,10 +11,11 @@ DoApi is a visual, open-source platform for designing, testing, documenting, gen
 
 ### Linux/macOS
 
-1. Run `./install.sh`.
-2. Once installation finishes, use `./start.sh` to launch the application.
+```bash
+./install.sh
+```
 
-The installer sets up the environment, installs dependencies, creates the admin user, and manages the database. If you choose Docker, it will automatically detect whether ports are in use and let you choose alternative ports.
+The installer sets up the environment, installs dependencies, creates the admin user with your chosen credentials, and manages the database.
 
 Supported databases:
 
@@ -24,32 +25,29 @@ Supported databases:
 - Existing MySQL/MariaDB
 - MySQL in Docker container
 
-If you choose a Docker-based database, credentials are saved in `.env`.
+### Windows
 
-When finished, open:
-
-```text
-http://localhost:5173
+```bash
+install.bat
 ```
 
 ## Starting the application
 
-The most professional and recommended way to start is using the scripts generated during installation:
+### Option A: Docker Compose (recommended)
 
-- **Windows**: `start.bat`
-- **Linux/macOS**: `./start.sh`
+```bash
+docker compose up -d --build
+# Frontend: http://localhost:5173
+# Backend:  http://localhost:8000
+```
 
-These scripts use `concurrently` to unify Backend and Frontend logs in a single terminal with colors and prefixes.
-
-### Manual start (Development)
-
-If you prefer to start each service separately:
+### Option B: Manual (development)
 
 **Backend:**
 
 ```bash
 cd backend
-source .venv/bin/activate && pip install -e ".[dev]"
+source .venv/bin/activate
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -60,6 +58,14 @@ cd frontend
 npm install
 npm run dev
 ```
+
+When the application is running, open:
+
+```text
+http://localhost:5173
+```
+
+Log in with the credentials you created during installation.
 
 ## Uninstallation
 

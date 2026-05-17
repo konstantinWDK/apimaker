@@ -68,7 +68,7 @@ export function LoginScreen({ onLogin, error }: Props) {
           </button>
         </form>
         <p className="muted-text login-hint">
-          {t('login.defaultCredentials')} <code>admin</code> / <code>admin</code>
+          {t('login.defaultCredentials')}
         </p>
       </div>
     </div>
