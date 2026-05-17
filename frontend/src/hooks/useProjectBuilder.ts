@@ -409,12 +409,16 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       return
     }
     set({ mockLoading: true, mockError: null })
-    const result = await startMockServer(pid)
-    set({ mockLoading: false })
-    if (!result.ok) {
-      set({ mockRunning: false, mockError: result.msg || 'Unknown error' })
-    } else {
-      set({ mockRunning: true, mockError: null })
+    try {
+      const result = await startMockServer(pid)
+      set({ mockLoading: false })
+      if (!result.ok) {
+        set({ mockRunning: false, mockError: result.msg || 'Unknown error' })
+      } else {
+        set({ mockRunning: true, mockError: null })
+      }
+    } catch (e) {
+      set({ mockLoading: false, mockRunning: false, mockError: String(e) })
     }
   },
 

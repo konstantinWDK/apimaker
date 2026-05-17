@@ -391,21 +391,25 @@ export const fetchRemoteProject = async (projectId: string): Promise<ProjectDraf
 export const startMockServer = async (projectId: string): Promise<{ ok: boolean; msg?: string }> => {
   const baseUrl = ensureBaseUrl()
   const headers = buildHeaders()
-  const response = await fetch(`${baseUrl}/projects/${projectId}/mock/start`, {
-    method: 'POST',
-    headers,
-  })
-  if (!response.ok) {
-    const err = await response.text()
-    if (err.includes('not found') || err.includes('404')) {
-      return { ok: false, msg: 'Proyecto no encontrado. Sincroniza el proyecto primero.' }
+  try {
+    const response = await fetch(`${baseUrl}/projects/${projectId}/mock/start`, {
+      method: 'POST',
+      headers,
+    })
+    if (!response.ok) {
+      const err = await response.text()
+      if (err.includes('not found') || err.includes('404')) {
+        return { ok: false, msg: 'Project not found. Sync the project first.' }
+      }
+      if (err.includes('401') || err.includes('403')) {
+        return { ok: false, msg: 'Permission denied. Log in again.' }
+      }
+      return { ok: false, msg: err }
     }
-    if (err.includes('401') || err.includes('403')) {
-      return { ok: false, msg: 'No tienes permisos. Inicia sesión.' }
-    }
-    return { ok: false, msg: err }
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, msg: String(e) }
   }
-  return { ok: true }
 }
 
 /**
