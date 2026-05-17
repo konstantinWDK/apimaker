@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Routes, Route, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { LayoutDashboard, Play, Shield, Settings, Rocket, Database, TestTube, BookOpen, Info, Activity } from 'lucide-react'
+import { LayoutDashboard, Play, Shield, Settings, Rocket, Database, TestTube, BookOpen, Info, Activity, LayoutList } from 'lucide-react'
 
 import { SetupWizard } from './components/SetupWizard'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -20,6 +20,7 @@ import { SimulatorPage } from './components/SimulatorPage'
 import { ProductOpsPage } from './components/ProductOpsPage'
 import { TestsPage } from './components/TestsPage'
 import { MonitorPage } from './components/MonitorPage'
+import { AdminPanel } from './components/AdminPanel'
 import { LanguageSwitcher } from './components/LanguageSwitcher'
 import { ThemeToggle } from './components/ThemeToggle'
 import { useProjectBuilder, createDefaultProject } from './hooks/useProjectBuilder'
@@ -222,14 +223,21 @@ export function App() {
             className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
           >
             <Activity size={16} />
-            {t('nav.monitor')}
-          </NavLink>
-          <NavLink
-            to="/tests"
-            className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-          >
-            <TestTube size={16} />
-            {t('nav.tests')}
+                {t('nav.monitor')}
+              </NavLink>
+              <NavLink
+                to="/admin"
+                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+              >
+                <LayoutList size={16} />
+                {t('nav.admin')}
+              </NavLink>
+              <NavLink
+                to="/tests"
+                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+              >
+                <TestTube size={16} />
+                {t('nav.tests')}
           </NavLink>
           <NavLink
             to="/docs"
@@ -301,6 +309,7 @@ export function App() {
                 <Route path="/deploy" element={<DeployPage />} />
                 <Route path="/operations" element={<ProductOpsPage />} />
                 <Route path="/monitor" element={<MonitorPage />} />
+                <Route path="/admin" element={<AdminPanel />} />
                 <Route path="/config" element={<ConfigPage authStatus={authStatus} onLogout={performLogout} />} />
                 <Route path="/docs" element={<DocsPage />} />
                 <Route path="/tests" element={<TestsPage />} />

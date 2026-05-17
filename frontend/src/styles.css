@@ -4661,7 +4661,7 @@ input[type='password'] {
   display: flex; align-items: center; justify-content: center;
   font-weight: 800; font-size: 0.85rem; flex-shrink: 0;
 }
-.info-step strong { display: block; font-size: 0.9rem; color: #1e293b; margin-bottom: 0.15rem; }
+.info-step strong { display: block; font-size: 0.9rem; color: var(--text-primary); margin-bottom: 0.15rem; }
 .info-step p { font-size: 0.8rem; color: var(--text-muted); margin: 0; line-height: 1.4; }
 
 @media (max-width: 768px) {
@@ -4838,8 +4838,9 @@ input[type='password'] {
 .docs-checkmark { color: #22c55e; font-weight: 700; }
 
 .docs-tutorial-code {
-  background: #1e293b; color: #e2e8f0; border-radius: 6px; padding: 0.75rem 1rem;
+  background: var(--code-bg, #1e293b); color: #e2e8f0; border-radius: 6px; padding: 0.75rem 1rem;
   font-size: 0.8rem; line-height: 1.5; margin: 0.75rem 0; overflow-x: auto;
+  white-space: pre-wrap; font-family: 'SF Mono', 'Fira Code', monospace;
 }
 .docs-tutorial-table {
   width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.82rem;

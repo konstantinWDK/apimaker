@@ -195,7 +195,7 @@ export function DocsPage() {
         {
           num: 11, title: t('docs.tutorialStep11Title'),
           desc: t('docs.tutorialStep11Desc'),
-          code: '# Docker (recomendado)\ndocker compose up -d --build\n\n# CLI Deploy\ndoapi deploy proyecto.json --port 80\n\n# O manual\npip install -r requirements.txt\nuvicorn main:app --host 0.0.0.0 --port 8000',
+          code: '# Docker (recommended)\ndocker compose up -d --build\n\n# CLI Deploy\ndoapi deploy project.json --port 80\n\n# Or manual\npip install -r requirements.txt\nuvicorn main:app --host 0.0.0.0 --port 8000',
         },
       ].map((step) => (
         <div key={step.num} className="info-step" style={{ marginBottom: '0.75rem' }}>
