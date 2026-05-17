@@ -56,6 +56,8 @@ body {
 
 .shell {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   background: radial-gradient(circle at 0% 0%, #e0f2fe, transparent 50%),
     radial-gradient(circle at 100% 100%, #f3e8ff, transparent 50%),
     #f8fafc;
@@ -196,9 +198,9 @@ body {
 
 .app-wrapper {
   width: 100%;
-  min-height: 100vh;
   display: flex;
   gap: 0;
+  flex: 1;
 }
 
 .app-content {
@@ -215,10 +217,19 @@ body {
   justify-content: space-between;
   align-items: center;
   background: var(--bg-secondary);
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  border-radius: 14px;
-  padding: 0.5rem 1rem;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0.5rem 1.5rem;
+  gap: 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
 }
 
 .nav-buttons {
@@ -1381,21 +1392,19 @@ input[type='password'] {
   gap: 1rem;
   padding: 1.25rem;
   background: var(--bg-secondary);
-  border-right: 1px solid rgba(148, 163, 184, 0.2);
-  min-height: 100vh;
+  border-right: 1px solid var(--border-color);
 }
 
 .security-banner {
   background: #fef3c7;
-  border: 1px solid #f59e0b;
+  border-bottom: 1px solid #f59e0b;
   color: #92400e;
-  padding: 0.75rem 1rem;
-  border-radius: 10px;
-  margin: 0;
+  padding: 0.5rem 1.5rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
+  font-size: 0.85rem;
 }
 
 .security-banner button {

@@ -163,6 +163,100 @@ export function App() {
 
   return (
     <div className="shell">
+      {authStatus.mustChange ? (
+        <div className="security-banner">
+          <span>{t('app.credentialsBanner')}</span>
+          <button type="button" onClick={() => navigate('/config')}>
+            {t('app.changeNow')}
+          </button>
+        </div>
+      ) : null}
+      <div className="top-nav">
+        <div className="nav-buttons">
+          <NavLink
+            to="/"
+            end
+            className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+          >
+            <LayoutDashboard size={16} />
+            {t('nav.editor')}
+          </NavLink>
+
+          <NavLink
+            to="/simulator"
+            className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+          >
+            <Play size={16} />
+            {t('nav.simulator')}
+          </NavLink>
+          <NavLink
+            to="/deploy"
+            className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+          >
+            <Rocket size={16} />
+            {t('nav.deploy')}
+          </NavLink>
+          <NavLink
+            to="/security"
+            className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+          >
+            <Shield size={16} />
+            {t('nav.security')}
+          </NavLink>
+          <NavLink
+            to="/config"
+            className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+          >
+            <Settings size={16} />
+            {t('nav.config')}
+          </NavLink>
+          <NavLink
+            to="/operations"
+            className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+          >
+            <Database size={16} />
+            {t('nav.operations')}
+          </NavLink>
+          <NavLink
+            to="/monitor"
+            className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+          >
+            <Activity size={16} />
+            {t('nav.monitor')}
+          </NavLink>
+          <NavLink
+            to="/tests"
+            className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+          >
+            <TestTube size={16} />
+            {t('nav.tests')}
+          </NavLink>
+          <NavLink
+            to="/docs"
+            className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+          >
+            <BookOpen size={16} />
+            {t('nav.docs')}
+          </NavLink>
+          <NavLink
+            to="/info"
+            className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+          >
+            <Info size={16} />
+            {t('nav.info')}
+          </NavLink>
+        </div>
+        <div className="nav-actions">
+          <LanguageSwitcher />
+          <ThemeToggle />
+          <a className="github-button" href="https://github.com/" target="_blank" rel="noreferrer">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+              <path d="M12 .5a12 12 0 00-3.79 23.4c.6.1.82-.26.82-.58v-2.02c-3.34.72-4.05-1.61-4.05-1.61-.55-1.4-1.34-1.78-1.34-1.78-1.09-.74.08-.72.08-.72 1.2.08 1.83 1.24 1.83 1.24 1.08 1.85 2.83 1.32 3.52 1 .11-.8.42-1.32.76-1.62-2.66-.3-5.46-1.34-5.46-5.96 0-1.32.47-2.4 1.24-3.24-.12-.3-.54-1.5.12-3.12 0 0 1-.32 3.3 1.23a11.4 11.4 0 016 0c2.31-1.55 3.3-1.23 3.3-1.23.66 1.62.24 2.82.12 3.12.77.84 1.24 1.92 1.24 3.24 0 4.64-2.8 5.66-5.47 5.96.42.36.81 1.06.81 2.14v3.17c0 .32.21.7.82.58A12 12 0 0012 .5z" />
+            </svg>
+            <span>GitHub</span>
+          </a>
+        </div>
+      </div>
       <div className="app-wrapper">
         <div className="sidebar-stack">
           <UserCard
@@ -197,99 +291,6 @@ export function App() {
           />
         </div>
         <div className="app-content">
-          {authStatus.mustChange ? (
-            <div className="security-banner">
-              <span>{t('app.credentialsBanner')}</span>
-              <button type="button" onClick={() => navigate('/config')}>
-                {t('app.changeNow')}
-              </button>
-            </div>
-          ) : null}
-          <div className="top-nav">
-            <div className="nav-buttons">
-              <NavLink
-                to="/"
-                end
-                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-              >
-                <LayoutDashboard size={16} />
-                {t('nav.editor')}
-              </NavLink>
-
-              <NavLink
-                to="/simulator"
-                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-              >
-                <Play size={16} />
-                {t('nav.simulator')}
-              </NavLink>
-              <NavLink
-                to="/deploy"
-                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-              >
-                <Rocket size={16} />
-                {t('nav.deploy')}
-              </NavLink>
-              <NavLink
-                to="/security"
-                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-              >
-                <Shield size={16} />
-                {t('nav.security')}
-              </NavLink>
-              <NavLink
-                to="/config"
-                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-              >
-                <Settings size={16} />
-                {t('nav.config')}
-              </NavLink>
-              <NavLink
-                to="/operations"
-                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-              >
-                <Database size={16} />
-                {t('nav.operations')}
-              </NavLink>
-              <NavLink
-                to="/monitor"
-                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-              >
-                <Activity size={16} />
-                {t('nav.monitor')}
-              </NavLink>
-              <NavLink
-                to="/tests"
-                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-              >
-                <TestTube size={16} />
-                {t('nav.tests')}
-              </NavLink>
-              <NavLink
-                to="/docs"
-                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-              >
-                <BookOpen size={16} />
-                {t('nav.docs')}
-              </NavLink>
-              <NavLink
-                to="/info"
-                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-              >
-                <Info size={16} />
-                {t('nav.info')}
-              </NavLink>
-            </div>
-            <LanguageSwitcher />
-            <ThemeToggle />
-            <a className="github-button" href="https://github.com/" target="_blank" rel="noreferrer">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-                <path d="M12 .5a12 12 0 00-3.79 23.4c.6.1.82-.26.82-.58v-2.02c-3.34.72-4.05-1.61-4.05-1.61-.55-1.4-1.34-1.78-1.34-1.78-1.09-.74.08-.72.08-.72 1.2.08 1.83 1.24 1.83 1.24 1.08 1.85 2.83 1.32 3.52 1 .11-.8.42-1.32.76-1.62-2.66-.3-5.46-1.34-5.46-5.96 0-1.32.47-2.4 1.24-3.24-.12-.3-.54-1.5.12-3.12 0 0 1-.32 3.3 1.23a11.4 11.4 0 016 0c2.31-1.55 3.3-1.23 3.3-1.23.66 1.62.24 2.82.12 3.12.77.84 1.24 1.92 1.24 3.24 0 4.64-2.8 5.66-5.47 5.96.42.36.81 1.06.81 2.14v3.17c0 .32.21.7.82.58A12 12 0 0012 .5z" />
-              </svg>
-              <span>GitHub</span>
-            </a>
-          </div>
-
           <div key={location.key} className="page-enter">
             <ErrorBoundary>
               <Routes location={location}>
