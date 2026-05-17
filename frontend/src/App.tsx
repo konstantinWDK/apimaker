@@ -25,6 +25,7 @@ import { QueryBuilder } from './components/QueryBuilder'
 import { DashboardPage } from './components/DashboardPage'
 import { LanguageSwitcher } from './components/LanguageSwitcher'
 import { ThemeToggle } from './components/ThemeToggle'
+import { NavDropdown } from './components/NavDropdown'
 import { useProjectBuilder, createDefaultProject } from './hooks/useProjectBuilder'
 import { useAuth } from './hooks/useAuth'
 import { useToast } from './components/Toast'
@@ -185,13 +186,17 @@ export function App() {
             {t('nav.editor')}
           </NavLink>
 
-          <NavLink
-            to="/simulator"
-            className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-          >
-            <Play size={16} />
-            {t('nav.simulator')}
-          </NavLink>
+          <NavDropdown
+            label={t('nav.apiTools')}
+            icon={<Play size={16} />}
+            items={[
+              { label: t('nav.simulator'), path: '/simulator', icon: <Play size={14} /> },
+              { label: t('nav.queries'), path: '/queries', icon: <Search size={14} /> },
+              { label: t('nav.dashboard'), path: '/dashboard', icon: <BarChart3 size={14} /> },
+              { label: t('nav.monitor'), path: '/monitor', icon: <Activity size={14} /> },
+            ]}
+          />
+
           <NavLink
             to="/deploy"
             className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
@@ -199,76 +204,20 @@ export function App() {
             <Rocket size={16} />
             {t('nav.deploy')}
           </NavLink>
-          <NavLink
-            to="/security"
-            className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-          >
-            <Shield size={16} />
-            {t('nav.security')}
-          </NavLink>
-          <NavLink
-            to="/config"
-            className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-          >
-            <Settings size={16} />
-            {t('nav.config')}
-          </NavLink>
-          <NavLink
-            to="/operations"
-            className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-          >
-            <Database size={16} />
-            {t('nav.operations')}
-          </NavLink>
-          <NavLink
-            to="/monitor"
-            className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-          >
-            <Activity size={16} />
-                {t('nav.monitor')}
-              </NavLink>
-              <NavLink
-                to="/dashboard"
-                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-              >
-                <BarChart3 size={16} />
-                {t('nav.dashboard')}
-              </NavLink>
-              <NavLink
-                to="/queries"
-                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-              >
-                <Search size={16} />
-                {t('nav.queries')}
-              </NavLink>
-              <NavLink
-                to="/admin"
-                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-              >
-                <LayoutList size={16} />
-                {t('nav.admin')}
-              </NavLink>
-              <NavLink
-                to="/tests"
-                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-              >
-                <TestTube size={16} />
-                {t('nav.tests')}
-          </NavLink>
-          <NavLink
-            to="/docs"
-            className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-          >
-            <BookOpen size={16} />
-            {t('nav.docs')}
-          </NavLink>
-          <NavLink
-            to="/info"
-            className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-          >
-            <Info size={16} />
-            {t('nav.info')}
-          </NavLink>
+
+          <NavDropdown
+            label={t('nav.settings')}
+            icon={<Settings size={16} />}
+            items={[
+              { label: t('nav.security'), path: '/security', icon: <Shield size={14} /> },
+              { label: t('nav.config'), path: '/config', icon: <Settings size={14} /> },
+              { label: t('nav.admin'), path: '/admin', icon: <LayoutList size={14} /> },
+              { label: t('nav.operations'), path: '/operations', icon: <Database size={14} /> },
+              { label: t('nav.tests'), path: '/tests', icon: <TestTube size={14} /> },
+              { label: t('nav.docs'), path: '/docs', icon: <BookOpen size={14} /> },
+              { label: t('nav.info'), path: '/info', icon: <Info size={14} /> },
+            ]}
+          />
         </div>
         <div className="nav-actions">
           <LanguageSwitcher />

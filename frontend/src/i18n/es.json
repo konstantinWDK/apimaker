@@ -1442,5 +1442,7 @@
   "dash.cancel": "Cancelar",
   "dash.save": "Guardar",
   "dash.add": "Añadir",
-  "dash.titleLabel": "Título"
+  "dash.titleLabel": "Título",
+  "nav.apiTools": "API",
+  "nav.settings": "Ajustes"
 }
