@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Play, Save, Copy, Terminal, Plus, Trash2, ChevronRight, ChevronDown, Clock, Bookmark, FileJson, Code2 } from 'lucide-react'
 import type { ProjectDraft } from '../types/schemas'
 import { readBackendConfig } from '../lib/backendConfig'
 
@@ -13,39 +14,15 @@ interface Props {
   deploymentBaseUrl?: string | null
 }
 
-interface ApiResponse {
-  url: string
-  status: number
-  body: unknown
-  method: string
-  time: number
-  size: number
-}
+interface ApiResponse { url: string; status: number; body: unknown; method: string; time: number; size: number }
+interface KvRow { key: string; value: string; enabled: boolean }
+interface SavedQuery { id: string; name: string; method: string; path: string; body: string; params: KvRow[]; headers: KvRow[]; collection: string }
+interface HistoryEntry { id: string; method: string; path: string; status: number; duration: number; timestamp: string }
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const
-const METHOD_COLORS: Record<string, string> = {
-  GET: '#0ea5e9',
-  POST: '#10b981',
-  PUT: '#f59e0b',
-  PATCH: '#a855f7',
-  DELETE: '#f43f5e',
-}
-
-function buildDefaultBody(project: ProjectDraft, method: string, datasetId?: string): string {
-  if (method === 'GET' || method === 'DELETE') return ''
-  const ds = datasetId ? project.datasets.find(d => d.id === datasetId) : project.datasets[0]
-  const fields = ds?.fields ?? []
-  if (fields.length === 0) return '{\n  \n}'
-  const obj: Record<string, unknown> = {}
-  for (const f of fields.slice(0, 6)) {
-    if (f.type === 'string') obj[f.name] = f.name.includes('email') ? 'demo@email.com' : 'valor'
-    else if (f.type === 'integer') obj[f.name] = 1
-    else if (f.type === 'float') obj[f.name] = 1.0
-    else if (f.type === 'boolean') obj[f.name] = true
-    else obj[f.name] = 'valor'
-  }
-  return JSON.stringify(obj, null, 2)
-}
+const METHOD_COLORS: Record<string, string> = { GET: '#22c55e', POST: '#3b82f6', PUT: '#f59e0b', PATCH: '#a855f7', DELETE: '#ef4444' }
+type ResponseView = 'pretty' | 'raw'
+function emptyKv(): KvRow { return { key: '', value: '', enabled: true } }
 
 export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, selectedDatasetId, deploymentBaseUrl }: Props) {
   const { t } = useTranslation()
@@ -61,450 +38,361 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
     [project.endpoints, selectedDatasetId]
   )
 
-  const [method, setMethod] = useState<string>('GET')
-  const [url, setUrl] = useState<string>('')
-  const [body, setBody] = useState<string>('')
-  const [queryParams, setQueryParams] = useState<Array<{ key: string; value: string; enabled: boolean }>>([])
-  const [headers, setHeaders] = useState<Array<{ key: string; value: string; enabled: boolean }>>([
-    { key: 'Content-Type', value: 'application/json', enabled: true },
-  ])
+  const [method, setMethod] = useState('GET')
+  const [url, setUrl] = useState('')
+  const [body, setBody] = useState('')
+  const [params, setParams] = useState<KvRow[]>([emptyKv()])
+  const [headers, setHeaders] = useState<KvRow[]>([{ key: 'Content-Type', value: 'application/json', enabled: true }])
   const [response, setResponse] = useState<ApiResponse | null>(null)
-  const [history, setHistory] = useState<ApiResponse[]>([])
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<'params' | 'headers' | 'body'>('params')
-  const [bodyError, setBodyError] = useState<string | null>(null)
+  const [respView, setRespView] = useState<ResponseView>('pretty')
+
+  const [savedQueries, setSavedQueries] = useState<SavedQuery[]>(() => {
+    try { return JSON.parse(localStorage.getItem('doapi-queries') || '[]') } catch { return [] }
+  })
+  const [history, setHistory] = useState<HistoryEntry[]>(() => {
+    try { return JSON.parse(localStorage.getItem('doapi-history') || '[]') } catch { return [] }
+  })
+  const [queryName, setQueryName] = useState('')
+  const [collection, setCollection] = useState('Default')
+  const [collectionsOpen, setCollectionsOpen] = useState(true)
+  const [histOpen, setHistOpen] = useState(false)
+  const [showSave, setShowSave] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
 
   const authKey = project.authMethod === 'apikey' ? 'X-API-Key' : project.authMethod === 'jwt' ? 'Authorization' : null
-  const authVal = project.authMethod === 'apikey' ? (project.apiKey || '') : project.authMethod === 'jwt' ? 'Bearer <token>' : ''
-
-  const urlInputRef = useRef<HTMLInputElement>(null)
+  const authVal = project.authMethod === 'apikey' ? (project.apiKey || '') : ''
 
   useEffect(() => {
     if (!authKey) return
-    setHeaders(prev => {
-      if (prev.some(h => h.key === authKey)) return prev
-      return [{ key: authKey, value: authVal, enabled: true }, ...prev]
-    })
+    setHeaders(prev => prev.some(h => h.key === authKey) ? prev : [{ key: authKey, value: authVal, enabled: true }, ...prev])
   }, [project.id])
 
   useEffect(() => {
-    if (endpoints.length > 0) {
+    if (endpoints.length > 0 && !url) {
       const ep = endpoints[0]
-      const newUrl = mockBase + (ep.path.startsWith('/') ? ep.path : `/${ep.path}`)
-      const newBody = buildDefaultBody(project, ep.method, selectedDatasetId)
       setMethod(ep.method)
-      setUrl(newUrl)
-      setBody(newBody)
-      setResponse(null)
-      executeRequest(newUrl, ep.method, newBody)
+      setUrl(ep.path)
+      setBody(ep.method === 'POST' || ep.method === 'PUT' ? '{\n  \n}' : '')
     }
-  }, [mockBase, selectedDatasetId])
+  }, [endpoints, url])
 
-  const fullUrl = useMemo(() => {
-    const enabledParams = queryParams.filter(p => p.enabled && p.key.trim())
-    if (enabledParams.length === 0) return url
-    const sep = url.includes('?') ? '&' : '?'
-    return url + sep + enabledParams.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&')
-  }, [url, queryParams])
+  const buildFullUrl = useCallback(() => {
+    let fullUrl = mockBase + (url.startsWith('/') ? url : `/${url}`)
+    const active = params.filter(p => p.key && p.enabled)
+    if (active.length) fullUrl += '?' + active.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&')
+    return fullUrl
+  }, [url, params, mockBase])
 
-  const executeRequest = async (targetUrl: string, targetMethod: string, targetBody: string) => {
+  const execute = useCallback(async (m?: string, p?: string, b?: string) => {
+    const execMethod = m || method
+    const execPath = p || url
+    const execBody = b !== undefined ? b : body
+    const execUrl = mockBase + (execPath.startsWith('/') ? execPath : `/${execPath}`) + (
+      params.filter(p2 => p2.key && p2.enabled).length
+        ? '?' + params.filter(p2 => p2.key && p2.enabled).map(p2 => `${encodeURIComponent(p2.key)}=${encodeURIComponent(p2.value)}`).join('&')
+        : ''
+    )
     setLoading(true)
-    setBodyError(null)
-
-    if (targetBody.trim() && targetMethod !== 'GET' && targetMethod !== 'DELETE') {
-      try { JSON.parse(targetBody) } catch {
-        setBodyError(t('playground.invalidJson'))
-        setLoading(false)
-        return
-      }
-    }
-
     const start = performance.now()
     try {
-      const requestHeaders: Record<string, string> = {}
-      headers.filter(h => h.enabled && h.key.trim()).forEach(h => { requestHeaders[h.key] = h.value })
-
-      const opts: RequestInit = { method: targetMethod, headers: requestHeaders }
-      if (targetMethod !== 'GET' && targetMethod !== 'DELETE' && targetBody) opts.body = targetBody
-
-      const res = await fetch(targetUrl, opts)
+      const h: Record<string, string> = {}
+      headers.filter(hh => hh.key && hh.enabled).forEach(hh => { h[hh.key] = hh.value })
+      const res = await fetch(execUrl, {
+        method: execMethod,
+        headers: h,
+        body: ['POST', 'PUT', 'PATCH'].includes(execMethod) ? execBody || undefined : undefined,
+      })
       const text = await res.text()
-      let parsed: unknown = text
-      try { parsed = JSON.parse(text) } catch { /* keep as text */ }
-
-      const elapsed = Math.round(performance.now() - start)
-      const size = new Blob([text]).size
-
-      const entry: ApiResponse = { url: targetUrl, status: res.status, body: parsed, method: targetMethod, time: elapsed, size }
-      setResponse(entry)
-      setHistory(prev => [entry, ...prev].slice(0, 20))
+      const duration = Math.round(performance.now() - start)
+      let parsed = text
+      try { parsed = JSON.stringify(JSON.parse(text), null, 2) } catch {}
+      setResponse({ url: execUrl, status: res.status, body: parsed, method: execMethod, time: duration, size: text.length })
+      const entry: HistoryEntry = { id: crypto.randomUUID(), method: execMethod, path: execPath, status: res.status, duration, timestamp: new Date().toISOString() }
+      setHistory(prev => {
+        const next = [entry, ...prev].slice(0, 50)
+        localStorage.setItem('doapi-history', JSON.stringify(next)); return next
+      })
     } catch {
-      setResponse({ url: targetUrl, status: 0, body: { error: t('playground.connectionError') }, method: targetMethod, time: 0, size: 0 })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSend = async () => {
-    if (!url.trim()) return
-    await executeRequest(fullUrl, method, body)
-  }
+      setResponse({ url: execUrl, status: 0, body: 'Connection error', method: execMethod, time: 0, size: 0 })
+    } finally { setLoading(false) }
+  }, [method, url, body, headers, params, mockBase])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSend()
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); execute() }
   }
 
-  const selectEndpoint = (ep: typeof endpoints[0]) => {
-    const newUrl = mockBase + (ep.path.startsWith('/') ? ep.path : `/${ep.path}`)
-    const newBody = buildDefaultBody(project, ep.method, selectedDatasetId)
-    setMethod(ep.method)
-    setUrl(newUrl)
-    setBody(newBody)
-    setResponse(null)
-    executeRequest(newUrl, ep.method, newBody)
+  const saveQuery = () => {
+    if (!queryName.trim()) return
+    const q: SavedQuery = { id: crypto.randomUUID(), name: queryName.trim(), method, path: url, body, params: params.filter(p => p.key), headers: headers.filter(h => h.key), collection }
+    const next = [...savedQueries, q]
+    setSavedQueries(next)
+    localStorage.setItem('doapi-queries', JSON.stringify(next))
+    setQueryName(''); setShowSave(false)
   }
 
-  const addQueryParam = () => setQueryParams([...queryParams, { key: '', value: '', enabled: true }])
-  const updateQueryParam = (i: number, field: 'key' | 'value' | 'enabled', val: string | boolean) => {
-    setQueryParams(prev => prev.map((p, idx) => idx === i ? { ...p, [field]: val } : p))
+  const loadQuery = (q: SavedQuery) => {
+    setMethod(q.method); setUrl(q.path); setBody(q.body)
+    setParams(q.params.length ? q.params : [emptyKv()])
+    setHeaders(q.headers.length ? q.headers : [{ key: 'Content-Type', value: 'application/json', enabled: true }])
   }
-  const removeQueryParam = (i: number) => setQueryParams(prev => prev.filter((_, idx) => idx !== i))
 
-  const addHeader = () => setHeaders([...headers, { key: '', value: '', enabled: true }])
-  const updateHeader = (i: number, field: 'key' | 'value' | 'enabled', val: string | boolean) => {
-    setHeaders(prev => prev.map((h, idx) => idx === i ? { ...h, [field]: val } : h))
+  const deleteQuery = (id: string) => {
+    const next = savedQueries.filter(q => q.id !== id)
+    setSavedQueries(next)
+    localStorage.setItem('doapi-queries', JSON.stringify(next))
   }
-  const removeHeader = (i: number) => setHeaders(prev => prev.filter((_, idx) => idx !== i))
+
+  const copyCurl = async () => {
+    const full = buildFullUrl()
+    let curl = `curl -X ${method} '${full}'`
+    headers.filter(h => h.key && h.enabled).forEach(h => curl += ` \\\n  -H '${h.key}: ${h.value}'`)
+    if (['POST', 'PUT', 'PATCH'].includes(method) && body) curl += ` \\\n  -d '${body.replace(/'/g, "\\'")}'`
+    await navigator.clipboard.writeText(curl)
+  }
+
+  const groups = savedQueries.reduce<Record<string, SavedQuery[]>>((acc, q) => {
+    const c = q.collection || 'Default'
+    if (!acc[c]) acc[c] = []
+    acc[c].push(q)
+    return acc
+  }, {})
 
   return (
-    <div className="pg">
-      {deploymentBaseUrl ? (
-        <div className="pg__banner pg__banner--deploy">
-          <span>{t('playground.testingAgainst', { url: deploymentBaseUrl })}</span>
-        </div>
-      ) : !mockRunning ? (
-        <div className="pg__banner">
+    <div onKeyDown={handleKeyDown}>
+      {!mockRunning && (
+        <div className="pg__banner" style={{ marginBottom: '0.75rem' }}>
           <span>{t('playground.mockServerStopped')}</span>
-          <button className="btn primary btn-small" onClick={onStartMock} disabled={mockLoading}>
+          <button type="button" className="btn primary btn-small" onClick={onStartMock} disabled={mockLoading} style={{ marginLeft: '0.5rem' }}>
             {mockLoading ? t('playground.starting') : t('playground.startMockServer')}
           </button>
         </div>
-      ) : null}
+      )}
 
-      {/* Main layout */}
-      <div className="pg__layout">
-        {/* Main content */}
-        <div className="pg__main">
+      <div className="pg__layout" style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+        <div className="pg__main" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {/* URL Bar */}
-          <div className="pg__urlbar">
-            <select
-              className="pg__method-select"
-              value={method}
-              onChange={e => {
-                setMethod(e.target.value)
-                setBody(buildDefaultBody(project, e.target.value, selectedDatasetId))
-              }}
-              style={{ color: METHOD_COLORS[method] || '#64748b' }}
-            >
+          <div className="pg__urlbar" style={{ display: 'flex', gap: '0.35rem', alignItems: 'stretch' }}>
+            <select value={method} onChange={e => setMethod(e.target.value)}
+              style={{
+                padding: '0.45rem 0.6rem', borderRadius: 8, border: `2px solid ${METHOD_COLORS[method] || '#64748b'}`,
+                background: 'var(--bg-secondary)', color: METHOD_COLORS[method] || 'var(--text-primary)',
+                fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', width: 80, textAlign: 'center',
+              }}>
               {METHODS.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
-            <input
-              ref={urlInputRef}
-              className="pg__url-input"
-              value={url}
-              onChange={e => setUrl(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={mockBase + '/records'}
-              spellCheck={false}
-            />
-            <button
-              className="pg__send-btn"
-              onClick={handleSend}
-              disabled={loading}
-            >
-              {loading ? t('playground.sending') : t('playground.send')}
+            <div style={{ flex: 1 }}>
+              <input value={url} onChange={e => setUrl(e.target.value)}
+                placeholder="/pokemon"
+                style={{
+                  width: '100%', padding: '0.45rem 0.75rem', borderRadius: 8,
+                  border: '1px solid var(--border-color)', background: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)', fontSize: '0.85rem', fontFamily: 'monospace',
+                  boxSizing: 'border-box',
+                }} />
+            </div>
+            <button type="button" className="btn primary" onClick={() => execute()} disabled={loading}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.45rem 1rem', fontWeight: 700 }}>
+              <Play size={15} /> {loading ? '...' : t('playground.send')}
             </button>
           </div>
 
-          {/* Tabs: Params | Headers | Body */}
-          <div className="pg__tabs">
-            <button className={`pg__tab ${activeTab === 'params' ? 'active' : ''}`} onClick={() => setActiveTab('params')}>
-              {t('playground.params')} {queryParams.filter(p => p.key).length > 0 && <span className="pg__tab-count">{queryParams.filter(p => p.key).length}</span>}
-            </button>
-            <button className={`pg__tab ${activeTab === 'headers' ? 'active' : ''}`} onClick={() => setActiveTab('headers')}>
-              {t('playground.headers')} {headers.filter(h => h.key).length > 0 && <span className="pg__tab-count">{headers.filter(h => h.key).length}</span>}
-            </button>
-            <button className={`pg__tab ${activeTab === 'body' ? 'active' : ''}`} onClick={() => setActiveTab('body')}>
-              {t('playground.body')}
-            </button>
-          </div>
-
-          {/* Tab content */}
-          <div className="pg__tab-content">
-            {activeTab === 'params' && (
-              <div className="pg__kv-editor">
-                {queryParams.map((p, i) => (
-                  <div key={i} className="pg__kv-row">
-                    <input
-                      className="pg__kv-check"
-                      type="checkbox"
-                      checked={p.enabled}
-                      onChange={e => updateQueryParam(i, 'enabled', e.target.checked)}
-                    />
-                    <input
-                      className="pg__kv-input"
-                      placeholder={t('playground.key')}
-                      value={p.key}
-                      onChange={e => updateQueryParam(i, 'key', e.target.value)}
-                    />
-                    <input
-                      className="pg__kv-input"
-                      placeholder={t('playground.value')}
-                      value={p.value}
-                      onChange={e => updateQueryParam(i, 'value', e.target.value)}
-                    />
-                    <button className="pg__kv-remove" onClick={() => removeQueryParam(i)}>&times;</button>
-                  </div>
-                ))}
-                <button className="pg__kv-add" onClick={addQueryParam}>{t('playground.addParam')}</button>
-              </div>
-            )}
-
-            {activeTab === 'headers' && (
-              <div className="pg__kv-editor">
-                {project.authMethod !== 'none' && (
-                  <p className="pg__auth-hint">
-                    {t('playground.authHeaderHint')}
-                  </p>
-                )}
-                {headers.map((h, i) => (
-                  <div key={i} className="pg__kv-row">
-                    <input
-                      className="pg__kv-check"
-                      type="checkbox"
-                      checked={h.enabled}
-                      onChange={e => updateHeader(i, 'enabled', e.target.checked)}
-                    />
-                    <input
-                      className="pg__kv-input"
-                      placeholder={t('playground.headerName')}
-                      value={h.key}
-                      onChange={e => updateHeader(i, 'key', e.target.value)}
-                    />
-                    <input
-                      className="pg__kv-input"
-                      placeholder={t('playground.headerValue')}
-                      value={h.value}
-                      onChange={e => updateHeader(i, 'value', e.target.value)}
-                    />
-                    <button className="pg__kv-remove" onClick={() => removeHeader(i)}>&times;</button>
-                  </div>
-                ))}
-                <button className="pg__kv-add" onClick={addHeader}>+ {t('playground.addHeader')}</button>
-              </div>
-            )}
-
-            {activeTab === 'body' && (
-              <div className="pg__body-editor">
-                <textarea
-                  className={`pg__body-textarea ${bodyError ? 'pg__body-textarea--err' : ''}`}
-                  value={body}
-                  onChange={e => { setBody(e.target.value); setBodyError(null) }}
-                  placeholder={method === 'GET' || method === 'DELETE' ? t('playground.bodyNotAvailable').replace('{method}', method) : '{\n  \n}'}
-                  disabled={method === 'GET' || method === 'DELETE'}
-                  spellCheck={false}
-                />
-                {bodyError && <p className="pg__body-error">{bodyError}</p>}
-              </div>
-            )}
-          </div>
-
-          {/* Response */}
-          <div className="pg__response">
-            {response ? (
-              <>
-                <div className="pg__response-bar">
-                  <span className={`pg__response-status ${response.status < 400 ? 'ok' : 'err'}`}>
-                    {response.status || 'ERR'}
-                  </span>
-                  <span className="pg__response-time">{response.time}ms</span>
-                  <span className="pg__response-size">{response.size < 1024 ? `${response.size}B` : `${(response.size / 1024).toFixed(1)}KB`}</span>
-                </div>
-                <pre className="pg__response-body">
-                  {typeof response.body === 'string' ? response.body : JSON.stringify(response.body, null, 2)}
-                </pre>
-              </>
-            ) : (
-              <div className="pg__response-empty">
-                {t('playground.promptSend')}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Sidebar: endpoints + history */}
-        <div className="pg__sidebar">
-          <div className="pg__sidebar-section">
-            <div className="pg__sidebar-label">{t('playground.endpoints')}</div>
-            {endpoints.length === 0 ? (
-              <p className="pg__empty">{t('playground.noEndpoints')}</p>
-            ) : (
-              endpoints.map(ep => (
-                <button
-                  key={ep.id}
-                  className="pg__ep-item"
-                  onClick={() => selectEndpoint(ep)}
-                >
-                  <span className="pg__ep-method" style={{ color: METHOD_COLORS[ep.method] || '#64748b' }}>{ep.method}</span>
-                  <span className="pg__ep-path">{ep.path}</span>
-                </button>
-              ))
-            )}
-          </div>
-
-          {history.length > 0 && (
-            <div className="pg__sidebar-section">
-              <div className="pg__sidebar-label">{t('playground.history')}</div>
-              {history.slice(0, 10).map((h, i) => (
-                <button
-                  key={i}
-                  className="pg__history-item"
-                  onClick={() => { setMethod(h.method); setUrl(h.url); setResponse(h) }}
-                >
-                  <span className={`pg__history-status ${h.status < 400 ? 'ok' : 'err'}`}>{h.status || 'ERR'}</span>
-                  <span className="pg__ep-method" style={{ color: METHOD_COLORS[h.method] || '#64748b' }}>{h.method}</span>
-                  <span className="pg__history-url">{h.url.replace(mockBase, '')}</span>
+          {/* Tabs */}
+          <div className="pg__editor" style={{ border: '1px solid var(--border-color)', borderRadius: 10, overflow: 'hidden', background: 'var(--bg-secondary)' }}>
+            <div className="pg__tabs" style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-tertiary)' }}>
+              {(['params', 'headers', 'body'] as const).map(tab => (
+                <button key={tab} type="button" onClick={() => setActiveTab(tab)}
+                  style={{
+                    padding: '0.5rem 1rem', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem',
+                    background: activeTab === tab ? 'var(--bg-secondary)' : 'transparent',
+                    color: activeTab === tab ? 'var(--accent-blue)' : 'var(--text-muted)',
+                    borderBottom: activeTab === tab ? '2px solid var(--accent-blue)' : '2px solid transparent',
+                  }}>
+                  {tab === 'params' ? t('playground.params') : tab === 'headers' ? t('playground.headers') : t('playground.body')}
                 </button>
               ))}
             </div>
+            <div style={{ padding: '0.75rem' }}>
+              {activeTab === 'params' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  {params.map((p, i) => (
+                    <div key={i} style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                      <input type="checkbox" checked={p.enabled} onChange={() => { const n = [...params]; n[i] = { ...p, enabled: !p.enabled }; setParams(n) }}
+                        style={{ width: 16, height: 16, accentColor: 'var(--accent-blue)' }} />
+                      <input value={p.key} onChange={e => { const n = [...params]; n[i] = { ...p, key: e.target.value }; setParams(n) }}
+                        placeholder={t('playground.key')} style={{ flex: 1, padding: '0.35rem 0.5rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
+                      <input value={p.value} onChange={e => { const n = [...params]; n[i] = { ...p, value: e.target.value }; setParams(n) }}
+                        placeholder={t('playground.value')} style={{ flex: 1, padding: '0.35rem 0.5rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
+                      <button type="button" className="btn ghost" onClick={() => setParams(params.filter((_, j) => j !== i))} style={{ padding: '0.25rem' }}>
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                  <button type="button" className="btn ghost" onClick={() => setParams([...params, emptyKv()])} style={{ alignSelf: 'flex-start', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <Plus size={13} /> {t('playground.addParam')}
+                  </button>
+                </div>
+              )}
+              {activeTab === 'headers' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  {headers.map((h, i) => (
+                    <div key={i} style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                      <input type="checkbox" checked={h.enabled} onChange={() => { const n = [...headers]; n[i] = { ...h, enabled: !h.enabled }; setHeaders(n) }}
+                        style={{ width: 16, height: 16, accentColor: 'var(--accent-blue)' }} />
+                      <input value={h.key} onChange={e => { const n = [...headers]; n[i] = { ...h, key: e.target.value }; setHeaders(n) }}
+                        style={{ flex: 1, padding: '0.35rem 0.5rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
+                      <input value={h.value} onChange={e => { const n = [...headers]; n[i] = { ...h, value: e.target.value }; setHeaders(n) }}
+                        style={{ flex: 1, padding: '0.35rem 0.5rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
+                      <button type="button" className="btn ghost" onClick={() => setHeaders(headers.filter((_, j) => j !== i))} style={{ padding: '0.25rem' }}>
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                  <button type="button" className="btn ghost" onClick={() => setHeaders([...headers, emptyKv()])} style={{ alignSelf: 'flex-start', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <Plus size={13} /> {t('playground.addHeader')}
+                  </button>
+                </div>
+              )}
+              {activeTab === 'body' && (
+                <textarea value={body} onChange={e => setBody(e.target.value)}
+                  placeholder='{ "key": "value" }'
+                  style={{
+                    width: '100%', minHeight: 140, padding: '0.75rem', borderRadius: 8,
+                    border: '1px solid var(--border-color)', background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)', fontSize: '0.8rem', fontFamily: 'monospace',
+                    resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.5,
+                  }} />
+              )}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <button type="button" className="btn ghost" onClick={() => setShowSave(!showSave)} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.82rem' }}>
+              <Save size={14} /> {t('playground.save')}
+            </button>
+            <button type="button" className="btn ghost" onClick={copyCurl} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.82rem' }}>
+              <Terminal size={14} /> cURL
+            </button>
+            <div style={{ flex: 1 }} />
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('playground.sendHint')}</span>
+          </div>
+
+          {showSave && (
+            <div className="info-card" style={{ padding: '0.75rem 1rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <input value={queryName} onChange={e => setQueryName(e.target.value)} placeholder={t('playground.queryName')} autoFocus
+                  style={{ flex: 1, padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.82rem' }} />
+                <input value={collection} onChange={e => setCollection(e.target.value)} placeholder={t('playground.collection')}
+                  style={{ width: 140, padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.82rem' }} />
+                <button type="button" className="btn primary" onClick={saveQuery} style={{ fontSize: '0.82rem' }}>{t('playground.saveQuery')}</button>
+                <button type="button" className="btn ghost" onClick={() => setShowSave(false)} style={{ fontSize: '0.82rem' }}>{t('playground.cancel')}</button>
+              </div>
+            </div>
+          )}
+
+          {/* Response */}
+          {response && (
+            <div className="info-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0.75rem',
+                borderBottom: '1px solid var(--border-color)', background: 'var(--bg-tertiary)',
+              }}>
+                <span style={{
+                  fontWeight: 700, fontSize: '0.85rem',
+                  color: response.status >= 200 && response.status < 300 ? 'var(--accent-green)' : response.status >= 400 ? 'var(--accent-red)' : 'var(--text-muted)',
+                }}>{response.status || 'ERR'}</span>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{response.time}ms</span>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{response.size >= 1024 ? `${(response.size / 1024).toFixed(1)}KB` : `${response.size}B`}</span>
+                <div style={{ flex: 1 }} />
+                <div style={{ display: 'flex', gap: '0.15rem', background: 'var(--bg-primary)', borderRadius: 6, padding: '0.1rem' }}>
+                  {(['pretty', 'raw'] as ResponseView[]).map(v => (
+                    <button key={v} type="button" onClick={() => setRespView(v)}
+                      style={{
+                        padding: '0.2rem 0.5rem', borderRadius: 4, border: 'none', cursor: 'pointer', fontSize: '0.72rem',
+                        background: respView === v ? 'var(--accent-blue)' : 'transparent',
+                        color: respView === v ? '#fff' : 'var(--text-muted)', fontWeight: 600,
+                      }}>
+                      {v === 'pretty' ? <FileJson size={12} style={{ verticalAlign: 'middle' }} /> : <Code2 size={12} style={{ verticalAlign: 'middle' }} />} {v === 'pretty' ? t('playground.pretty') : t('playground.raw')}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <pre style={{
+                margin: 0, padding: '0.75rem', fontSize: '0.78rem', lineHeight: 1.5, overflow: 'auto', maxHeight: 350,
+                fontFamily: 'monospace', background: '#0a0f1c', color: '#e2e8f0',
+              }}>
+                {respView === 'pretty' ? (() => { try { return JSON.stringify(JSON.parse(response.body as string), null, 2) } catch { return String(response.body) } })() : String(response.body)}
+              </pre>
+            </div>
           )}
         </div>
+
+        {/* Sidebar: Saved Queries + History */}
+        {sidebarOpen && (
+          <div style={{ width: 260, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div className="info-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ padding: '0.5rem 0.75rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}
+                onClick={() => setCollectionsOpen(!collectionsOpen)}>
+                <Bookmark size={14} style={{ color: 'var(--accent-indigo)' }} />
+                <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--text-primary)', flex: 1 }}>{t('playground.savedQueries')}</span>
+                {collectionsOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+              </div>
+              {collectionsOpen && (
+                <div style={{ maxHeight: 220, overflow: 'auto' }}>
+                  {Object.keys(groups).length === 0 ? (
+                    <p style={{ padding: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>{t('playground.noSaved')}</p>
+                  ) : Object.entries(groups).map(([col, qs]) => (
+                    <div key={col}>
+                      <div style={{ padding: '0.25rem 0.75rem', fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', background: 'var(--bg-tertiary)' }}>
+                        {col}
+                      </div>
+                      {qs.map(q => (
+                        <div key={q.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.25rem 0.75rem', cursor: 'pointer' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#fff', padding: '0.08rem 0.25rem', borderRadius: 3, background: METHOD_COLORS[q.method] || '#64748b', minWidth: 28, textAlign: 'center' }}>{q.method}</span>
+                          <span style={{ flex: 1, fontSize: '0.75rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} onClick={() => loadQuery(q)}>{q.name}</span>
+                          <button type="button" onClick={() => deleteQuery(q.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.1rem' }}>
+                            <Trash2 size={10} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="info-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ padding: '0.5rem 0.75rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}
+                onClick={() => setHistOpen(!histOpen)}>
+                <Clock size={14} style={{ color: 'var(--text-muted)' }} />
+                <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--text-primary)', flex: 1 }}>{t('playground.history')}</span>
+                {histOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+              </div>
+              {histOpen && (
+                <div style={{ maxHeight: 180, overflow: 'auto' }}>
+                  {history.length === 0 ? (
+                    <p style={{ padding: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>{t('playground.noHistory')}</p>
+                  ) : history.map(entry => (
+                    <div key={entry.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.75rem', cursor: 'pointer', fontSize: '0.72rem' }}
+                      onClick={() => { setMethod(entry.method); setUrl(entry.path); execute(entry.method, entry.path) }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      <span style={{ fontWeight: 700, color: entry.status >= 200 && entry.status < 300 ? 'var(--accent-green)' : 'var(--accent-red)', minWidth: 24 }}>{entry.status}</span>
+                      <span style={{ fontWeight: 600, fontSize: '0.62rem', color: METHOD_COLORS[entry.method] || '#64748b', minWidth: 32 }}>{entry.method}</span>
+                      <span style={{ flex: 1, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.path}</span>
+                      <span style={{ color: 'var(--text-muted)' }}>{entry.duration}ms</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
-
-      <style>{`
-        .pg { font-size: 14px; }
-        .pg__banner {
-          display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-          padding: 0.65rem 1rem; margin-bottom: 0.75rem;
-          background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px;
-          font-size: 0.82rem; color: #92400e;
-        }
-        .pg__banner--deploy {
-          background: #e0f2fe; border-color: #7dd3fc; color: #0369a1;
-        }
-        .pg__layout { display: flex; gap: 1rem; min-height: 500px; }
-        .pg__sidebar { width: 220px; flex-shrink: 0; display: flex; flex-direction: column; gap: 1rem; }
-        .pg__sidebar-section { display: flex; flex-direction: column; }
-        .pg__sidebar-label {
-          font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
-          color: #94a3b8; padding: 0.25rem 0; margin-bottom: 0.25rem;
-        }
-        .pg__ep-item {
-          display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0.4rem;
-          border: none; background: none; cursor: pointer; border-radius: 4px;
-          font-size: 0.78rem; text-align: left; transition: background 0.1s;
-        }
-        .pg__ep-item:hover { background: #f1f5f9; }
-        .pg__ep-method { font-weight: 700; font-size: 0.65rem; min-width: 42px; text-transform: uppercase; }
-        .pg__ep-path { color: #475569; font-family: monospace; font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .pg__history-item {
-          display: flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.4rem;
-          border: none; background: none; cursor: pointer; border-radius: 4px;
-          font-size: 0.72rem; text-align: left; transition: background 0.1s;
-        }
-        .pg__history-item:hover { background: #f1f5f9; }
-        .pg__history-status { font-weight: 700; font-size: 0.65rem; min-width: 28px; }
-        .pg__history-status.ok { color: #166534; } .pg__history-status.err { color: #991b1b; }
-        .pg__history-url { color: #64748b; font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.7rem; }
-        .pg__empty { font-size: 0.75rem; color: #94a3b8; padding: 0.5rem; margin: 0; }
-
-        .pg__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.5rem; }
-
-        .pg__urlbar { display: flex; gap: 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
-        .pg__urlbar:focus-within { border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,0.15); }
-        .pg__method-select {
-          width: 90px; border: none; border-right: 1px solid #e2e8f0; padding: 0.5rem 0.6rem;
-          font-size: 0.8rem; font-weight: 700; background: #f8fafc; cursor: pointer; outline: none;
-          font-family: monospace;
-        }
-        .pg__url-input {
-          flex: 1; border: none; padding: 0.5rem 0.75rem; font-size: 0.8rem; font-family: monospace;
-          outline: none; background: #fff;
-        }
-        .pg__send-btn {
-          padding: 0.5rem 1.25rem; border: none; background: #6366f1; color: #fff;
-          font-size: 0.8rem; font-weight: 600; cursor: pointer; white-space: nowrap;
-          transition: background 0.15s;
-        }
-        .pg__send-btn:hover { background: #4f46e5; }
-        .pg__send-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        .pg__tabs { display: flex; gap: 0; border-bottom: 1px solid #e2e8f0; }
-        .pg__tab {
-          padding: 0.4rem 0.75rem; border: none; background: none; cursor: pointer;
-          font-size: 0.78rem; font-weight: 600; color: #64748b;
-          border-bottom: 2px solid transparent; transition: all 0.1s;
-          display: flex; align-items: center; gap: 0.35rem;
-        }
-        .pg__tab.active { color: #6366f1; border-bottom-color: #6366f1; }
-        .pg__tab-count {
-          background: #e0e7ff; color: #4f46e5; font-size: 0.6rem; padding: 0.05rem 0.35rem;
-          border-radius: 999px; font-weight: 700;
-        }
-
-        .pg__tab-content { min-height: 100px; }
-
-        .pg__kv-editor { display: flex; flex-direction: column; gap: 0.3rem; padding: 0.5rem 0; }
-        .pg__kv-row { display: flex; gap: 0.35rem; align-items: center; }
-        .pg__kv-check { width: 16px; height: 16px; accent-color: #6366f1; cursor: pointer; flex-shrink: 0; }
-        .pg__kv-input {
-          flex: 1; padding: 0.3rem 0.5rem; border: 1px solid #e2e8f0; border-radius: 4px;
-          font-size: 0.78rem; font-family: monospace; outline: none; min-width: 0;
-        }
-        .pg__kv-input:focus { border-color: #6366f1; }
-        .pg__kv-remove {
-          border: none; background: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer;
-          padding: 0 0.25rem; border-radius: 4px; line-height: 1;
-        }
-        .pg__kv-remove:hover { color: #ef4444; background: #fef2f2; }
-        .pg__kv-add {
-          border: none; background: none; color: #6366f1; font-size: 0.75rem; font-weight: 600;
-          cursor: pointer; padding: 0.2rem 0; text-align: left; align-self: flex-start;
-        }
-        .pg__auth-hint {
-          font-size: 0.72rem; color: #6366f1; background: #eef2ff; padding: 0.35rem 0.5rem;
-          border-radius: 4px; margin: 0 0 0.35rem; border: 1px solid #c7d2fe;
-        }
-
-
-        .pg__body-editor { padding: 0.5rem 0; }
-        .pg__body-textarea {
-          width: 100%; min-height: 120px; padding: 0.6rem; border: 1px solid #e2e8f0; border-radius: 6px;
-          font-family: monospace; font-size: 0.78rem; resize: vertical; outline: none; background: #fafafa;
-        }
-        .pg__body-textarea:focus { border-color: #6366f1; background: #fff; }
-        .pg__body-textarea--err { border-color: #ef4444; }
-        .pg__body-textarea:disabled { opacity: 0.5; background: #f1f5f9; cursor: not-allowed; }
-        .pg__body-error { font-size: 0.72rem; color: #dc2626; margin-top: 0.25rem; }
-
-        .pg__response { flex: 1; display: flex; flex-direction: column; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; min-height: 200px; }
-        .pg__response-bar {
-          display: flex; align-items: center; gap: 1rem; padding: 0.4rem 0.75rem;
-          background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); font-size: 0.75rem;
-        }
-        .pg__response-status { font-weight: 700; font-size: 0.8rem; }
-        .pg__response-status.ok { color: var(--accent-green); } .pg__response-status.err { color: var(--accent-red); }
-        .pg__response-time, .pg__response-size { color: var(--text-muted); font-family: monospace; font-size: 0.72rem; }
-        .pg__response-body {
-          flex: 1; margin: 0; padding: 0.75rem; font-family: monospace; font-size: 0.75rem;
-          line-height: 1.5; overflow: auto; white-space: pre-wrap; word-break: break-all;
-          color: var(--text-primary); background: var(--bg-secondary);
-        }
-        .pg__response-empty {
-          flex: 1; display: flex; align-items: center; justify-content: center;
-          color: #94a3b8; font-size: 0.82rem;
-        }
-      `}</style>
     </div>
   )
 }

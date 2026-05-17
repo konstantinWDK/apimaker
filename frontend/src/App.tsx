@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Routes, Route, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { LayoutDashboard, Play, Shield, Settings, Rocket, Database, TestTube, BookOpen, Info, Activity, LayoutList, Search, BarChart3 } from 'lucide-react'
+import { LayoutDashboard, Play, Shield, Settings, Rocket, Database, TestTube, BookOpen, Info, Activity, LayoutList, BarChart3 } from 'lucide-react'
 
 import { SetupWizard } from './components/SetupWizard'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -21,7 +21,6 @@ import { ProductOpsPage } from './components/ProductOpsPage'
 import { TestsPage } from './components/TestsPage'
 import { MonitorPage } from './components/MonitorPage'
 import { AdminPanel } from './components/AdminPanel'
-import { QueryBuilder } from './components/QueryBuilder'
 import { DashboardPage } from './components/DashboardPage'
 import { LanguageSwitcher } from './components/LanguageSwitcher'
 import { ThemeToggle } from './components/ThemeToggle'
@@ -206,9 +205,9 @@ export function App() {
             icon={<Play size={16} />}
             items={[
               { label: t('nav.simulator'), path: '/simulator', icon: <Play size={14} /> },
-              { label: t('nav.queries'), path: '/queries', icon: <Search size={14} /> },
               { label: t('nav.dashboard'), path: '/dashboard', icon: <BarChart3 size={14} /> },
               { label: t('nav.monitor'), path: '/monitor', icon: <Activity size={14} /> },
+              { label: t('nav.security'), path: '/security', icon: <Shield size={14} /> },
             ]}
           />
 
@@ -224,7 +223,6 @@ export function App() {
             label={t('nav.settings')}
             icon={<Settings size={16} />}
             items={[
-              { label: t('nav.security'), path: '/security', icon: <Shield size={14} /> },
               { label: t('nav.config'), path: '/config', icon: <Settings size={14} /> },
               { label: t('nav.admin'), path: '/admin', icon: <LayoutList size={14} /> },
               { label: t('nav.operations'), path: '/operations', icon: <Database size={14} /> },
@@ -289,7 +287,6 @@ export function App() {
                 <Route path="/monitor" element={<MonitorPage />} />
                 <Route path="/admin" element={<AdminPanel />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/queries" element={<QueryBuilder />} />
                 <Route path="/config" element={<ConfigPage authStatus={authStatus} onLogout={performLogout} />} />
                 <Route path="/docs" element={<DocsPage />} />
                 <Route path="/tests" element={<TestsPage />} />
