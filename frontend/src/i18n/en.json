@@ -1424,5 +1424,22 @@
   "query.savedQueries": "Saved Queries",
   "query.noSaved": "No saved queries yet.",
   "query.history": "History",
-  "query.noHistory": "No requests yet."
+  "query.noHistory": "No requests yet.",
+  "nav.dashboard": "Dashboard",
+  "dash.title": "Dashboard",
+  "dash.subtitle": "Visualize your API data with customizable widgets.",
+  "dash.addWidget": "Add Widget",
+  "dash.refresh": "Auto-refresh",
+  "dash.empty": "No widgets yet. Click \"Add Widget\" to get started.",
+  "dash.loading": "Loading...",
+  "dash.noData": "No data. Start the Mock Server and generate records.",
+  "dash.configure": "Configure Widget",
+  "dash.dataset": "Dataset",
+  "dash.field": "Group by Field",
+  "dash.aggregate": "Aggregation",
+  "dash.manual": "Manual",
+  "dash.cancel": "Cancel",
+  "dash.save": "Save",
+  "dash.add": "Add",
+  "dash.titleLabel": "Title"
 }

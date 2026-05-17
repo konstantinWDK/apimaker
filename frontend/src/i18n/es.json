@@ -1425,5 +1425,22 @@
   "query.savedQueries": "Consultas Guardadas",
   "query.noSaved": "Aún no hay consultas guardadas.",
   "query.history": "Historial",
-  "query.noHistory": "Aún no hay peticiones."
+  "query.noHistory": "Aún no hay peticiones.",
+  "nav.dashboard": "Dashboard",
+  "dash.title": "Dashboard",
+  "dash.subtitle": "Visualiza los datos de tu API con widgets personalizables.",
+  "dash.addWidget": "Añadir Widget",
+  "dash.refresh": "Auto-refresco",
+  "dash.empty": "Aún no hay widgets. Haz clic en \"Añadir Widget\" para empezar.",
+  "dash.loading": "Cargando...",
+  "dash.noData": "Sin datos. Inicia el Mock Server y genera registros.",
+  "dash.configure": "Configurar Widget",
+  "dash.dataset": "Dataset",
+  "dash.field": "Agrupar por Campo",
+  "dash.aggregate": "Agregación",
+  "dash.manual": "Manual",
+  "dash.cancel": "Cancelar",
+  "dash.save": "Guardar",
+  "dash.add": "Añadir",
+  "dash.titleLabel": "Título"
 }
