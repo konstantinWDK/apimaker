@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Routes, Route, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { LayoutDashboard, Play, Shield, Settings, Rocket, Database, TestTube, BookOpen, Info, Activity, LayoutList } from 'lucide-react'
+import { LayoutDashboard, Play, Shield, Settings, Rocket, Database, TestTube, BookOpen, Info, Activity, LayoutList, Search } from 'lucide-react'
 
 import { SetupWizard } from './components/SetupWizard'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -21,6 +21,7 @@ import { ProductOpsPage } from './components/ProductOpsPage'
 import { TestsPage } from './components/TestsPage'
 import { MonitorPage } from './components/MonitorPage'
 import { AdminPanel } from './components/AdminPanel'
+import { QueryBuilder } from './components/QueryBuilder'
 import { LanguageSwitcher } from './components/LanguageSwitcher'
 import { ThemeToggle } from './components/ThemeToggle'
 import { useProjectBuilder, createDefaultProject } from './hooks/useProjectBuilder'
@@ -226,6 +227,13 @@ export function App() {
                 {t('nav.monitor')}
               </NavLink>
               <NavLink
+                to="/queries"
+                className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
+              >
+                <Search size={16} />
+                {t('nav.queries')}
+              </NavLink>
+              <NavLink
                 to="/admin"
                 className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
               >
@@ -310,6 +318,7 @@ export function App() {
                 <Route path="/operations" element={<ProductOpsPage />} />
                 <Route path="/monitor" element={<MonitorPage />} />
                 <Route path="/admin" element={<AdminPanel />} />
+                <Route path="/queries" element={<QueryBuilder />} />
                 <Route path="/config" element={<ConfigPage authStatus={authStatus} onLogout={performLogout} />} />
                 <Route path="/docs" element={<DocsPage />} />
                 <Route path="/tests" element={<TestsPage />} />
