@@ -1,59 +1,65 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { BarChart3, Table2, Activity, Plus, Settings, X, GripVertical, RefreshCw, ChevronDown, LayoutDashboard } from 'lucide-react'
+import { Plus, Settings, X, RefreshCw, LayoutDashboard } from 'lucide-react'
 import { useProjectBuilder } from '../hooks/useProjectBuilder'
 import { readBackendConfig } from '../lib/backendConfig'
 import { readToken } from '../lib/api'
-import type { DatasetMeta, ApiEndpoint } from '../types/schemas'
+import type { ApiEndpoint, DatasetMeta } from '../types/schemas'
 
 type WidgetType = 'metric' | 'table' | 'chart'
-type ChartField = string
 type Aggregate = 'count' | 'avg' | 'sum'
 
 interface WidgetConfig {
-  id: string
-  type: WidgetType
-  title: string
-  endpointId?: string
-  field?: string
-  aggregate?: Aggregate
-  refresh?: number
-  datasetId?: string
+  id: string; type: WidgetType; title: string
+  field?: string; aggregate?: Aggregate; refresh?: number
+  datasetId?: string; method?: string; path?: string
 }
 
-interface MetricData { value: number; label: string; change?: number }
+interface MetricData { value: number; label: string }
 interface TableData { cols: string[]; rows: Record<string, unknown>[] }
 interface ChartData { labels: string[]; values: number[] }
 
-const WIDGET_PRESETS: { type: WidgetType; label: string; icon: string }[] = [
-  { type: 'metric', label: 'Metric', icon: '#' },
-  { type: 'table', label: 'Table', icon: '⊞' },
-  { type: 'chart', label: 'Chart', icon: '▤' },
-]
+const DS_KEY = 'doapi-dashboard'
 
-function useDashboard() {
-  const key = 'doapi-dashboard'
-  const [widgets, setWidgets] = useState<WidgetConfig[]>(() => {
-    try { return JSON.parse(localStorage.getItem(key) || '[]') }
-    catch { return [] }
-  })
-  const save = (w: WidgetConfig[]) => {
-    setWidgets(w)
-    localStorage.setItem(key, JSON.stringify(w))
+function defaultWidgets(projectName: string): WidgetConfig[] {
+  if (projectName.toLowerCase().includes('pok')) {
+    return [
+      { id: 'w-pokemon-count', type: 'metric', title: 'Total Pokémon', field: 'pokedex_id', aggregate: 'count', datasetId: 'dataset-demo-001' },
+      { id: 'w-trainer-count', type: 'metric', title: 'Total Trainers', field: 'trainer_id', aggregate: 'count', datasetId: 'dataset-demo-002' },
+      { id: 'w-avg-level', type: 'metric', title: 'Avg Level', field: 'level', aggregate: 'avg', datasetId: 'dataset-demo-001' },
+      { id: 'w-types', type: 'chart', title: 'Pokémon by Type', field: 'type', datasetId: 'dataset-demo-001' },
+      { id: 'w-regions', type: 'chart', title: 'Pokémon by Region', field: 'region', datasetId: 'dataset-demo-001' },
+      { id: 'w-pokemon', type: 'table', title: 'Pokémon List', datasetId: 'dataset-demo-001' },
+      { id: 'w-trainers', type: 'table', title: 'Trainer List', datasetId: 'dataset-demo-002' },
+    ]
   }
-  return { widgets, save }
+  return []
+}
+
+function findEndpoint(datasets: DatasetMeta[], endpoints: ApiEndpoint[], dsId?: string, opType = 'list'): { method: string; path: string } | null {
+  if (!dsId) return null
+  const ep = endpoints.find(e => e.targetDatasetId === dsId && e.operationType === opType)
+  if (ep) return { method: ep.method, path: ep.path }
+  const ds = datasets.find(d => d.id === dsId)
+  if (ds) return { method: 'GET', path: `/${ds.name.toLowerCase()}` }
+  return null
 }
 
 export function DashboardPage() {
   const { t } = useTranslation()
   const { project } = useProjectBuilder()
-  const { widgets, save } = useDashboard()
-  const [editing, setEditing] = useState(false)
-  const [editWidget, setEditWidget] = useState<WidgetConfig | null>(null)
+  const [widgets, setWidgets] = useState<WidgetConfig[]>(() => {
+    try {
+      const saved = localStorage.getItem(DS_KEY)
+      if (saved) return JSON.parse(saved)
+    } catch {}
+    return defaultWidgets(project.name)
+  })
+  const [loading, setLoading] = useState<Record<string, boolean>>({})
+  const [data, setData] = useState<Record<string, MetricData | TableData | ChartData>>({})
+  const [editing, setEditing] = useState<WidgetConfig | null>(null)
   const [adding, setAdding] = useState(false)
   const [newType, setNewType] = useState<WidgetType>('metric')
-  const [data, setData] = useState<Record<string, MetricData | TableData | ChartData>>({})
-  const [loading, setLoading] = useState<Record<string, boolean>>({})
   const intervals = useRef<Record<string, ReturnType<typeof setInterval>>>({})
 
   const baseUrl = readBackendConfig().baseUrl?.replace(/\/$/, '') || 'http://localhost:8000'
@@ -62,55 +68,49 @@ export function DashboardPage() {
   if (token) headers['Authorization'] = `Bearer ${token}`
   const mockBase = `${baseUrl}/api/mock/${project.remoteId || project.slug || project.id}`
 
-  const findEndpoint = (dsId?: string) =>
-    project.endpoints.find(e => (dsId ? e.targetDatasetId === dsId : true) && e.operationType === 'list')
+  const saveWidgets = (w: WidgetConfig[]) => {
+    setWidgets(w)
+    localStorage.setItem(DS_KEY, JSON.stringify(w))
+  }
 
   const fetchWidget = useCallback(async (w: WidgetConfig) => {
+    const ep = findEndpoint(project.datasets, project.endpoints, w.datasetId)
+    if (!ep) return
+
     setLoading(prev => ({ ...prev, [w.id]: true }))
     try {
-      const ep = w.endpointId
-        ? project.endpoints.find(e => e.id === w.endpointId)
-        : findEndpoint(w.datasetId)
-
-      if (!ep) { setLoading(prev => ({ ...prev, [w.id]: false })); return }
-
       const path = ep.path.startsWith('/') ? ep.path : `/${ep.path}`
-      const res = await fetch(`${mockBase}${path}?limit=100`, { headers })
-      if (!res.ok) { setLoading(prev => ({ ...prev, [w.id]: false })); return }
+      const limit = w.type === 'table' ? 10 : 200
+      const res = await fetch(`${mockBase}${path}?limit=${limit}`, { headers })
+      if (!res.ok) return
       const json = await res.json()
       const items = json.data ?? json ?? []
       const rows = Array.isArray(items) ? items : []
 
       if (w.type === 'metric') {
-        const f = w.field || 'id'
-        const vals = rows.map((r: Record<string, unknown>) => Number(r[f])).filter((n: number) => !isNaN(n))
+        const f = w.field
+        const vals = f ? rows.map((r: Record<string, unknown>) => Number(r[f])).filter((n: number) => !isNaN(n)) : []
         const value = w.aggregate === 'avg'
-          ? (vals.length ? Math.round(vals.reduce((a: number, b: number) => a + b, 0) / vals.length * 10) / 10 : 0)
+          ? vals.length ? Math.round(vals.reduce((a: number, b: number) => a + b, 0) / vals.length * 10) / 10 : 0
           : w.aggregate === 'sum'
             ? vals.reduce((a: number, b: number) => a + b, 0)
             : rows.length
-        setData(prev => ({ ...prev, [w.id]: { value, label: w.title, change: 0 } as MetricData }))
+        setData(prev => ({ ...prev, [w.id]: { value, label: w.title } as MetricData }))
       } else if (w.type === 'table') {
         const cols = rows.length ? Object.keys(rows[0]).slice(0, 6) : []
         setData(prev => ({ ...prev, [w.id]: { cols, rows: rows.slice(0, 10) } as TableData }))
-      } else if (w.type === 'chart') {
-        const f = w.field
+      } else if (w.type === 'chart' && w.field) {
         const groups: Record<string, number> = {}
-        if (f) {
-          rows.forEach((r: Record<string, unknown>) => {
-            const v = String(r[f] ?? 'unknown')
-            groups[v] = (groups[v] || 0) + 1
-          })
-        } else {
-          groups['Total'] = rows.length
-        }
-        const labels = Object.keys(groups).slice(0, 10)
-        const values = labels.map(l => groups[l])
-        setData(prev => ({ ...prev, [w.id]: { labels, values } as ChartData }))
+        rows.forEach((r: Record<string, unknown>) => {
+          const v = String(r[w.field!] ?? 'unknown')
+          groups[v] = (groups[v] || 0) + 1
+        })
+        const entries = Object.entries(groups).sort((a, b) => b[1] - a[1]).slice(0, 10)
+        setData(prev => ({ ...prev, [w.id]: { labels: entries.map(e => e[0]), values: entries.map(e => e[1]) } as ChartData }))
       }
     } catch { /* ignore */ }
     setLoading(prev => ({ ...prev, [w.id]: false }))
-  }, [project.endpoints, mockBase, headers])
+  }, [project.datasets, project.endpoints, mockBase, headers])
 
   useEffect(() => {
     widgets.forEach(w => {
@@ -124,33 +124,28 @@ export function DashboardPage() {
 
   const addWidget = () => {
     const dsId = project.datasets[0]?.id
-    const ep = findEndpoint(dsId)
+    const ep = findEndpoint(project.datasets, project.endpoints, dsId)
     const w: WidgetConfig = {
-      id: crypto.randomUUID(),
-      type: newType,
+      id: crypto.randomUUID(), type: newType,
       title: `${newType.charAt(0).toUpperCase() + newType.slice(1)} ${widgets.length + 1}`,
       datasetId: dsId,
-      endpointId: ep?.id,
       field: newType === 'chart' ? project.datasets[0]?.fields?.[0]?.name : undefined,
       aggregate: newType === 'metric' ? 'count' : undefined,
       refresh: 0,
     }
-    save([...widgets, w])
+    saveWidgets([...widgets, w])
     setAdding(false)
   }
 
   const removeWidget = (id: string) => {
-    save(widgets.filter(w => w.id !== id))
+    saveWidgets(widgets.filter(w => w.id !== id))
     if (intervals.current[id]) clearInterval(intervals.current[id])
   }
 
   const updateWidget = (w: WidgetConfig) => {
-    save(widgets.map(x => x.id === w.id ? w : x))
-    setEditWidget(null)
-    setEditing(false)
+    saveWidgets(widgets.map(x => x.id === w.id ? w : x))
+    setEditing(null)
   }
-
-  const ds = project.datasets
 
   return (
     <div className="page-container">
@@ -176,25 +171,16 @@ export function DashboardPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
         {widgets.map(w => (
-          <div key={w.id} className="info-card" style={{ padding: 0, overflow: 'hidden', position: 'relative' }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 0.75rem',
-              borderBottom: '1px solid var(--border-color)', background: 'var(--bg-tertiary)',
-            }}>
+          <div key={w.id} className="info-card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-tertiary)' }}>
               <span style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', flex: 1 }}>{w.title}</span>
-              <button type="button" className="btn ghost" onClick={() => setEditWidget(w)} style={{ padding: '0.2rem' }}>
-                <Settings size={13} />
-              </button>
-              <button type="button" className="btn ghost" onClick={() => removeWidget(w.id)} style={{ padding: '0.2rem', color: 'var(--accent-red)' }}>
-                <X size={13} />
-              </button>
+              <button type="button" className="btn ghost" onClick={() => setEditing(w)} style={{ padding: '0.2rem' }}><Settings size={13} /></button>
+              <button type="button" className="btn ghost" onClick={() => removeWidget(w.id)} style={{ padding: '0.2rem', color: 'var(--accent-red)' }}><X size={13} /></button>
             </div>
             <div style={{ padding: '0.75rem', minHeight: 100 }}>
-              {loading[w.id] && (
-                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.82rem' }}>{t('dash.loading')}</div>
-              )}
+              {loading[w.id] && <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.82rem' }}>{t('dash.loading')}</div>}
               {!loading[w.id] && w.type === 'metric' && renderMetric(data[w.id] as MetricData)}
               {!loading[w.id] && w.type === 'table' && renderTable(data[w.id] as TableData)}
               {!loading[w.id] && w.type === 'chart' && renderChart(data[w.id] as ChartData)}
@@ -206,22 +192,21 @@ export function DashboardPage() {
         ))}
       </div>
 
-      {/* Add Widget Modal */}
       {adding && (
         <div className="modal-overlay" onClick={() => setAdding(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div className="modal-content" onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-secondary)', borderRadius: 14, padding: '1.5rem', width: 'min(400px, 90vw)', border: '1px solid var(--border-color)' }}>
             <h2 style={{ margin: '0 0 1rem', fontSize: '1.1rem', color: 'var(--text-primary)' }}>{t('dash.addWidget')}</h2>
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-              {WIDGET_PRESETS.map(p => (
-                <button key={p.type} type="button" onClick={() => setNewType(p.type)}
+              {(['metric', 'table', 'chart'] as WidgetType[]).map(tp => (
+                <button key={tp} type="button" onClick={() => setNewType(tp)}
                   style={{
                     flex: 1, padding: '0.75rem', borderRadius: 10, cursor: 'pointer', textAlign: 'center',
-                    border: newType === p.type ? '2px solid var(--accent-blue)' : '1px solid var(--border-color)',
-                    background: newType === p.type ? 'var(--bg-hover)' : 'var(--bg-secondary)',
+                    border: newType === tp ? '2px solid var(--accent-blue)' : '1px solid var(--border-color)',
+                    background: newType === tp ? 'var(--bg-hover)' : 'var(--bg-secondary)',
                     color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.82rem',
                   }}>
-                  <div style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>{p.icon}</div>
-                  {p.label}
+                  {tp === 'metric' ? '#' : tp === 'table' ? '⊞' : '▤'}
+                  <div style={{ marginTop: '0.2rem', fontSize: '0.75rem' }}>{tp.charAt(0).toUpperCase() + tp.slice(1)}</div>
                 </button>
               ))}
             </div>
@@ -233,24 +218,15 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* Edit Widget Modal */}
-      {editWidget && (
+      {editing && (
         <EditWidgetModal
-          widget={editWidget}
-          datasets={ds}
-          endpoints={project.endpoints}
+          widget={editing}
+          datasets={project.datasets}
           onSave={updateWidget}
-          onClose={() => setEditWidget(null)}
+          onClose={() => setEditing(null)}
           t={t}
         />
       )}
-
-      <style>{`
-        .modal-overlay { animation: fadeIn 0.15s ease; }
-        .modal-content { animation: slideUp 0.2s ease; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-      `}</style>
     </div>
   )
 }
@@ -261,24 +237,19 @@ function renderMetric(d: MetricData | undefined) {
     <div style={{ textAlign: 'center', padding: '0.5rem' }}>
       <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--accent-blue)', lineHeight: 1.1 }}>{d.value.toLocaleString()}</div>
       <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>{d.label}</div>
-      {d.change !== undefined && (
-        <div style={{ fontSize: '0.78rem', color: d.change >= 0 ? 'var(--accent-green)' : 'var(--accent-red)', marginTop: '0.25rem' }}>
-          {d.change >= 0 ? '+' : ''}{d.change}%
-        </div>
-      )}
     </div>
   )
 }
 
 function renderTable(d: TableData | undefined) {
-  if (!d || !d.rows.length) return <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.82rem' }}>No data</div>
+  if (!d || !d.rows.length) return <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.82rem' }}>—</div>
   return (
     <div style={{ overflowX: 'auto', fontSize: '0.78rem' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
             {d.cols.map(col => (
-              <th key={col} style={{ padding: '0.35rem 0.5rem', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{col}</th>
+              <th key={col} style={{ padding: '0.3rem 0.4rem', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap', fontSize: '0.72rem' }}>{col}</th>
             ))}
           </tr>
         </thead>
@@ -286,7 +257,7 @@ function renderTable(d: TableData | undefined) {
           {d.rows.map((row, i) => (
             <tr key={i} style={{ borderBottom: '1px solid var(--border-color)' }}>
               {d.cols.map(col => (
-                <td key={col} style={{ padding: '0.3rem 0.5rem', color: 'var(--text-primary)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <td key={col} style={{ padding: '0.25rem 0.4rem', color: 'var(--text-primary)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.75rem' }}>
                   {String(row[col] ?? '—')}
                 </td>
               ))}
@@ -299,23 +270,24 @@ function renderTable(d: TableData | undefined) {
 }
 
 function renderChart(d: ChartData | undefined) {
-  if (!d || !d.labels.length) return <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.82rem' }}>No data</div>
+  if (!d || !d.labels.length) return <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.82rem' }}>—</div>
   const max = Math.max(...d.values, 1)
+  const colors = ['var(--accent-blue)', 'var(--accent-sky)', 'var(--accent-indigo)', '#f59e0b', '#10b981', '#ef4444', '#a855f7', '#ec4899', '#14b8a6', '#f97316']
   return (
-    <div style={{ padding: '0.5rem 0' }}>
+    <div style={{ padding: '0.25rem 0' }}>
       {d.labels.map((label, i) => {
         const pct = (d.values[i] / max) * 100
         return (
-          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
-            <span style={{ minWidth: 80, fontSize: '0.78rem', color: 'var(--text-secondary)', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
-            <div style={{ flex: 1, height: 22, background: 'var(--bg-tertiary)', borderRadius: 4, overflow: 'hidden', position: 'relative' }}>
+          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
+            <span style={{ minWidth: 70, fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+            <div style={{ flex: 1, height: 20, background: 'var(--bg-tertiary)', borderRadius: 4, overflow: 'hidden' }}>
               <div style={{
-                width: `${pct}%`, height: '100%',
-                background: `linear-gradient(90deg, var(--accent-blue), ${i % 2 === 0 ? 'var(--accent-sky)' : 'var(--accent-indigo)'})`,
-                borderRadius: 4, transition: 'width 0.3s ease', display: 'flex', alignItems: 'center', paddingLeft: '0.4rem',
-                minWidth: pct > 10 ? undefined : 0,
+                width: `${Math.max(pct, 3)}%`, height: '100%',
+                background: colors[i % colors.length],
+                borderRadius: 4, transition: 'width 0.3s ease',
+                display: 'flex', alignItems: 'center', paddingLeft: '0.35rem',
               }}>
-                {pct > 10 && <span style={{ color: '#fff', fontSize: '0.7rem', fontWeight: 700 }}>{d.values[i]}</span>}
+                <span style={{ color: '#fff', fontSize: '0.68rem', fontWeight: 700 }}>{d.values[i]}</span>
               </div>
             </div>
           </div>
@@ -325,8 +297,8 @@ function renderChart(d: ChartData | undefined) {
   )
 }
 
-function EditWidgetModal({ widget, datasets, endpoints, onSave, onClose, t }: {
-  widget: WidgetConfig; datasets: DatasetMeta[]; endpoints: ApiEndpoint[]
+function EditWidgetModal({ widget, datasets, onSave, onClose, t }: {
+  widget: WidgetConfig; datasets: DatasetMeta[]
   onSave: (w: WidgetConfig) => void; onClose: () => void; t: (k: string) => string
 }) {
   const [w, setW] = useState<WidgetConfig>({ ...widget })
@@ -335,51 +307,39 @@ function EditWidgetModal({ widget, datasets, endpoints, onSave, onClose, t }: {
       <div className="modal-content" onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-secondary)', borderRadius: 14, padding: '1.5rem', width: 'min(420px, 90vw)', border: '1px solid var(--border-color)' }}>
         <h2 style={{ margin: '0 0 1rem', fontSize: '1.1rem', color: 'var(--text-primary)' }}>{t('dash.configure')}</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <div>
-            <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>{t('dash.titleLabel')}</label>
+          <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block' }}>
+            {t('dash.titleLabel')}
             <input value={w.title} onChange={e => setW({ ...w, title: e.target.value })}
-              style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.82rem', boxSizing: 'border-box' }} />
-          </div>
-          <div>
-            <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>{t('dash.dataset')}</label>
+              style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.82rem', boxSizing: 'border-box', marginTop: '0.25rem' }} />
+          </label>
+          <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block' }}>
+            {t('dash.dataset')}
             <select value={w.datasetId || ''} onChange={e => setW({ ...w, datasetId: e.target.value })}
-              style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.82rem' }}>
-              {datasets.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+              style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.82rem', marginTop: '0.25rem' }}>
+              {datasets.map(d => <option key={d.id} value={d.id}>{d.name} ({d.fields.length} fields)</option>)}
             </select>
-          </div>
-          {(w.type === 'chart') && (
-            <div>
-              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>{t('dash.field')}</label>
-              <select value={w.field || ''} onChange={e => setW({ ...w, field: e.target.value })}
-                style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.82rem' }}>
-                {datasets.find(d => d.id === w.datasetId)?.fields.map((f: { id: string; name: string }) => (
-                  <option key={f.id} value={f.name}>{f.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
+          </label>
+          <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block' }}>
+            {t('dash.field')}
+            <select value={w.field || ''} onChange={e => setW({ ...w, field: e.target.value })}
+              style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.82rem', marginTop: '0.25rem' }}>
+              <option value="">—</option>
+              {datasets.find(d => d.id === w.datasetId)?.fields.map(f => (
+                <option key={f.id} value={f.name}>{f.name}</option>
+              ))}
+            </select>
+          </label>
           {w.type === 'metric' && (
-            <div>
-              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>{t('dash.aggregate')}</label>
+            <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block' }}>
+              {t('dash.aggregate')}
               <select value={w.aggregate || 'count'} onChange={e => setW({ ...w, aggregate: e.target.value as Aggregate })}
-                style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.82rem' }}>
+                style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.82rem', marginTop: '0.25rem' }}>
                 <option value="count">Count</option>
                 <option value="avg">Average</option>
                 <option value="sum">Sum</option>
               </select>
-            </div>
+            </label>
           )}
-          <div>
-            <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>{t('dash.refresh')}</label>
-            <select value={w.refresh || 0} onChange={e => setW({ ...w, refresh: Number(e.target.value) })}
-              style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.82rem' }}>
-              <option value={0}>{t('dash.manual')}</option>
-              <option value={10}>10s</option>
-              <option value={30}>30s</option>
-              <option value={60}>1min</option>
-              <option value={300}>5min</option>
-            </select>
-          </div>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1.25rem' }}>
           <button type="button" className="btn ghost" onClick={onClose}>{t('dash.cancel')}</button>
