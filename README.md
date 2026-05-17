@@ -184,6 +184,7 @@ doapi deploy project.json --ssh user@host --port 80
 - Per-project Redoc: `/projects/{project_id}/docs`.
 - Per-project OpenAPI: `/projects/{project_id}/openapi.json`.
 - Backend API: `docs/API.md`.
+- Deploy guide (VPS, security, production): `docs/DEPLOY_GUIDE.md`.
 - Feature status: `docs/PROJECT_OVERVIEW.md`.
 - Roadmap: `docs/ROADMAP.md`.
 
