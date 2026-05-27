@@ -227,8 +227,7 @@ IMPORT_DEMO="${IMPORT_DEMO:-y}"
 if [ "$IMPORT_DEMO" = "y" ]; then
     cd backend
     export APIMAKER_DATABASE_URL="$DB_URL"
-    ./.venv/bin/python migrate_json_to_db.py
-    ./.venv/bin/python repair_pokedex.py
+    ./.venv/bin/python -m app.cli seed-demo --force
     cd ..
 fi
 

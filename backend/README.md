@@ -23,9 +23,10 @@ pip install -e .[dev]
 
 # Crear/migrar la base de datos
 alembic upgrade head
+doapi init-db
 
 # (Opcional) Migrar datos antiguas de JSON → DB
-python migrate_json_to_db.py
+doapi seed-demo
 
 uvicorn app.main:app --reload
 ```

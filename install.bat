@@ -155,8 +155,7 @@ if "%IMPORT_DEMO%"=="" set "IMPORT_DEMO=y"
 if /i "%IMPORT_DEMO%"=="y" (
     pushd backend || goto fail
     set "APIMAKER_DATABASE_URL=%DB_URL%"
-    ".venv\Scripts\python.exe" migrate_json_to_db.py || goto fail
-    ".venv\Scripts\python.exe" repair_pokedex.py || goto fail
+    ".venv\Scripts\python.exe" -m app.cli seed-demo --force || goto fail
     popd
 )
 

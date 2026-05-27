@@ -81,7 +81,7 @@ include_legacy_and_v1(monitor_router.router)
 
 
 def on_startup() -> None:
-    """Initialize database tables on startup."""
+    """Initialize application services on startup."""
     logging.basicConfig(level=logging.INFO)
     logging.info("Starting DoApi backend...")
     logging.info(f"Environment: {settings.environment}")
@@ -92,53 +92,6 @@ def on_startup() -> None:
     except Exception as e:
         logging.error(f"Database initialization failed: {e}")
         raise
-
-    # Auto-seed demo data if DB has no projects
-    try:
-        from pathlib import Path
-        import json
-        from sqlmodel import Session, select
-        from .db import engine
-        from .db_models import Project
-
-        projects_json = Path(__file__).resolve().parent / "data" / "projects.json"
-        frontend_demo = Path(__file__).resolve().parent.parent.parent / "frontend" / "public" / "demo-project.json"
-        # Copy from frontend demo if backend file doesn't exist
-        if not projects_json.exists() and frontend_demo.exists():
-            projects_json.parent.mkdir(parents=True, exist_ok=True)
-            content = json.loads(frontend_demo.read_text(encoding="utf-8"))
-            if isinstance(content, dict):
-                content = [content]
-            projects_json.write_text(json.dumps(content, indent=2), encoding="utf-8")
-            logging.info("Copied demo data from frontend demo-project.json")
-        with Session(engine) as session:
-            existing = session.exec(select(Project)).first()
-            if not existing and projects_json.exists():
-                logging.info("No projects found. Auto-seeding from projects.json...")
-                import subprocess, sys
-                seed_script = Path(__file__).resolve().parent / "scripts" / "seed_admin.py"
-                # Run migrate_json_to_db as subprocess
-                migrate_script = Path(__file__).resolve().parent.parent / "migrate_json_to_db.py"
-                if migrate_script.exists():
-                    result = subprocess.run(
-                        [sys.executable, str(migrate_script)],
-                        capture_output=True, text=True,
-                        cwd=str(migrate_script.parent)
-                    )
-                    if result.returncode == 0:
-                        logging.info("Demo data seeded successfully")
-                        # Also repair pokedex endpoints
-                        repair_script = Path(__file__).resolve().parent.parent / "repair_pokedex.py"
-                        if repair_script.exists():
-                            subprocess.run(
-                                [sys.executable, str(repair_script)],
-                                capture_output=True, text=True,
-                                cwd=str(repair_script.parent)
-                            )
-                    else:
-                        logging.warning(f"Migration script failed: {result.stderr}")
-    except Exception as e:
-        logging.warning(f"Auto-seed skipped: {e}")
 
 
 @asynccontextmanager

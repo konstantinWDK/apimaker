@@ -4,6 +4,8 @@ Commands:
   deploy  <file.json>   Deploy an exported project as a standalone API
   serve   <slug>        Serve an existing project from the builder database
   init    <file.json>   Initialize a project JSON from an existing database project
+  init-db               Create database tables for the configured database
+  seed-demo             Import the bundled demo project into the database
   deploy --ssh <host>   Deploy to a remote server via SSH+Docker
 """
 
@@ -187,6 +189,83 @@ def cmd_init(args: argparse.Namespace) -> None:
     print(f" Project '{project.name}' exported to {out_path}")
 
 
+def cmd_init_db(args: argparse.Namespace) -> None:
+    """Create database tables for the configured database."""
+    from app.db import create_db_and_tables, get_database_info
+
+    create_db_and_tables()
+    db_info = get_database_info()
+    print(f" Database initialized ({db_info['type']}).")
+
+
+def cmd_seed_demo(args: argparse.Namespace) -> None:
+    """Import bundled demo data into the configured database."""
+    from sqlmodel import Session, select
+
+    from app.db import engine
+    from app.db_models import Project
+
+    app_dir = Path(__file__).resolve().parent
+    backend_dir = app_dir.parent
+    project_root = backend_dir.parent
+    projects_json = app_dir / "data" / "projects.json"
+    frontend_demo = project_root / "frontend" / "public" / "demo-project.json"
+
+    if not projects_json.exists() and frontend_demo.exists():
+        projects_json.parent.mkdir(parents=True, exist_ok=True)
+        content = json.loads(frontend_demo.read_text(encoding="utf-8"))
+        if isinstance(content, dict):
+            content = [content]
+        projects_json.write_text(json.dumps(content, indent=2), encoding="utf-8")
+        print(" Copied demo project from frontend/public/demo-project.json.")
+
+    if not projects_json.exists():
+        print(" No demo project found to import.")
+        return
+
+    if not args.force:
+        with Session(engine) as session:
+            existing = session.exec(select(Project)).first()
+            if existing:
+                print(" Demo import skipped because the database already has projects.")
+                return
+
+    migrate_script = backend_dir / "migrate_json_to_db.py"
+    if not migrate_script.exists():
+        print(" migrate_json_to_db.py not found.")
+        sys.exit(1)
+
+    result = subprocess.run(
+        [sys.executable, str(migrate_script)],
+        capture_output=True,
+        text=True,
+        cwd=str(backend_dir),
+    )
+    if result.returncode != 0:
+        if result.stdout:
+            print(result.stdout)
+        if result.stderr:
+            print(result.stderr, file=sys.stderr)
+        sys.exit(result.returncode)
+
+    repair_script = backend_dir / "repair_pokedex.py"
+    if repair_script.exists():
+        repair = subprocess.run(
+            [sys.executable, str(repair_script)],
+            capture_output=True,
+            text=True,
+            cwd=str(backend_dir),
+        )
+        if repair.returncode != 0:
+            if repair.stdout:
+                print(repair.stdout)
+            if repair.stderr:
+                print(repair.stderr, file=sys.stderr)
+            sys.exit(repair.returncode)
+
+    print(" Demo data imported successfully.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="doapi",
@@ -213,6 +292,13 @@ def main() -> None:
     ip.add_argument("project", help="Project slug or ID")
     ip.add_argument("--output", "-o", help="Output JSON path (default: <slug>.json)")
 
+    # init-db
+    subparsers.add_parser("init-db", help="Create database tables for the configured database")
+
+    # seed-demo
+    seed = subparsers.add_parser("seed-demo", help="Import the bundled demo project")
+    seed.add_argument("--force", action="store_true", help="Import even when projects already exist")
+
     args = parser.parse_args()
 
     if args.command == "deploy":
@@ -221,6 +307,10 @@ def main() -> None:
         cmd_serve(args)
     elif args.command == "init":
         cmd_init(args)
+    elif args.command == "init-db":
+        cmd_init_db(args)
+    elif args.command == "seed-demo":
+        cmd_seed_demo(args)
 
 
 if __name__ == "__main__":
