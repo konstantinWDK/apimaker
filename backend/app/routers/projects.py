@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.openapi.docs import get_redoc_html
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
@@ -117,11 +117,28 @@ def _db_to_pydantic(db_project, datasets_with_fields=None, endpoints=None, inclu
 @router.get("", response_model=list[PydanticProject])
 def list_projects(
     workspace_id: str | None = None,
+    include: str = Query(default="data", pattern="^(data|summary)$"),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
 ) -> list[PydanticProject]:
+    if include == "summary":
+        db_projects = project_service.list_projects(
+            session,
+            workspace_id=workspace_id,
+            user_id=user.user_id,
+            limit=limit,
+            offset=offset,
+        )
+        return [_db_to_pydantic(project) for project in db_projects]
+
     projects_data = project_service.list_projects_with_data(
-        session, workspace_id=workspace_id, user_id=user.user_id
+        session,
+        workspace_id=workspace_id,
+        user_id=user.user_id,
+        limit=limit,
+        offset=offset,
     )
     result = []
     for data in projects_data:

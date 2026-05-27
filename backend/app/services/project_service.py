@@ -111,8 +111,21 @@ class ProjectService:
         session.refresh(project)
         return project
 
-    def list_projects(self, session: Session, workspace_id: str | None = None, user_id: str | None = None) -> list[Project]:
-        return project_repository.list_accessible(session, workspace_id=workspace_id, user_id=user_id)
+    def list_projects(
+        self,
+        session: Session,
+        workspace_id: str | None = None,
+        user_id: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[Project]:
+        return project_repository.list_accessible(
+            session,
+            workspace_id=workspace_id,
+            user_id=user_id,
+            limit=limit,
+            offset=offset,
+        )
 
     def _legacy_list_projects(self, session: Session, workspace_id: str | None = None, user_id: str | None = None) -> list[Project]:
         query = select(Project)
@@ -140,8 +153,16 @@ class ProjectService:
         session: Session,
         workspace_id: str | None = None,
         user_id: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[dict]:
-        projects = self.list_projects(session, workspace_id=workspace_id, user_id=user_id)
+        projects = self.list_projects(
+            session,
+            workspace_id=workspace_id,
+            user_id=user_id,
+            limit=limit,
+            offset=offset,
+        )
         return project_repository.get_graphs(session, projects)
 
     def get_project(self, session: Session, project_id: str) -> Project:

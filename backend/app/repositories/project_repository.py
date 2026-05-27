@@ -36,11 +36,13 @@ class ProjectRepository:
         session: Session,
         workspace_id: str | None = None,
         user_id: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[Project]:
         if not user_id:
             return []
 
-        query = select(Project)
+        query = select(Project).order_by(Project.updated_at.desc()).offset(offset).limit(limit)
         if workspace_id:
             query = query.where(Project.workspace_id == workspace_id)
 
