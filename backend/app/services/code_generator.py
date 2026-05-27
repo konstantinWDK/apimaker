@@ -13,7 +13,7 @@ from uuid import uuid4
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from ..config import get_settings
-from ..db_models import Dataset, DatasetField, Endpoint
+from ..db_models import Dataset, DatasetField, Datasource, Endpoint
 from ..models import GenerationRequest, GenerationResult
 from .project_service import project_service
 
@@ -39,6 +39,13 @@ def _extract_path_param(path: str) -> str:
     if "{" in path:
         return path.split("{")[1].split("}")[0]
     return "item_id"
+
+
+def _env_name_for_dataset(dataset_name: str) -> str:
+    import re
+
+    token = re.sub(r"[^A-Z0-9]+", "_", dataset_name.upper()).strip("_")
+    return f"{token or 'DATASET'}_DATABASE_URL"
 
 
 @lru_cache(maxsize=8)
@@ -67,16 +74,17 @@ def _build_context(
     endpoints: list[Endpoint],
     target_stack: str = "fastapi",
     include_data: bool = True,
+    datasource_configs: dict[str, dict] | None = None,
 ) -> dict:
     """Build the Jinja2 template context."""
     import json
-    
+
     # Build a name lookup for datasets (id -> name) to resolve FK references
     dataset_name_map = {}
     for entry in datasets_with_fields:
         ds = entry["dataset"]
         dataset_name_map[ds.id] = ds.name
-    
+
     # First pass: collect all field references
     field_references = {}  # child_dataset_id -> [(child_field_name, ref_dataset_id, ref_field_name)]
     for entry in datasets_with_fields:
@@ -97,7 +105,7 @@ def _build_context(
                     field_references.setdefault(ds.id, []).append(
                         (f.name, ref_ds_id, ref_field)
                     )
-    
+
     # Build reverse references: for each dataset, which child datasets reference it
     reverse_refs = {}  # ref_dataset_id -> [(child_ds_name, child_field_name)]
     for child_id, refs in field_references.items():
@@ -109,12 +117,16 @@ def _build_context(
                 "dataset_name": child_name,
                 "field_name": field_name,
             })
-    
+
+    datasource_configs = datasource_configs or {}
     processed_datasets = []
     for entry in datasets_with_fields:
         ds = entry["dataset"]
         fields = entry["fields"]
-        
+        datasource_config = datasource_configs.get(ds.id, {})
+        table_name = datasource_config.get("table_name") or f"{ds.name.lower().replace(' ', '_')}_records"
+        database_url_env = datasource_config.get("database_url_env") or _env_name_for_dataset(ds.name)
+
         ds_fields = []
         for f in fields:
             ref_raw = f.references
@@ -124,7 +136,7 @@ def _build_context(
                     ref_parsed = json.loads(ref_raw) if isinstance(ref_raw, str) else ref_raw
                 except Exception:
                     pass
-            
+
             resolved_ref = None
             if ref_parsed:
                 ref_ds_id = ref_parsed.get("datasetId")
@@ -136,31 +148,44 @@ def _build_context(
                         "dataset_name": ref_ds_name,
                         "field_name": ref_field_name,
                     }
-            
+
             ds_fields.append({
                 "name": f.name,
                 "type": f.field_type,
                 "python_type": _get_python_type(f.field_type),
                 "required": f.required,
                 "description": f.description,
+                "is_primary_key": getattr(f, "is_primary_key", False),
                 "references": resolved_ref,
             })
-        
+
+        primary_key_fields = [field for field in ds_fields if field["is_primary_key"]]
+        primary_key_field = primary_key_fields[0] if primary_key_fields else {
+            "name": "id",
+            "python_type": "int",
+            "is_primary_key": True,
+        }
+
         ds_ctx = {
             "id": ds.id,
             "name": ds.name,
+            "source_type": ds.source_type,
+            "table_name": table_name,
+            "external_database_url_env": database_url_env if ds.source_type == "database" else "",
+            "primary_key_fields": primary_key_fields,
+            "primary_key_field": primary_key_field,
             "fields": ds_fields,
             "sample_rows": [],
             "referenced_by": reverse_refs.get(ds.id, []),
             "filterable_fields": [f["name"] for f in ds_fields],
         }
-        
+
         if ds.sample_rows:
             try:
                 ds_ctx["sample_rows"] = json.loads(ds.sample_rows) if isinstance(ds.sample_rows, str) else ds.sample_rows
             except:
                 ds_ctx["sample_rows"] = []
-        
+
         processed_datasets.append(ds_ctx)
 
     # Build dataset lookup by ID so endpoints can reference their target dataset directly
@@ -189,6 +214,7 @@ def _build_context(
         "rate_limit": rate_limit,
         "target_stack": target_stack,
         "datasets": processed_datasets,
+        "external_datasets": [d for d in processed_datasets if d["external_database_url_env"]],
         "endpoints": endpoints_context,
         "include_data": include_data,
     }
@@ -205,6 +231,7 @@ def render_bundle(
     datasets_with_fields: list[dict],
     endpoints: list[Endpoint],
     include_data: bool = True,
+    datasource_configs: dict[str, dict] | None = None,
 ) -> bytes:
     """Render a project bundle as zip bytes based on the selected stack."""
     stack_dir = TEMPLATE_DIR / stack
@@ -216,8 +243,8 @@ def render_bundle(
     env = _get_template_env(str(stack_dir), include_route_filters=True)
 
     context = _build_context(
-        project_name, project_description, auth_method, api_key, jwt_secret, rate_limit, 
-        datasets_with_fields, endpoints, stack, include_data
+        project_name, project_description, auth_method, api_key, jwt_secret, rate_limit,
+        datasets_with_fields, endpoints, stack, include_data, datasource_configs
     )
 
     buf = BytesIO()
@@ -321,7 +348,7 @@ def render_bundle(
                 "jest.config.js",
                 "module.exports = { testEnvironment: 'node' };\n",
             )
-        
+
         # README
         if project_description:
             readme_content = f"#  {project_name}\n\n"
@@ -329,7 +356,7 @@ def render_bundle(
             readme_content = f"# {project_name}\n\n"
         readme_content += f"{project_description or 'API generated with DoApi.'}\n\n"
         readme_content += "This project contains a complete professional API, ready to be deployed to production.\n\n"
-        
+
         readme_content += "##  Quick Start\n\n"
         readme_content += "The easiest way to set up and run the API is using the interactive installer:\n\n"
         readme_content += "```bash\n"
@@ -394,7 +421,7 @@ def render_bundle(
         readme_content += "```\n"
 
         readme_content += "\n---\n*Generated with  by DoApi*"
-        
+
         zf.writestr("README.md", readme_content)
 
         # Add deployment configs
@@ -462,6 +489,26 @@ def get_latest_bundle_path(settings, folder_name: str, target_stack: str) -> Pat
     return project_root / f"{target_stack}-bundle.zip"
 
 
+def _load_datasource_configs(session, project_id: str) -> dict[str, dict]:
+    """Load generated-code datasource metadata keyed by dataset ID."""
+    import json
+    from sqlmodel import select
+
+    configs: dict[str, dict] = {}
+    datasources = session.exec(
+        select(Datasource).where(Datasource.project_id == project_id, Datasource.source_type == "database")
+    ).all()
+    for datasource in datasources:
+        try:
+            config = json.loads(datasource.config or "{}")
+        except Exception:
+            config = {}
+        dataset_id = config.get("dataset_id")
+        if dataset_id:
+            configs[dataset_id] = config
+    return configs
+
+
 def run_generation(
     session, project_id, payload: GenerationRequest
 ) -> GenerationResult:
@@ -475,6 +522,7 @@ def run_generation(
     project = data["project"]
     datasets_with_fields = data["datasets"]
     endpoints = data["endpoints"]
+    datasource_configs = _load_datasource_configs(session, str(project.id))
 
     datasets_with_fields = data["datasets"]
     endpoints = data["endpoints"]
@@ -507,6 +555,7 @@ def run_generation(
             datasets_with_fields,
             endpoints,
             project.include_data if hasattr(project, "include_data") else True,
+            datasource_configs,
         )
 
         # Save to an isolated artifact run (use slug for folder name)
@@ -582,6 +631,7 @@ def run_generation(
                 project.api_key, project.jwt_secret, project.rate_limit,
                 datasets_with_fields, endpoints, project.target_stack or "fastapi",
                 project.include_data if hasattr(project, "include_data") else True,
+                _load_datasource_configs(session, str(project.id)),
             )
             ts_code = ts_env.get_template("typescript.ts.j2").render(ts_context)
             ts_path = sdk_dir / "api-client.ts"
@@ -600,6 +650,7 @@ def run_generation(
                 project.api_key, project.jwt_secret, project.rate_limit,
                 datasets_with_fields, endpoints, project.target_stack or "fastapi",
                 project.include_data if hasattr(project, "include_data") else True,
+                _load_datasource_configs(session, str(project.id)),
             )
             py_code = py_env.get_template("python.py.j2").render(py_context)
             py_path = sdk_dir / "api_client.py"

@@ -13,7 +13,7 @@ from sqlalchemy import MetaData, Table, create_engine, inspect, select as sa_sel
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, select as sqlmodel_select
 
-from ..db_models import Dataset, DbConnection, Endpoint
+from ..db_models import Dataset, Datasource, DbConnection, Endpoint
 from ..models import ColumnInfo, FieldType, TableInfo, TableSchema
 from ..services.project_service import project_service
 from ..services.product_ops import create_runtime_log
@@ -135,6 +135,15 @@ class DataSourceExplorer:
         if not dataset:
             raise RuntimeError("Imported dataset could not be loaded")
 
+        self._upsert_import_datasource(
+            session,
+            project_id=project_id,
+            conn=conn,
+            dataset=dataset,
+            table_name=table_name,
+            schema=schema,
+        )
+
         created_endpoints = []
         if create_endpoints:
             created_endpoints = self._ensure_crud_endpoints(session, project_id, dataset.id, table_name)
@@ -154,6 +163,46 @@ class DataSourceExplorer:
             "sample_rows": len(preview["rows"]),
             "endpoints_created": created_endpoints,
         }
+
+    def _upsert_import_datasource(
+        self,
+        session: Session,
+        project_id: str,
+        conn: DbConnection,
+        dataset: Dataset,
+        table_name: str,
+        schema: TableSchema,
+    ) -> None:
+        config = {
+            "dataset_id": dataset.id,
+            "table_name": table_name,
+            "database_url_env": self._database_url_env(dataset.name),
+        }
+        snapshot = {
+            "table": table_name,
+            "columns": [column.model_dump() for column in schema.columns],
+        }
+        existing = session.exec(
+            sqlmodel_select(Datasource).where(Datasource.project_id == project_id, Datasource.name == dataset.name)
+        ).first()
+        if existing:
+            existing.source_type = "database"
+            existing.connection_id = conn.id
+            existing.config = json.dumps(config)
+            existing.schema_snapshot = json.dumps(snapshot)
+            session.add(existing)
+        else:
+            session.add(
+                Datasource(
+                    project_id=project_id,
+                    name=dataset.name,
+                    source_type="database",
+                    connection_id=conn.id,
+                    config=json.dumps(config),
+                    schema_snapshot=json.dumps(snapshot),
+                )
+            )
+        session.commit()
 
     def _table_info(
         self,
@@ -247,6 +296,10 @@ class DataSourceExplorer:
     def _slugify(self, value: str) -> str:
         slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
         return slug or "items"
+
+    def _database_url_env(self, dataset_name: str) -> str:
+        token = re.sub(r"[^A-Z0-9]+", "_", dataset_name.upper()).strip("_")
+        return f"{token or 'DATASET'}_DATABASE_URL"
 
     def _title_from_identifier(self, value: str) -> str:
         return re.sub(r"[_-]+", " ", value).strip().title() or value

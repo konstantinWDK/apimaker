@@ -116,6 +116,51 @@ def test_bundle_auth_settings_reflected() -> None:
         assert "apikey" in app_js
 
 
+def test_fastapi_bundle_uses_imported_table_metadata() -> None:
+    """Imported DB datasets should render CRUD against their source table."""
+    imported_data = [
+        {
+            "dataset": type("obj", (object,), {
+                "id": "ds-orders", "name": "Orders", "source_type": "database",
+                "sample_rows": json.dumps([{"id": 1, "total": 19.95}]),
+                "saved_requests": None,
+            })(),
+            "fields": [
+                type("obj", (object,), {"name": "id", "field_type": "integer", "required": True, "description": None, "references": None, "is_primary_key": True})(),
+                type("obj", (object,), {"name": "total", "field_type": "float", "required": True, "description": None, "references": None, "is_primary_key": False})(),
+            ],
+        }
+    ]
+    endpoints = [
+        type("obj", (object,), {
+            "id": "ep-1", "name": "Get Order", "method": "GET", "path": "/orders/{id}",
+            "summary": "Get order", "operation_type": "get", "target_dataset_id": "ds-orders",
+        })(),
+    ]
+    zip_bytes = render_bundle(
+        "fastapi", "TestAPI", "A test API", "none", None, None, 0,
+        imported_data, endpoints, True,
+        {"ds-orders": {"table_name": "orders", "database_url_env": "ORDERS_DATABASE_URL"}},
+    )
+    import py_compile
+    import tempfile
+    import zipfile
+    from io import BytesIO
+    from pathlib import Path
+
+    with zipfile.ZipFile(BytesIO(zip_bytes)) as zf:
+        main_py = zf.read("main.py").decode("utf-8")
+        env_example = zf.read(".env.example").decode("utf-8")
+        assert '__tablename__ = "orders"' in main_py
+        assert "ORDERS_DATABASE_URL" in main_py
+        assert "OrdersRecord.id == id" in main_py
+        assert main_py.count("id: Mapped[int] = mapped_column(primary_key=True") == 1
+        assert "ORDERS_DATABASE_URL=sqlite:///./data.db" in env_example
+        tmp_file = Path(tempfile.gettempdir()) / "doapi_generated_external_main.py"
+        tmp_file.write_text(main_py, encoding="utf-8")
+        py_compile.compile(str(tmp_file), doraise=True)
+
+
 def test_typescript_sdk_renders() -> None:
     """TypeScript SDK template should render without errors."""
     from jinja2 import Environment, FileSystemLoader, select_autoescape
