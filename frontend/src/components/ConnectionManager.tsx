@@ -1,12 +1,22 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { ColumnInfo, DbConnectionInfo, TableInfo } from '../lib/api'
-import { createConnection, deleteConnection, getTableSchema, listConnections, listTables, testConnection, updateConnection } from '../lib/api'
+import type { ColumnInfo, DbConnectionInfo, ImportTableResult, TableInfo, TablePreview } from '../lib/api'
+import {
+  createConnection,
+  deleteConnection,
+  getTableSchema,
+  importConnectionTable,
+  listConnections,
+  listTables,
+  previewTable,
+  testConnection,
+  updateConnection,
+} from '../lib/api'
 import { useToast } from './Toast'
 
 interface Props {
   projectId: string
-  onImportTable: (table: string, columns: ColumnInfo[]) => void
+  onImportTable: (result: ImportTableResult) => void | Promise<void>
 }
 
 export function ConnectionManager({ projectId, onImportTable }: Props) {
@@ -18,8 +28,11 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
   const [testingId, setTestingId] = useState<string | null>(null)
   const [testResults, setTestResults] = useState<Record<string, { success: boolean; message: string }>>({})
   const [exploringId, setExploringId] = useState<string | null>(null)
+  const [loadingTablesId, setLoadingTablesId] = useState<string | null>(null)
   const [tables, setTables] = useState<TableInfo[]>([])
   const [schemaView, setSchemaView] = useState<{ table: string; columns: ColumnInfo[] } | null>(null)
+  const [previewView, setPreviewView] = useState<TablePreview | null>(null)
+  const [importingTable, setImportingTable] = useState<string | null>(null)
   const toast = useToast()
 
   const load = useCallback(async () => {
@@ -37,11 +50,16 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
     setForm({ name: '', db_type: 'postgresql', host: '', port: 5432, username: '', password: '', database: '' })
   }
 
+  const startNewConnection = () => {
+    resetForm()
+    setShowForm(true)
+  }
+
   const handleSave = async () => {
     if (!form.name.trim()) { toast(t('connectionManager.nameRequired'), 'error'); return }
     try {
       if (editingId) {
-        const updates: any = { name: form.name }
+        const updates: any = { name: form.name, db_type: form.db_type }
         if (form.host) updates.host = form.host
         if (form.port) updates.port = form.port
         if (form.username) updates.username = form.username
@@ -81,11 +99,13 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
   const handleExplore = async (id: string) => {
     setExploringId(id)
     setSchemaView(null)
+    setPreviewView(null)
+    setLoadingTablesId(id)
     try {
-      const tbls = await listTables(id)
+      const tbls = await listTables(id, true)
       setTables(tbls)
     } catch (e: any) { toast(e.message, 'error') }
-    setExploringId(null)
+    setLoadingTablesId(null)
   }
 
   const handleViewSchema = async (table: string) => {
@@ -96,11 +116,31 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
     } catch (e: any) { toast(e.message, 'error') }
   }
 
-  const handleImport = (table: string, columns: ColumnInfo[]) => {
-    onImportTable(table, columns)
-    setExploringId(null)
-    setSchemaView(null)
-    toast(t('connectionManager.imported').replace('{table}', table), 'info')
+  const handlePreview = async (table: string) => {
+    if (!exploringId) return
+    try {
+      const preview = await previewTable(exploringId, table, 25)
+      setPreviewView(preview)
+    } catch (e: any) { toast(e.message, 'error') }
+  }
+
+  const handleImport = async (table: string) => {
+    if (!exploringId) return
+    setImportingTable(table)
+    try {
+      const result = await importConnectionTable(exploringId, {
+        table_name: table,
+        dataset_name: table,
+        sample_limit: 25,
+        create_endpoints: true,
+      })
+      await onImportTable(result)
+      toast(t('connectionManager.imported').replace('{table}', table), 'info')
+    } catch (e: any) {
+      toast(e.message, 'error')
+    } finally {
+      setImportingTable(null)
+    }
   }
 
   const dbTypeLabel = (t: string) => ({ postgresql: 'PostgreSQL', mysql: 'MySQL', sqlite: 'SQLite', mssql: 'SQL Server' })[t] || t
@@ -109,7 +149,7 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
     <div className="conn-mgr">
       <div className="conn-mgr__header">
         <p className="conn-mgr__title">{t('connectionManager.title')}</p>
-        <button type="button" className="btn primary btn-small" onClick={() => resetForm()}>
+        <button type="button" className="btn primary btn-small" onClick={startNewConnection}>
           + {t('connectionManager.newConnection')}
         </button>
       </div>
@@ -179,29 +219,37 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
               <button type="button" className="btn ghost btn-small" onClick={() => handleTest(conn.id)} disabled={testingId === conn.id}>
                 {testingId === conn.id ? t('connectionManager.testing') : t('connectionManager.test')}
               </button>
-              <button type="button" className="btn ghost btn-small" onClick={() => handleExplore(conn.id)} disabled={exploringId === conn.id && exploringId !== conn.id}>
-                {t('connectionManager.explore')}
+              <button type="button" className="btn ghost btn-small" onClick={() => handleExplore(conn.id)} disabled={loadingTablesId === conn.id}>
+                {loadingTablesId === conn.id ? t('connectionManager.loading') : t('connectionManager.explore')}
               </button>
               <button type="button" className="btn ghost btn-small" onClick={() => handleDelete(conn.id, conn.name)}>{t('connectionManager.delete')}</button>
             </div>
 
             {/* Tables explorer */}
-            {exploringId === conn.id && tables.length > 0 && (
+            {exploringId === conn.id && (
               <div className="conn-mgr__explorer">
                 <div className="conn-mgr__explorer-header">
                   <span className="conn-mgr__explorer-title">{t('connectionManager.tablesFound')} ({tables.length})</span>
-                  <button type="button" className="btn ghost btn-small" onClick={() => { setExploringId(null); setTables([]); setSchemaView(null) }}>{t('connectionManager.close')}</button>
+                  <button type="button" className="btn ghost btn-small" onClick={() => { setExploringId(null); setTables([]); setSchemaView(null); setPreviewView(null) }}>{t('connectionManager.close')}</button>
                 </div>
-                <div className="conn-mgr__table-list">
-                  {tables.map(tbl => (
+                {tables.length === 0 ? (
+                  <p className="muted-text">{loadingTablesId === conn.id ? t('connectionManager.loading') : t('connectionManager.noTables')}</p>
+                ) : (
+                  <div className="conn-mgr__table-list">
+                    {tables.map(tbl => (
                     <div key={tbl.name} className="conn-mgr__table-item">
-                      <span className="conn-mgr__table-name">{tbl.name}</span>
-                      {tbl.kind && <span className="conn-mgr__table-kind">{tbl.kind}</span>}
+                      <div className="conn-mgr__table-main">
+                        <span className="conn-mgr__table-name">{tbl.name}</span>
+                        {tbl.kind && <span className="conn-mgr__table-kind">{tbl.kind}</span>}
+                        {typeof tbl.column_count === 'number' && <span className="conn-mgr__table-meta">{tbl.column_count} cols</span>}
+                        {typeof tbl.row_count === 'number' && <span className="conn-mgr__table-meta">{tbl.row_count} rows</span>}
+                      </div>
                       <div className="conn-mgr__table-actions">
                         <button type="button" className="btn ghost btn-small" onClick={() => handleViewSchema(tbl.name)}>{t('connectionManager.viewColumns')}</button>
-                        {schemaView?.table === tbl.name && (
-                          <button type="button" className="btn primary btn-small" onClick={() => handleImport(tbl.name, schemaView.columns)}>{t('connectionManager.importAsDataset')}</button>
-                        )}
+                        <button type="button" className="btn ghost btn-small" onClick={() => handlePreview(tbl.name)}>{t('connectionManager.preview')}</button>
+                        <button type="button" className="btn primary btn-small" onClick={() => handleImport(tbl.name)} disabled={importingTable === tbl.name}>
+                          {importingTable === tbl.name ? t('connectionManager.importing') : t('connectionManager.importAsDataset')}
+                        </button>
                       </div>
                       {schemaView?.table === tbl.name && (
                         <div className="conn-mgr__schema">
@@ -221,14 +269,26 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
                           </table>
                         </div>
                       )}
+                      {previewView?.table === tbl.name && previewView.rows.length > 0 && (
+                        <div className="conn-mgr__preview">
+                          <table className="conn-mgr__schema-table">
+                            <thead>
+                              <tr>{previewView.columns.slice(0, 8).map(col => <th key={col}>{col}</th>)}</tr>
+                            </thead>
+                            <tbody>
+                              {previewView.rows.slice(0, 5).map((row, idx) => (
+                                <tr key={idx}>
+                                  {previewView.columns.slice(0, 8).map(col => <td key={col}>{String(row[col] ?? '')}</td>)}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {exploringId === conn.id && tables.length === 0 && (
-              <div className="conn-mgr__explorer">
-                <p className="muted-text">{t('connectionManager.noTables')}</p>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -266,10 +326,12 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
         .conn-mgr__explorer-title { font-size: 0.8rem; font-weight: 600; color: #475569; }
         .conn-mgr__table-list { display: flex; flex-direction: column; gap: 0.3rem; }
         .conn-mgr__table-item { border: 1px solid #f1f5f9; border-radius: 6px; padding: 0.5rem 0.75rem; background: #fafafa; }
+        .conn-mgr__table-main { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
         .conn-mgr__table-name { font-weight: 600; font-size: 0.82rem; font-family: monospace; }
         .conn-mgr__table-kind { font-size: 0.65rem; color: #94a3b8; margin-left: 0.3rem; }
+        .conn-mgr__table-meta { font-size: 0.65rem; color: #475569; background: #e2e8f0; border-radius: 999px; padding: 0.1rem 0.4rem; }
         .conn-mgr__table-actions { display: flex; gap: 0.3rem; margin-top: 0.35rem; }
-        .conn-mgr__schema { margin-top: 0.5rem; }
+        .conn-mgr__schema, .conn-mgr__preview { margin-top: 0.5rem; overflow-x: auto; }
         .conn-mgr__schema-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
         .conn-mgr__schema-table th { text-align: left; padding: 0.25rem 0.5rem; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; font-weight: 600; }
         .conn-mgr__schema-table td { padding: 0.25rem 0.5rem; border-bottom: 1px solid #f1f5f9; font-family: monospace; }

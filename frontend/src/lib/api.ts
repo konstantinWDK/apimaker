@@ -390,35 +390,7 @@ export const fetchRemoteProject = async (projectId: string): Promise<ProjectDraf
   const headers = buildHeaders()
   const response = await fetch(`${baseUrl}/projects/${projectId}`, { headers })
   const data = await handleResponse(response)
-  return {
-    id: data.project.id,
-    remoteId: data.project.slug || data.project.id,
-    slug: data.project.slug,
-    name: data.project.name,
-    description: data.project.description,
-    authMethod: (data.project.auth_method as any) || 'none',
-    targetStack: data.project.target_stack,
-    datasets: (data.datasets || []).map((ds: any) => ({
-      id: ds.id,
-      name: ds.name,
-      sourceType: ds.source_type,
-      fields: (ds.fields || []).map((f: any) => ({
-        id: f.id || crypto.randomUUID(),
-        name: f.name,
-        type: f.type,
-        required: f.required ?? true,
-        description: f.description,
-        isPrimaryKey: f.is_primary_key ?? false,
-        defaultValue: f.default_value,
-        fakerCategory: f.faker_category,
-        enum: f.enum_values || undefined,
-        references: f.references || undefined,
-      })),
-      sampleRows: ds.sample_rows || [],
-    })),
-    endpoints: data.endpoints || [],
-    updatedAt: data.project.updated_at,
-  }
+  return mapProjectResponse({ ...data.project, datasets: data.datasets || [], endpoints: data.endpoints || [] })
 }
 
 /**
@@ -667,6 +639,8 @@ export interface DbConnectionInfo {
 export interface TableInfo {
   name: string
   kind?: string
+  column_count?: number | null
+  row_count?: number | null
 }
 
 export interface ColumnInfo {
@@ -676,6 +650,21 @@ export interface ColumnInfo {
   is_primary_key: boolean
   default: string | null
   foreign_key: string | null
+}
+
+export interface TablePreview {
+  table: string
+  columns: string[]
+  rows: Record<string, unknown>[]
+}
+
+export interface ImportTableResult {
+  dataset_id: string
+  dataset_name: string
+  table: string
+  fields_imported: number
+  sample_rows: number
+  endpoints_created: Array<{ method: string; path: string; operation_type: string }>
 }
 
 export const listConnections = async (projectId: string): Promise<DbConnectionInfo[]> => {
@@ -706,13 +695,30 @@ export const testConnection = async (id: string): Promise<{ success: boolean; me
   return res.json()
 }
 
-export const listTables = async (id: string): Promise<TableInfo[]> => {
-  const res = await apiFetch(`/api/connections/${id}/tables`)
+export const listTables = async (id: string, includeCounts = false): Promise<TableInfo[]> => {
+  const suffix = includeCounts ? '?include_counts=true' : ''
+  const res = await apiFetch(`/api/connections/${id}/tables${suffix}`)
   return res.json()
 }
 
 export const getTableSchema = async (id: string, table: string): Promise<{ table: string; columns: ColumnInfo[] }> => {
   const res = await apiFetch(`/api/connections/${id}/tables/${encodeURIComponent(table)}/schema`)
+  return res.json()
+}
+
+export const previewTable = async (id: string, table: string, limit = 25): Promise<TablePreview> => {
+  const res = await apiFetch(`/api/connections/${id}/tables/${encodeURIComponent(table)}/preview?limit=${limit}`)
+  return res.json()
+}
+
+export const importConnectionTable = async (
+  id: string,
+  data: { table_name: string; dataset_name?: string; sample_limit?: number; create_endpoints?: boolean },
+): Promise<ImportTableResult> => {
+  const res = await apiFetch(`/api/connections/${id}/import-table`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
   return res.json()
 }
 

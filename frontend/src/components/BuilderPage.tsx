@@ -15,11 +15,11 @@ import { ConnectionManager } from './ConnectionManager'
 
 import { useProjectBuilder } from '../hooks/useProjectBuilder'
 import { useToast } from './Toast'
-import type { FieldType, GenerationResult, MappingRule } from '../types/schemas'
+import type { GenerationResult, MappingRule } from '../types/schemas'
 import { slugify } from '../lib/slug'
 import { readBackendConfig } from '../lib/backendConfig'
-import { createGenerationJob, fetchMappings, getGenerationJob, createMapping, deleteMapping } from '../lib/api'
-import type { GenerationJob } from '../lib/api'
+import { createGenerationJob, fetchMappings, fetchRemoteProject, getGenerationJob, createMapping, deleteMapping } from '../lib/api'
+import type { GenerationJob, ImportTableResult } from '../lib/api'
 
 export function BuilderPage() {
   const { t } = useTranslation()
@@ -32,6 +32,7 @@ export function BuilderPage() {
     removeEndpoint,
     setGenerationResult,
     removeDataset,
+    replaceProject,
     saveProject,
     isSyncing,
     isGenerating,
@@ -184,37 +185,14 @@ export function BuilderPage() {
     }
   }, [project.slug, project.remoteId, project.datasets, toast, t])
 
-  const handleImportTable = useCallback((tableName: string, columns: any[]) => {
-    const dsId = crypto.randomUUID()
-    const inferType = (dbType: string): FieldType => {
-      const dt = dbType.toLowerCase()
-      if (dt.includes('int')) return 'integer'
-      if (dt.includes('float') || dt.includes('double') || dt.includes('numeric') || dt.includes('decimal') || dt.includes('real')) return 'float'
-      if (dt.includes('bool')) return 'boolean'
-      return 'string'
-    }
-    const fields = columns.map((col: any) => ({
-      id: crypto.randomUUID(),
-      name: col.name,
-      type: inferType(col.type),
-      required: !col.nullable,
-      isPrimaryKey: col.is_primary_key,
-    }))
-    upsertDataset({
-      id: dsId,
-      name: tableName,
-      sourceType: 'database',
-      fields,
-      sampleRows: [],
-    })
-    const basePath = '/' + tableName.toLowerCase().replace(/[^a-z0-9]+/g, '_')
-    upsertEndpoint({ id: crypto.randomUUID(), name: 'Listar ' + tableName, method: 'GET', path: basePath, summary: 'Listar registros de ' + tableName, operationType: 'list', targetDatasetId: dsId })
-    upsertEndpoint({ id: crypto.randomUUID(), name: 'Obtener ' + tableName, method: 'GET', path: basePath + '/{id}', summary: 'Obtener un registro de ' + tableName, operationType: 'get', targetDatasetId: dsId })
-    upsertEndpoint({ id: crypto.randomUUID(), name: 'Crear ' + tableName, method: 'POST', path: basePath, summary: 'Crear registro en ' + tableName, operationType: 'create', targetDatasetId: dsId })
-    upsertEndpoint({ id: crypto.randomUUID(), name: 'Actualizar ' + tableName, method: 'PUT', path: basePath + '/{id}', summary: 'Actualizar registro de ' + tableName, operationType: 'update', targetDatasetId: dsId })
-    upsertEndpoint({ id: crypto.randomUUID(), name: 'Eliminar ' + tableName, method: 'DELETE', path: basePath + '/{id}', summary: 'Eliminar registro de ' + tableName, operationType: 'delete', targetDatasetId: dsId })
-    setEditingDatasetId(dsId)
-  }, [upsertDataset, upsertEndpoint])
+  const handleImportTable = useCallback(async (result: ImportTableResult) => {
+    const pid = project.slug || project.remoteId || project.id
+    const updated = await fetchRemoteProject(pid)
+    replaceProject(updated)
+    setEditingDatasetId(result.dataset_id)
+    setSelectedDatasetId(result.dataset_id)
+    setActiveTab('datasets')
+  }, [project.slug, project.remoteId, project.id, replaceProject, setSelectedDatasetId])
 
   const handleRemoveMapping = useCallback(async (mappingId: string) => {
     const pid = project.slug || project.remoteId
