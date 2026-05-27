@@ -24,6 +24,7 @@ from ..models import (
 from ..security import CurrentUser, get_current_user_from_header, require_project_access
 from ..openapi_builder import build_openapi_document
 from ..services.generation import run_generation
+from ..services.code_generator import get_latest_bundle_path
 from ..services.project_service import project_service
 
 
@@ -523,7 +524,7 @@ def download_bundle(
     except KeyError:
         target_stack = "fastapi"
 
-    bundle_path = artifacts_root / f"{target_stack}-bundle.zip"
+    bundle_path = get_latest_bundle_path(settings, folder_name, target_stack)
     if not bundle_path.exists():
         raise HTTPException(status_code=404, detail="Bundle not found. Generate artifacts first.")
     return FileResponse(

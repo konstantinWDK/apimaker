@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import zipfile
+import shutil
+from datetime import datetime, timezone
 from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
+from uuid import uuid4
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -16,6 +19,7 @@ from .project_service import project_service
 
 
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent.parent.parent / "generator" / "templates"
+LATEST_MANIFEST = "latest.json"
 
 FIELD_TYPE_MAP = {
     "string": "str",
@@ -409,6 +413,55 @@ def render_bundle(
     return buf.getvalue()
 
 
+def _create_artifact_run_root(settings, folder_name: str) -> tuple[Path, Path, str]:
+    project_root = Path(settings.artifacts_dir) / folder_name
+    run_id = f"{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{uuid4().hex[:8]}"
+    run_root = project_root / "runs" / run_id
+    run_root.mkdir(parents=True, exist_ok=True)
+    return project_root, run_root, run_id
+
+
+def _write_latest_manifest(
+    project_root: Path,
+    run_id: str,
+    target_stack: str,
+    bundle_path: Path,
+    openapi_path: Path,
+    sdk_paths: list[str],
+) -> None:
+    import json
+
+    manifest = {
+        "run_id": run_id,
+        "target_stack": target_stack,
+        "bundle_path": str(bundle_path.relative_to(project_root)),
+        "openapi_path": str(openapi_path.relative_to(project_root)),
+        "sdk_paths": [str(Path(path).relative_to(project_root)) for path in sdk_paths],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    (project_root / LATEST_MANIFEST).write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+def get_latest_bundle_path(settings, folder_name: str, target_stack: str) -> Path:
+    """Return the latest generated bundle path, falling back to legacy location."""
+    import json
+
+    project_root = Path(settings.artifacts_dir) / folder_name
+    manifest_path = project_root / LATEST_MANIFEST
+    if manifest_path.exists():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            bundle_path = project_root / manifest["bundle_path"]
+            if bundle_path.exists():
+                return bundle_path
+        except Exception:
+            pass
+    return project_root / f"{target_stack}-bundle.zip"
+
+
 def run_generation(
     session, project_id, payload: GenerationRequest
 ) -> GenerationResult:
@@ -456,11 +509,10 @@ def run_generation(
             project.include_data if hasattr(project, "include_data") else True,
         )
 
-        # Save to artifacts (use slug for folder name)
+        # Save to an isolated artifact run (use slug for folder name)
         settings = get_settings()
         folder_name = project.slug or str(project.id)
-        artifacts_root = Path(settings.artifacts_dir) / folder_name
-        artifacts_root.mkdir(parents=True, exist_ok=True)
+        project_artifacts_root, artifacts_root, run_id = _create_artifact_run_root(settings, folder_name)
 
         bundle_path = artifacts_root / f"{project.target_stack}-bundle.zip"
         bundle_path.write_bytes(zip_bytes)
@@ -556,6 +608,19 @@ def run_generation(
         except Exception as e:
             import logging
             logging.warning(f"Python SDK generation failed: {e}")
+
+    legacy_bundle_path = project_artifacts_root / f"{project.target_stack}-bundle.zip"
+    legacy_openapi_path = project_artifacts_root / "openapi.json"
+    shutil.copy2(bundle_path, legacy_bundle_path)
+    shutil.copy2(openapi_path, legacy_openapi_path)
+    _write_latest_manifest(
+        project_artifacts_root,
+        run_id,
+        project.target_stack or "fastapi",
+        bundle_path,
+        openapi_path,
+        sdk_paths,
+    )
 
     project_service.mark_status(session, project_id, "ready")
 
