@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from fastapi.openapi.docs import get_redoc_html
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
@@ -14,6 +14,7 @@ from ..models import (
     UpdateProjectRequest,
     CreateProjectRequest,
     DefineEndpointsRequest,
+    GenerationJobResponse,
     GenerationRequest,
     GenerationResult,
     Project as PydanticProject,
@@ -25,6 +26,7 @@ from ..security import CurrentUser, get_current_user_from_header, require_projec
 from ..openapi_builder import build_openapi_document
 from ..services.generation import run_generation
 from ..services.code_generator import get_latest_bundle_path
+from ..services.generation_job_service import generation_job_service
 from ..services.project_service import project_service
 
 
@@ -460,6 +462,52 @@ def generate_artifacts(
     try:
         resolved_id = project_service.resolve_id(session, project_id)
         return run_generation(session, resolved_id, payload)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post(
+    "/{project_id}/generation-jobs",
+    response_model=GenerationJobResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def create_generation_job(
+    project_id: str,
+    payload: GenerationRequest,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(get_current_user_from_header),
+    _project: DBProject = Depends(require_project_access),
+) -> GenerationJobResponse:
+    try:
+        resolved_id = project_service.resolve_id(session, project_id)
+        job = generation_job_service.create_job(
+            session,
+            resolved_id,
+            payload,
+            created_by=user.user_id,
+        )
+        background_tasks.add_task(generation_job_service.run_job, job.id)
+        return generation_job_service.to_response(job)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get(
+    "/{project_id}/generation-jobs/{job_id}",
+    response_model=GenerationJobResponse,
+)
+def get_generation_job(
+    project_id: str,
+    job_id: str,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(get_current_user_from_header),
+    _project: DBProject = Depends(require_project_access),
+) -> GenerationJobResponse:
+    try:
+        resolved_id = project_service.resolve_id(session, project_id)
+        job = generation_job_service.get_job(session, resolved_id, job_id)
+        return generation_job_service.to_response(job)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

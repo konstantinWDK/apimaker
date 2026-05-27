@@ -209,6 +209,23 @@ class ProjectVersion(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class GenerationJob(SQLModel, table=True):
+    """Background code generation job for a project."""
+
+    __tablename__ = "generation_jobs"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    project_id: str = Field(foreign_key="projects.id", index=True)
+    status: str = Field(default="pending", index=True)  # pending | running | success | failed
+    payload_json: str = Field(default="{}", sa_column=Column(Text))
+    result_json: str | None = Field(default=None, sa_column=Column(Text))
+    error: str | None = None
+    created_by: str | None = Field(default=None, foreign_key="users.id")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+
+
 class Datasource(SQLModel, table=True):
     """Unified data source attached to a project."""
 

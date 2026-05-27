@@ -148,6 +148,17 @@ class GenerationResult(BaseModel):
     sdk_paths: list[str]
 
 
+class GenerationJobResponse(BaseModel):
+    id: str
+    project_id: str
+    status: str
+    result: GenerationResult | None = None
+    error: str | None = None
+    created_at: datetime
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+
+
 class ErrorResponse(BaseModel):
     detail: str
     error_code: str | None = None
