@@ -161,6 +161,48 @@ def test_fastapi_bundle_uses_imported_table_metadata() -> None:
         py_compile.compile(str(tmp_file), doraise=True)
 
 
+def test_fastapi_bundle_renders_nested_relation_endpoint() -> None:
+    """Nested FK endpoints should filter children by the imported FK column."""
+    imported_data = [
+        {
+            "dataset": type("obj", (object,), {
+                "id": "ds-orders", "name": "Orders", "source_type": "database",
+                "sample_rows": json.dumps([{"id": 1, "customer_id": 10, "total": 19.95}]),
+                "saved_requests": None,
+            })(),
+            "fields": [
+                type("obj", (object,), {"name": "id", "field_type": "integer", "required": True, "description": None, "references": None, "is_primary_key": True})(),
+                type("obj", (object,), {"name": "customer_id", "field_type": "integer", "required": True, "description": "customers.id", "references": json.dumps({"table": "customers", "column": "id"}), "is_primary_key": False})(),
+                type("obj", (object,), {"name": "total", "field_type": "float", "required": True, "description": None, "references": None, "is_primary_key": False})(),
+            ],
+        }
+    ]
+    endpoints = [
+        type("obj", (object,), {
+            "id": "ep-nested", "name": "List Orders By Customer", "method": "GET", "path": "/customers/{id}/orders",
+            "summary": "List orders by customer", "operation_type": "list_related", "target_dataset_id": "ds-orders",
+        })(),
+    ]
+    zip_bytes = render_bundle(
+        "fastapi", "TestAPI", "A test API", "none", None, None, 0,
+        imported_data, endpoints, True,
+        {"ds-orders": {"table_name": "orders", "database_url_env": "ORDERS_DATABASE_URL"}},
+    )
+    import py_compile
+    import tempfile
+    import zipfile
+    from io import BytesIO
+    from pathlib import Path
+
+    with zipfile.ZipFile(BytesIO(zip_bytes)) as zf:
+        main_py = zf.read("main.py").decode("utf-8")
+        assert '@app.get("/customers/{id}/orders"' in main_py
+        assert "OrdersRecord.customer_id == id" in main_py
+        tmp_file = Path(tempfile.gettempdir()) / "doapi_generated_nested_main.py"
+        tmp_file.write_text(main_py, encoding="utf-8")
+        py_compile.compile(str(tmp_file), doraise=True)
+
+
 def test_typescript_sdk_renders() -> None:
     """TypeScript SDK template should render without errors."""
     from jinja2 import Environment, FileSystemLoader, select_autoescape

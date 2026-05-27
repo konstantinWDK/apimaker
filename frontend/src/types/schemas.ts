@@ -61,7 +61,7 @@ export interface ApiEndpoint {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   path: string
   summary?: string
-  operationType?: 'list' | 'get' | 'create' | 'update' | 'delete' | 'custom'
+  operationType?: 'list' | 'get' | 'create' | 'update' | 'delete' | 'list_related' | 'custom'
   targetDatasetId?: string // Link to a specific dataset in the project
 }
 

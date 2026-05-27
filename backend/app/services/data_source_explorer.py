@@ -147,6 +147,7 @@ class DataSourceExplorer:
         created_endpoints = []
         if create_endpoints:
             created_endpoints = self._ensure_crud_endpoints(session, project_id, dataset.id, table_name)
+            created_endpoints.extend(self._ensure_nested_endpoints(session, project_id, dataset.id, table_name, schema))
 
         create_runtime_log(
             session,
@@ -253,6 +254,24 @@ class DataSourceExplorer:
         table_name, column_name = foreign_key.split(".", 1)
         return json.dumps({"table": table_name, "column": column_name})
 
+    def _dataset_for_table(self, session: Session, project_id: str, table_name: str) -> Dataset | None:
+        matching_datasources = session.exec(
+            sqlmodel_select(Datasource).where(Datasource.project_id == project_id, Datasource.source_type == "database")
+        ).all()
+        for datasource in matching_datasources:
+            try:
+                config = json.loads(datasource.config or "{}")
+            except Exception:
+                config = {}
+            if config.get("table_name") != table_name:
+                continue
+            dataset_id = config.get("dataset_id")
+            if dataset_id:
+                dataset = session.get(Dataset, dataset_id)
+                if dataset:
+                    return dataset
+        return None
+
     def _ensure_crud_endpoints(
         self,
         session: Session,
@@ -290,6 +309,48 @@ class DataSourceExplorer:
             )
             session.add(endpoint)
             created.append({"method": method, "path": path, "operation_type": operation_type})
+        session.commit()
+        return created
+
+    def _ensure_nested_endpoints(
+        self,
+        session: Session,
+        project_id: str,
+        dataset_id: str,
+        table_name: str,
+        schema: TableSchema,
+    ) -> list[dict[str, str]]:
+        created = []
+        for column in schema.columns:
+            if not column.foreign_key or "." not in column.foreign_key:
+                continue
+            parent_table, parent_column = column.foreign_key.split(".", 1)
+            parent_dataset = self._dataset_for_table(session, project_id, parent_table)
+            if not parent_dataset:
+                continue
+            parent_path = self._slugify(parent_table)
+            child_path = self._slugify(table_name)
+            path = f"/{parent_path}/{{{parent_column}}}/{child_path}"
+            exists = session.exec(
+                sqlmodel_select(Endpoint).where(
+                    Endpoint.project_id == project_id,
+                    Endpoint.method == "GET",
+                    Endpoint.path == path,
+                )
+            ).first()
+            if exists:
+                continue
+            endpoint = Endpoint(
+                project_id=project_id,
+                name=f"List {table_name} by {parent_table}",
+                method="GET",
+                path=path,
+                summary=f"List {table_name} related to a {parent_table} record",
+                operation_type="list_related",
+                target_dataset_id=dataset_id,
+            )
+            session.add(endpoint)
+            created.append({"method": "GET", "path": path, "operation_type": "list_related"})
         session.commit()
         return created
 

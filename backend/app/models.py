@@ -66,7 +66,7 @@ class ApiEndpoint(BaseModel):
     method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"] = "GET"
     path: str
     summary: str | None = None
-    operation_type: Literal["list", "get", "create", "update", "delete", "custom"] = "custom"
+    operation_type: Literal["list", "get", "create", "update", "delete", "list_related", "custom"] = "custom"
     target_dataset_id: str | None = None
 
 

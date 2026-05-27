@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 import time
 from pathlib import Path
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
@@ -32,10 +33,11 @@ def _auth_headers() -> dict[str, str]:
 
 
 def _create_project(headers: dict[str, str]) -> str:
+    unique = f"{SUFFIX}-{uuid4().hex[:8]}"
     response = client.post(
         "/projects",
         headers=headers,
-        json={"name": f"Explorer Project {SUFFIX}", "target_stack": "fastapi"},
+        json={"name": f"Explorer Project {unique}", "target_stack": "fastapi"},
     )
     assert response.status_code == 201
     return response.json()["id"]
@@ -118,3 +120,44 @@ def test_sqlite_datasource_explorer_imports_table_as_dataset(tmp_path: Path) -> 
         assert {field.name for field in fields} == {"id", "customer_id", "total"}
         endpoints = session.exec(select(Endpoint).where(Endpoint.target_dataset_id == dataset.id)).all()
         assert {endpoint.operation_type for endpoint in endpoints} == {"list", "get", "create", "update", "delete"}
+
+
+def test_import_creates_nested_endpoint_when_parent_table_is_imported(tmp_path: Path) -> None:
+    source_db = tmp_path / "source_nested.db"
+    _create_external_sqlite(source_db)
+    headers = _auth_headers()
+    project_id = _create_project(headers)
+
+    created = client.post(
+        f"/api/connections/project/{project_id}",
+        headers=headers,
+        json={"name": "SQLite nested source", "db_type": "sqlite", "database": source_db.as_posix()},
+    )
+    assert created.status_code == 201
+    connection_id = created.json()["id"]
+
+    parent = client.post(
+        f"/api/connections/{connection_id}/import-table",
+        headers=headers,
+        json={"table_name": "customers", "dataset_name": "Customers", "sample_limit": 5},
+    )
+    assert parent.status_code == 201
+
+    child = client.post(
+        f"/api/connections/{connection_id}/import-table",
+        headers=headers,
+        json={"table_name": "orders", "dataset_name": "Orders", "sample_limit": 5},
+    )
+    assert child.status_code == 201
+    nested = [endpoint for endpoint in child.json()["endpoints_created"] if endpoint["operation_type"] == "list_related"]
+    assert nested == [{"method": "GET", "path": "/customers/{id}/orders", "operation_type": "list_related"}]
+
+    with Session(engine) as session:
+        endpoint = session.exec(
+            select(Endpoint).where(
+                Endpoint.project_id == project_id,
+                Endpoint.operation_type == "list_related",
+                Endpoint.path == "/customers/{id}/orders",
+            )
+        ).first()
+        assert endpoint is not None

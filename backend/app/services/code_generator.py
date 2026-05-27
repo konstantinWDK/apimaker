@@ -138,6 +138,7 @@ def _build_context(
                     pass
 
             resolved_ref = None
+            table_ref = None
             if ref_parsed:
                 ref_ds_id = ref_parsed.get("datasetId")
                 ref_field_name = ref_parsed.get("fieldName", "id")
@@ -148,6 +149,13 @@ def _build_context(
                         "dataset_name": ref_ds_name,
                         "field_name": ref_field_name,
                     }
+                ref_table = ref_parsed.get("table")
+                ref_column = ref_parsed.get("column")
+                if ref_table and ref_column:
+                    table_ref = {
+                        "table": ref_table,
+                        "column": ref_column,
+                    }
 
             ds_fields.append({
                 "name": f.name,
@@ -157,6 +165,7 @@ def _build_context(
                 "description": f.description,
                 "is_primary_key": getattr(f, "is_primary_key", False),
                 "references": resolved_ref,
+                "table_reference": table_ref,
             })
 
         primary_key_fields = [field for field in ds_fields if field["is_primary_key"]]

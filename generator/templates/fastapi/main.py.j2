@@ -364,6 +364,37 @@ async def {{ ep.name | lower | replace(" ", "_") }}({{ ep.path | extract_path_pa
         db.delete(item)
         db.commit()
 
+{# --- LIST RELATED --- #}
+{% elif ep.operation_type == "list_related" %}
+{% set parent_param = ep.path | extract_path_param %}
+{% set relation = namespace(field=none) %}
+{% for field in target_ds.fields %}
+{% if field.table_reference and field.table_reference.column == parent_param %}
+{% set relation.field = field %}
+{% endif %}
+{% endfor %}
+{% if not relation.field %}
+{% for field in target_ds.fields %}
+{% if field.table_reference %}
+{% set relation.field = field %}
+{% endif %}
+{% endfor %}
+{% endif %}
+@app.get("{{ ep.path }}", dependencies=[Depends(verify_auth)])
+async def {{ ep.name | lower | replace(" ", "_") }}(
+    {{ parent_param }}: {{ relation.field.python_type if relation.field else "int" }},
+    page: int = Query(1, ge=1),
+    limit: int = Query(100, ge=1, le=1000),
+):
+    with get_{{ target_ds.name | lower | replace(" ", "_") }}_db() if "{{ target_ds.external_database_url_env }}" else get_db() as db:
+        query = db.query({{ model_name }}Record)
+        {% if relation.field %}
+        query = query.filter({{ model_name }}Record.{{ relation.field.name }} == {{ parent_param }})
+        {% endif %}
+        total = query.count()
+        items = query.offset((page - 1) * limit).limit(limit).all()
+        return {"data": [item.__dict__ | {"_sa_instance_state": None} for item in items] if items else [], "total": total, "page": page, "pages": (total + limit - 1) // limit}
+
 {% else %}
 @app.{{ ep.method | lower }}("{{ ep.path }}", dependencies=[Depends(verify_auth)])
 async def {{ ep.name | lower | replace(" ", "_") }}():
