@@ -203,6 +203,41 @@ def test_fastapi_bundle_renders_nested_relation_endpoint() -> None:
         py_compile.compile(str(tmp_file), doraise=True)
 
 
+def test_fastapi_bundle_renders_saved_query_endpoint() -> None:
+    """Saved SQL queries marked as endpoints should render as FastAPI routes."""
+    saved_queries = [
+        type("obj", (object,), {
+            "id": "query-1",
+            "name": "Top Customers",
+            "query_type": "sql",
+            "statement": "SELECT :limit as limit_value",
+            "datasource_id": None,
+            "bindings": json.dumps({
+                "endpoint": {"enabled": True, "method": "GET", "path": "/reports/top-customers"},
+                "params": [{"name": "limit", "type": "integer"}],
+            }),
+        })(),
+    ]
+    zip_bytes = render_bundle(
+        "fastapi", "TestAPI", "A test API", "none", None, None, 0,
+        _make_sample_data(), _make_endpoints(), True, {}, saved_queries,
+    )
+    import py_compile
+    import tempfile
+    import zipfile
+    from io import BytesIO
+    from pathlib import Path
+
+    with zipfile.ZipFile(BytesIO(zip_bytes)) as zf:
+        main_py = zf.read("main.py").decode("utf-8")
+        assert '@app.get("/reports/top-customers"' in main_py
+        assert 'TOP_CUSTOMERS_SQL = """SELECT :limit as limit_value"""' in main_py
+        assert "db.execute(text(TOP_CUSTOMERS_SQL), query_params)" in main_py
+        tmp_file = Path(tempfile.gettempdir()) / "doapi_generated_query_main.py"
+        tmp_file.write_text(main_py, encoding="utf-8")
+        py_compile.compile(str(tmp_file), doraise=True)
+
+
 def test_typescript_sdk_renders() -> None:
     """TypeScript SDK template should render without errors."""
     from jinja2 import Environment, FileSystemLoader, select_autoescape

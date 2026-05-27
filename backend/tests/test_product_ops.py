@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
@@ -31,10 +32,11 @@ def _auth_headers() -> dict[str, str]:
 
 
 def _create_project(headers: dict[str, str]) -> str:
+    unique = f"{SUFFIX}-{uuid4().hex[:8]}"
     res = client.post(
         "/projects",
         headers=headers,
-        json={"name": f"Ops Project {SUFFIX}", "target_stack": "fastapi"},
+        json={"name": f"Ops Project {unique}", "target_stack": "fastapi"},
     )
     assert res.status_code == 201
     return res.json()["id"]
@@ -64,9 +66,13 @@ def test_datasources_queries_releases_automations_and_imports() -> None:
             "query_type": "sql",
             "statement": "SELECT 1",
             "datasource_id": datasource_id,
+            "expose_as_endpoint": True,
+            "endpoint_path": "/reports/list-things",
         },
     )
     assert query.status_code == 201
+    assert query.json()["endpoint"]["enabled"] is True
+    assert query.json()["endpoint"]["path"] == "/reports/list-things"
 
     automation = client.post(
         f"/projects/{project_id}/automations",

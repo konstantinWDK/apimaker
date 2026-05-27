@@ -1157,6 +1157,8 @@
   "productOps.current": "Current",
   "productOps.datasource": "Datasource",
   "productOps.datasourceCreated": "Datasource Created",
+  "productOps.endpointPath": "Endpoint path",
+  "productOps.exposeAsEndpoint": "Expose as API endpoint",
   "productOps.deployProviders": "Deploy Providers",
   "productOps.documentJson": "Document Json",
   "productOps.execute": "Execute",

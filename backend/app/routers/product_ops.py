@@ -52,6 +52,8 @@ class QueryPayload(BaseModel):
     datasource_id: str | None = None
     connection_id: str | None = None
     bindings: dict[str, Any] | None = None
+    expose_as_endpoint: bool = False
+    endpoint_path: str | None = None
 
 
 class RunQueryPayload(BaseModel):
@@ -109,6 +111,7 @@ def _datasource_to_dict(ds: Datasource) -> dict:
 
 
 def _query_to_dict(query: SavedQuery) -> dict:
+    bindings = json_loads(query.bindings, {})
     return {
         "id": query.id,
         "project_id": query.project_id,
@@ -117,7 +120,8 @@ def _query_to_dict(query: SavedQuery) -> dict:
         "name": query.name,
         "query_type": query.query_type,
         "statement": query.statement,
-        "bindings": json_loads(query.bindings, {}),
+        "bindings": bindings,
+        "endpoint": bindings.get("endpoint", {}),
         "created_at": query.created_at.isoformat(),
         "updated_at": query.updated_at.isoformat(),
     }
@@ -232,6 +236,19 @@ def create_query(
 ) -> dict:
     _ensure_project_connection(session, project.id, payload.connection_id)
     _ensure_project_datasource(session, project.id, payload.datasource_id)
+    bindings = payload.bindings or {}
+    if payload.expose_as_endpoint:
+        endpoint_path = payload.endpoint_path or f"/queries/{payload.name.lower().replace(' ', '-')}"
+        if not endpoint_path.startswith("/"):
+            endpoint_path = f"/{endpoint_path}"
+        bindings = {
+            **bindings,
+            "endpoint": {
+                "enabled": True,
+                "method": "GET",
+                "path": endpoint_path,
+            },
+        }
     query = SavedQuery(
         project_id=project.id,
         datasource_id=payload.datasource_id,
@@ -239,7 +256,7 @@ def create_query(
         name=payload.name,
         query_type=payload.query_type,
         statement=payload.statement,
-        bindings=json_dumps(payload.bindings or {}),
+        bindings=json_dumps(bindings),
     )
     session.add(query)
     session.commit()

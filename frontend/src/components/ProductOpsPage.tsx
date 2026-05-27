@@ -25,6 +25,8 @@ type QueryFormState = {
   statement: string
   connection_id: string
   datasource_id: string
+  expose_as_endpoint: boolean
+  endpoint_path: string
 }
 
 const tabs: Array<{ id: Tab; label: string }> = [
@@ -62,6 +64,8 @@ export function ProductOpsPage() {
     statement: 'SELECT 1',
     connection_id: '',
     datasource_id: '',
+    expose_as_endpoint: true,
+    endpoint_path: '/reports/list-rows',
   })
   const [releaseMessage, setReleaseMessage] = useState('')
   const [automationForm, setAutomationForm] = useState({
@@ -190,6 +194,20 @@ export function ProductOpsPage() {
               </select>
               <label>SQL</label>
               <textarea rows={5} value={queryForm.statement} onChange={e => setQueryForm({ ...queryForm, statement: e.target.value })} />
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={queryForm.expose_as_endpoint}
+                  onChange={e => setQueryForm({ ...queryForm, expose_as_endpoint: e.target.checked })}
+                />
+                {t('productOps.exposeAsEndpoint')}
+              </label>
+              {queryForm.expose_as_endpoint && (
+                <>
+                  <label>{t('productOps.endpointPath')}</label>
+                  <input value={queryForm.endpoint_path} onChange={e => setQueryForm({ ...queryForm, endpoint_path: e.target.value })} />
+                </>
+              )}
               <button className="btn primary btn-sm" type="button" onClick={() => runAction(async (id) => {
                 await createSavedQuery(id, {
                   ...queryForm,
@@ -210,6 +228,7 @@ export function ProductOpsPage() {
                     <div>
                       <strong>{item.name}</strong>
                       <span>{item.statement}</span>
+                      {item.endpoint?.enabled && <small>GET {item.endpoint.path}</small>}
                     </div>
                     <button className="btn ghost btn-sm" type="button" onClick={() => runAction(async (id) => {
                       const result = await runSavedQuery(id, item.id)

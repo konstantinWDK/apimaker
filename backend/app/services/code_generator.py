@@ -13,7 +13,7 @@ from uuid import uuid4
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from ..config import get_settings
-from ..db_models import Dataset, DatasetField, Datasource, Endpoint
+from ..db_models import Dataset, DatasetField, Datasource, Endpoint, SavedQuery
 from ..models import GenerationRequest, GenerationResult
 from .project_service import project_service
 
@@ -48,6 +48,17 @@ def _env_name_for_dataset(dataset_name: str) -> str:
     return f"{token or 'DATASET'}_DATABASE_URL"
 
 
+def _query_function_name(name: str, fallback: str) -> str:
+    import re
+
+    token = re.sub(r"[^a-zA-Z0-9]+", "_", name.strip().lower()).strip("_")
+    if not token:
+        token = f"saved_query_{fallback.replace('-', '_')}"
+    if token[0].isdigit():
+        token = f"query_{token}"
+    return token
+
+
 @lru_cache(maxsize=8)
 def _get_template_env(template_dir: str, include_route_filters: bool = False) -> Environment:
     env = Environment(
@@ -75,6 +86,7 @@ def _build_context(
     target_stack: str = "fastapi",
     include_data: bool = True,
     datasource_configs: dict[str, dict] | None = None,
+    saved_queries: list[SavedQuery] | None = None,
 ) -> dict:
     """Build the Jinja2 template context."""
     import json
@@ -213,6 +225,40 @@ def _build_context(
         }
         for ep in endpoints
     ]
+    saved_query_context = []
+    for query in saved_queries or []:
+        if query.query_type != "sql" or not query.statement.strip().lower().startswith("select"):
+            continue
+        try:
+            bindings = json.loads(query.bindings or "{}")
+        except Exception:
+            bindings = {}
+        endpoint = bindings.get("endpoint", {})
+        if not endpoint.get("enabled"):
+            continue
+        path = endpoint.get("path") or f"/queries/{query.id}"
+        if not path.startswith("/"):
+            path = f"/{path}"
+        datasource_config = {}
+        if query.datasource_id:
+            datasource_config = next(
+                (
+                    config
+                    for config in datasource_configs.values()
+                    if config.get("datasource_id") == query.datasource_id
+                ),
+                {},
+            )
+        saved_query_context.append({
+            "id": query.id,
+            "name": query.name,
+            "function_name": _query_function_name(query.name, query.id),
+            "method": endpoint.get("method", "GET").lower(),
+            "path": path,
+            "statement": query.statement,
+            "connection_env": datasource_config.get("database_url_env") or "",
+            "params": bindings.get("params", []),
+        })
 
     return {
         "project_name": project_name,
@@ -225,6 +271,7 @@ def _build_context(
         "datasets": processed_datasets,
         "external_datasets": [d for d in processed_datasets if d["external_database_url_env"]],
         "endpoints": endpoints_context,
+        "saved_queries": saved_query_context,
         "include_data": include_data,
     }
 
@@ -241,6 +288,7 @@ def render_bundle(
     endpoints: list[Endpoint],
     include_data: bool = True,
     datasource_configs: dict[str, dict] | None = None,
+    saved_queries: list[SavedQuery] | None = None,
 ) -> bytes:
     """Render a project bundle as zip bytes based on the selected stack."""
     stack_dir = TEMPLATE_DIR / stack
@@ -253,7 +301,7 @@ def render_bundle(
 
     context = _build_context(
         project_name, project_description, auth_method, api_key, jwt_secret, rate_limit,
-        datasets_with_fields, endpoints, stack, include_data, datasource_configs
+        datasets_with_fields, endpoints, stack, include_data, datasource_configs, saved_queries
     )
 
     buf = BytesIO()
@@ -512,10 +560,17 @@ def _load_datasource_configs(session, project_id: str) -> dict[str, dict]:
             config = json.loads(datasource.config or "{}")
         except Exception:
             config = {}
+        config["datasource_id"] = datasource.id
         dataset_id = config.get("dataset_id")
         if dataset_id:
             configs[dataset_id] = config
     return configs
+
+
+def _load_saved_queries(session, project_id: str) -> list[SavedQuery]:
+    from sqlmodel import select
+
+    return list(session.exec(select(SavedQuery).where(SavedQuery.project_id == project_id)).all())
 
 
 def run_generation(
@@ -532,6 +587,7 @@ def run_generation(
     datasets_with_fields = data["datasets"]
     endpoints = data["endpoints"]
     datasource_configs = _load_datasource_configs(session, str(project.id))
+    saved_queries = _load_saved_queries(session, str(project.id))
 
     datasets_with_fields = data["datasets"]
     endpoints = data["endpoints"]
@@ -565,6 +621,7 @@ def run_generation(
             endpoints,
             project.include_data if hasattr(project, "include_data") else True,
             datasource_configs,
+            saved_queries,
         )
 
         # Save to an isolated artifact run (use slug for folder name)
@@ -641,6 +698,7 @@ def run_generation(
                 datasets_with_fields, endpoints, project.target_stack or "fastapi",
                 project.include_data if hasattr(project, "include_data") else True,
                 _load_datasource_configs(session, str(project.id)),
+                _load_saved_queries(session, str(project.id)),
             )
             ts_code = ts_env.get_template("typescript.ts.j2").render(ts_context)
             ts_path = sdk_dir / "api-client.ts"
@@ -660,6 +718,7 @@ def run_generation(
                 datasets_with_fields, endpoints, project.target_stack or "fastapi",
                 project.include_data if hasattr(project, "include_data") else True,
                 _load_datasource_configs(session, str(project.id)),
+                _load_saved_queries(session, str(project.id)),
             )
             py_code = py_env.get_template("python.py.j2").render(py_context)
             py_path = sdk_dir / "api_client.py"

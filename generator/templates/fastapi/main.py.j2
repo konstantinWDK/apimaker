@@ -21,7 +21,7 @@ from fastapi import FastAPI, HTTPException, Query, Request, Depends, Security
 from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from sqlalchemy import create_engine, ForeignKey
+from sqlalchemy import create_engine, ForeignKey, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, relationship, joinedload
 import jwt
 import httpx
@@ -235,6 +235,13 @@ async def rate_limit_middleware(request: Request, call_next):
     return response
 {% endif %}
 
+{% if saved_queries %}
+# Saved SQL query endpoints
+{% for query in saved_queries %}
+{{ query.function_name | upper }}_SQL = """{{ query.statement }}"""
+{% endfor %}
+{% endif %}
+
 @app.middleware("http")
 async def telemetry_middleware(request: Request, call_next):
     start = time.time()
@@ -380,6 +387,7 @@ async def {{ ep.name | lower | replace(" ", "_") }}({{ ep.path | extract_path_pa
 {% endif %}
 {% endfor %}
 {% endif %}
+
 @app.get("{{ ep.path }}", dependencies=[Depends(verify_auth)])
 async def {{ ep.name | lower | replace(" ", "_") }}(
     {{ parent_param }}: {{ relation.field.python_type if relation.field else "int" }},
@@ -401,6 +409,17 @@ async def {{ ep.name | lower | replace(" ", "_") }}():
     return {"message": "Custom endpoint for {{ model_name }}"}
 {% endif %}
 {% endif %}
+{% endfor %}
+
+{% for query in saved_queries %}
+@app.{{ query.method }}("{{ query.path }}", dependencies=[Depends(verify_auth)])
+async def {{ query.function_name }}(request: Request):
+    query_params = dict(request.query_params)
+    with {% if query.connection_env %}sessionmaker(bind=create_engine(os.getenv("{{ query.connection_env }}", DATABASE_URL)))(){% else %}SessionLocal(){% endif %} as db:
+        result = db.execute(text({{ query.function_name | upper }}_SQL), query_params)
+        rows = [dict(row._mapping) for row in result]
+        return {"columns": list(rows[0].keys()) if rows else [], "rows": rows}
+
 {% endfor %}
 
 @app.get("/health")
