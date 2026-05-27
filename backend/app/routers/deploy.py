@@ -26,7 +26,7 @@ from ..security import CurrentUser, require_admin
 from ..services.project_service import project_service
 
 logger = logging.getLogger("doapi.deploy")
-router = APIRouter(prefix="/api/deploy", tags=["deploy"])
+router = APIRouter(prefix="/deploy", tags=["deploy"])
 
 # When running inside Docker, APIMAKER_DEPLOY_HOST_PATH maps the container's
 # /app to the host path so generated docker-compose volumes work correctly.

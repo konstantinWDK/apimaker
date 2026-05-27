@@ -120,10 +120,11 @@ def list_projects(
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
 ) -> list[PydanticProject]:
-    db_projects = project_service.list_projects(session, workspace_id=workspace_id, user_id=user.user_id)
+    projects_data = project_service.list_projects_with_data(
+        session, workspace_id=workspace_id, user_id=user.user_id
+    )
     result = []
-    for p in db_projects:
-        data = project_service.get_project_with_data(session, p.id)
+    for data in projects_data:
         result.append(_db_to_pydantic(
             data["project"],
             datasets_with_fields=data["datasets"],

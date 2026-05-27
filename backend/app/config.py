@@ -35,8 +35,8 @@ class Settings(BaseSettings):
         if not v:
             key = secrets.token_urlsafe(32)
             logger.warning(
-                "No APIMAKER_ENCRYPTION_KEY set. Auto-generated encryption key: %s. "
-                "Set it in production for persistence across restarts.", key
+                "No APIMAKER_ENCRYPTION_KEY set. Auto-generated an ephemeral encryption key. "
+                "Set it in production for persistence across restarts."
             )
             return key
         return v

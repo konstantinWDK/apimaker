@@ -166,7 +166,7 @@ async def verify_mock_auth(
     return True
 
 
-router = APIRouter(prefix="/api/mock/{project_id}", tags=["mock"], dependencies=[Depends(verify_mock_auth)])
+router = APIRouter(prefix="/mock/{project_id}", tags=["mock"], dependencies=[Depends(verify_mock_auth)])
 
 
 def _find_dataset_for_endpoint(session: Session, resolved_project_id: str, matched_ep: Endpoint) -> tuple[str | None, list[dict]]:

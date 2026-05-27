@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import zipfile
+from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
 
@@ -34,6 +35,21 @@ def _extract_path_param(path: str) -> str:
     if "{" in path:
         return path.split("{")[1].split("}")[0]
     return "item_id"
+
+
+@lru_cache(maxsize=8)
+def _get_template_env(template_dir: str, include_route_filters: bool = False) -> Environment:
+    env = Environment(
+        loader=FileSystemLoader(template_dir),
+        autoescape=select_autoescape(),
+    )
+    env.filters["capitalize"] = lambda s: s.capitalize() if s else ""
+    env.filters["lower"] = lambda s: s.lower() if s else ""
+    env.filters["replace"] = lambda s, old, new: s.replace(old, new) if s else ""
+    if include_route_filters:
+        env.filters["extract_path_param"] = _extract_path_param
+        env.filters["js_bool"] = lambda v: "true" if v else "false"
+    return env
 
 
 def _build_context(
@@ -193,15 +209,7 @@ def render_bundle(
         stack = "fastapi"
         stack_dir = TEMPLATE_DIR / stack
 
-    env = Environment(
-        loader=FileSystemLoader(str(stack_dir)),
-        autoescape=select_autoescape(),
-    )
-    env.filters["capitalize"] = lambda s: s.capitalize() if s else ""
-    env.filters["lower"] = lambda s: s.lower() if s else ""
-    env.filters["replace"] = lambda s, old, new: s.replace(old, new) if s else ""
-    env.filters["extract_path_param"] = _extract_path_param
-    env.filters["js_bool"] = lambda v: "true" if v else "false"
+    env = _get_template_env(str(stack_dir), include_route_filters=True)
 
     context = _build_context(
         project_name, project_description, auth_method, api_key, jwt_secret, rate_limit, 
@@ -389,10 +397,7 @@ def render_bundle(
         deploy_dir = TEMPLATE_DIR / "deploy"
         if deploy_dir.exists():
             try:
-                deploy_env = Environment(
-                    loader=FileSystemLoader(str(deploy_dir)),
-                    autoescape=select_autoescape(),
-                )
+                deploy_env = _get_template_env(str(deploy_dir))
                 for tpl in deploy_env.list_templates():
                     target = tpl.replace(".j2", "")
                     content = deploy_env.get_template(tpl).render(context)
@@ -518,13 +523,7 @@ def run_generation(
 
         # Render TypeScript SDK
         try:
-            ts_env = Environment(
-                loader=FileSystemLoader(str(TEMPLATE_DIR / "sdk")),
-                autoescape=select_autoescape(),
-            )
-            ts_env.filters["capitalize"] = lambda s: s.capitalize() if s else ""
-            ts_env.filters["lower"] = lambda s: s.lower() if s else ""
-            ts_env.filters["replace"] = lambda s, old, new: s.replace(old, new) if s else ""
+            ts_env = _get_template_env(str(TEMPLATE_DIR / "sdk"))
 
             ts_context = _build_context(
                 project.name, project.description, project.auth_method,
@@ -542,13 +541,7 @@ def run_generation(
 
         # Render Python SDK
         try:
-            py_env = Environment(
-                loader=FileSystemLoader(str(TEMPLATE_DIR / "sdk")),
-                autoescape=select_autoescape(),
-            )
-            py_env.filters["capitalize"] = lambda s: s.capitalize() if s else ""
-            py_env.filters["lower"] = lambda s: s.lower() if s else ""
-            py_env.filters["replace"] = lambda s, old, new: s.replace(old, new) if s else ""
+            py_env = _get_template_env(str(TEMPLATE_DIR / "sdk"))
 
             py_context = _build_context(
                 project.name, project.description, project.auth_method,

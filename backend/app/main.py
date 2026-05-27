@@ -21,6 +21,7 @@ from .services.mock_server import router as mock_api_router
 
 
 settings = get_settings()
+API_V1_PREFIX = "/api/v1"
 
 app = FastAPI(title=settings.project_name)
 
@@ -56,21 +57,27 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-app.include_router(auth.router)
-app.include_router(projects.router)
-app.include_router(mock_ctrl_router.router)
-app.include_router(mock_api_router)
-app.include_router(share_router.router)
-app.include_router(admin_router.router)
-app.include_router(db.router)
-app.include_router(setup_router.router)
-app.include_router(webhooks_router.router)
-app.include_router(versions_router.router)
-app.include_router(deploy_router.router)
-app.include_router(connections_router.router)
-app.include_router(product_ops_router.router)
-app.include_router(product_ops_router.system_router)
-app.include_router(monitor_router.router)
+def include_legacy_and_v1(router, legacy_prefix: str = "") -> None:
+    """Expose legacy routes and the versioned API namespace."""
+    app.include_router(router, prefix=legacy_prefix)
+    app.include_router(router, prefix=API_V1_PREFIX)
+
+
+include_legacy_and_v1(auth.router)
+include_legacy_and_v1(projects.router)
+include_legacy_and_v1(mock_ctrl_router.router)
+include_legacy_and_v1(mock_api_router, legacy_prefix="/api")
+include_legacy_and_v1(share_router.router)
+include_legacy_and_v1(admin_router.router)
+include_legacy_and_v1(db.router)
+include_legacy_and_v1(setup_router.router)
+include_legacy_and_v1(webhooks_router.router)
+include_legacy_and_v1(versions_router.router)
+include_legacy_and_v1(deploy_router.router, legacy_prefix="/api")
+include_legacy_and_v1(connections_router.router, legacy_prefix="/api")
+include_legacy_and_v1(product_ops_router.router)
+include_legacy_and_v1(product_ops_router.system_router, legacy_prefix="/api")
+include_legacy_and_v1(monitor_router.router)
 
 
 def on_startup() -> None:
@@ -143,6 +150,7 @@ async def lifespan(app: FastAPI):
 app.router.lifespan_context = lifespan
 
 
+@app.get(f"{API_V1_PREFIX}/health", tags=["health"])
 @app.get("/health", tags=["health"])
 def health() -> dict:
     db_info = get_database_info()

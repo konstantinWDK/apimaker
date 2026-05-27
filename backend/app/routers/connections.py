@@ -30,7 +30,7 @@ from ..models import (
 from ..security import CurrentUser, get_current_user_from_header, require_connection_access, require_project_access
 
 logger = logging.getLogger("doapi.connections")
-router = APIRouter(prefix="/api/connections", tags=["connections"])
+router = APIRouter(prefix="/connections", tags=["connections"])
 
 # ── Password encryption ──
 

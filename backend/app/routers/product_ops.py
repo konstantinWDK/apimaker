@@ -34,7 +34,7 @@ from ..services.product_ops import (
 )
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["product-ops"])
-system_router = APIRouter(prefix="/api/platform", tags=["platform"])
+system_router = APIRouter(prefix="/platform", tags=["platform"])
 
 
 class DatasourcePayload(BaseModel):

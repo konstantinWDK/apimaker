@@ -8,6 +8,7 @@ from uuid import uuid4
 from sqlmodel import Session, select
 
 from ..db_models import Dataset, DatasetField, Endpoint, FieldMappingRule, Project, User, WorkspaceMember
+from ..repositories.project_repository import project_repository
 
 
 
@@ -16,18 +17,7 @@ class ProjectService:
 
     def resolve_id(self, session: Session, project_id: str) -> str:
         """Resolve project ID from slug or internal ID. Prioritizes slug."""
-        # 1. Try slug match (case-insensitive)
-        slug_id = project_id.lower()
-        project = session.exec(select(Project).where(Project.slug == slug_id)).first()
-        if project:
-            return project.id
-
-        # 2. Try exact ID match
-        project = session.get(Project, project_id)
-        if project:
-            return project.id
-
-        raise KeyError(f"Project '{project_id}' not found")
+        return project_repository.resolve_id(session, project_id)
 
 
     def create_project(
@@ -122,6 +112,9 @@ class ProjectService:
         return project
 
     def list_projects(self, session: Session, workspace_id: str | None = None, user_id: str | None = None) -> list[Project]:
+        return project_repository.list_accessible(session, workspace_id=workspace_id, user_id=user_id)
+
+    def _legacy_list_projects(self, session: Session, workspace_id: str | None = None, user_id: str | None = None) -> list[Project]:
         query = select(Project)
         if workspace_id:
             query = query.where(Project.workspace_id == workspace_id)
@@ -142,7 +135,19 @@ class ProjectService:
             if project.created_by == user_id or (project.workspace_id and project.workspace_id in workspace_ids)
         ]
 
+    def list_projects_with_data(
+        self,
+        session: Session,
+        workspace_id: str | None = None,
+        user_id: str | None = None,
+    ) -> list[dict]:
+        projects = self.list_projects(session, workspace_id=workspace_id, user_id=user_id)
+        return project_repository.get_graphs(session, projects)
+
     def get_project(self, session: Session, project_id: str) -> Project:
+        return project_repository.get(session, project_id)
+
+    def _legacy_get_project(self, session: Session, project_id: str) -> Project:
         project = session.get(Project, str(project_id))
         if project is None:
             raise KeyError("Project not found")
@@ -150,6 +155,9 @@ class ProjectService:
 
     def get_project_with_data(self, session: Session, project_id: str) -> dict:
         """Get project with its datasets and endpoints loaded."""
+        return project_repository.get_graph(session, project_id)
+
+    def _legacy_get_project_with_data(self, session: Session, project_id: str) -> dict:
         project = self.get_project(session, project_id)
 
         # Load datasets

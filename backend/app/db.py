@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Generator
 
 from sqlmodel import SQLModel, Session, create_engine
+from sqlalchemy.engine import make_url
 from alembic.config import Config
 from alembic import command
 import logging
@@ -61,6 +62,9 @@ DATABASE_URL = _get_database_url()
 connect_args = {}
 if DATABASE_URL.startswith("sqlite"):
     connect_args["check_same_thread"] = False
+    sqlite_database = make_url(DATABASE_URL).database
+    if sqlite_database and sqlite_database != ":memory:":
+        Path(sqlite_database).expanduser().parent.mkdir(parents=True, exist_ok=True)
 
 engine = create_engine(DATABASE_URL, echo=settings.environment == "development", connect_args=connect_args)
 
