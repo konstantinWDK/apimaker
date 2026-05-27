@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { Routes, Route, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { LayoutDashboard, Play, Shield, Settings, Rocket, Database, TestTube, BookOpen, Info, Activity, LayoutList, BarChart3 } from 'lucide-react'
@@ -10,18 +10,6 @@ import { LoginScreen } from './components/LoginScreen'
 import { ProjectSidebar } from './components/ProjectSidebar'
 import { ShareView } from './components/ShareView'
 import { UserCard } from './components/UserCard'
-import { InfoPage } from './components/InfoPage'
-import { DocsPage } from './components/DocsPage'
-import { ConfigPage } from './components/ConfigPage'
-import { SecurityPage } from './components/SecurityPage'
-import { DeployPage } from './components/DeployPage'
-import { BuilderPage } from './components/BuilderPage'
-import { SimulatorPage } from './components/SimulatorPage'
-import { ProductOpsPage } from './components/ProductOpsPage'
-import { TestsPage } from './components/TestsPage'
-import { MonitorPage } from './components/MonitorPage'
-import { AdminPanel } from './components/AdminPanel'
-import { DashboardPage } from './components/DashboardPage'
 import { LanguageSwitcher } from './components/LanguageSwitcher'
 import { ThemeToggle } from './components/ThemeToggle'
 import { NavDropdown } from './components/NavDropdown'
@@ -31,6 +19,27 @@ import { useAuth } from './hooks/useAuth'
 import { useToast } from './components/Toast'
 import { readBackendConfig } from './lib/backendConfig'
 import { apiFetch } from './lib/api'
+
+const AdminPanel = lazy(() => import('./components/AdminPanel').then((module) => ({ default: module.AdminPanel })))
+const BuilderPage = lazy(() => import('./components/BuilderPage').then((module) => ({ default: module.BuilderPage })))
+const ConfigPage = lazy(() => import('./components/ConfigPage').then((module) => ({ default: module.ConfigPage })))
+const DashboardPage = lazy(() => import('./components/DashboardPage').then((module) => ({ default: module.DashboardPage })))
+const DeployPage = lazy(() => import('./components/DeployPage').then((module) => ({ default: module.DeployPage })))
+const DocsPage = lazy(() => import('./components/DocsPage').then((module) => ({ default: module.DocsPage })))
+const InfoPage = lazy(() => import('./components/InfoPage').then((module) => ({ default: module.InfoPage })))
+const MonitorPage = lazy(() => import('./components/MonitorPage').then((module) => ({ default: module.MonitorPage })))
+const ProductOpsPage = lazy(() => import('./components/ProductOpsPage').then((module) => ({ default: module.ProductOpsPage })))
+const SecurityPage = lazy(() => import('./components/SecurityPage').then((module) => ({ default: module.SecurityPage })))
+const SimulatorPage = lazy(() => import('./components/SimulatorPage').then((module) => ({ default: module.SimulatorPage })))
+const TestsPage = lazy(() => import('./components/TestsPage').then((module) => ({ default: module.TestsPage })))
+
+function PageFallback() {
+  return (
+    <div className="loading-screen">
+      <div className="loading-spinner" />
+    </div>
+  )
+}
 
 export function App() {
   const { t } = useTranslation()
@@ -270,21 +279,23 @@ export function App() {
         <div className="app-content">
           <div key={location.key} className="page-enter">
             <ErrorBoundary>
-              <Routes location={location}>
-                <Route path="/" element={<BuilderPage />} />
-                <Route path="/simulator" element={<SimulatorPage />} />
-                <Route path="/info" element={<InfoPage />} />
-                <Route path="/security" element={<SecurityPage />} />
-                <Route path="/deploy" element={<DeployPage />} />
-                <Route path="/operations" element={<ProductOpsPage />} />
-                <Route path="/monitor" element={<MonitorPage />} />
-                <Route path="/admin" element={<AdminPanel />} />
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/config" element={<ConfigPage authStatus={authStatus} onLogout={performLogout} />} />
-                <Route path="/docs" element={<DocsPage />} />
-                <Route path="/tests" element={<TestsPage />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
+              <Suspense fallback={<PageFallback />}>
+                <Routes location={location}>
+                  <Route path="/" element={<BuilderPage />} />
+                  <Route path="/simulator" element={<SimulatorPage />} />
+                  <Route path="/info" element={<InfoPage />} />
+                  <Route path="/security" element={<SecurityPage />} />
+                  <Route path="/deploy" element={<DeployPage />} />
+                  <Route path="/operations" element={<ProductOpsPage />} />
+                  <Route path="/monitor" element={<MonitorPage />} />
+                  <Route path="/admin" element={<AdminPanel />} />
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/config" element={<ConfigPage authStatus={authStatus} onLogout={performLogout} />} />
+                  <Route path="/docs" element={<DocsPage />} />
+                  <Route path="/tests" element={<TestsPage />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Suspense>
             </ErrorBoundary>
           </div>
         </div>
