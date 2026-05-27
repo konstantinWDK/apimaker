@@ -115,6 +115,24 @@ export interface SyncResult {
   openapiUrl: string
 }
 
+export interface BackendGenerationResult {
+  project_id: string
+  openapi_path: string
+  bundle_path: string
+  sdk_paths: string[]
+}
+
+export interface GenerationJob {
+  id: string
+  project_id: string
+  status: 'pending' | 'running' | 'success' | 'failed'
+  result: BackendGenerationResult | null
+  error: string | null
+  created_at: string
+  started_at?: string | null
+  finished_at?: string | null
+}
+
 /**
  * Sync a local project draft with the backend.
  * Creates the project if no remoteId exists, otherwise updates dataset + endpoints.
@@ -227,11 +245,29 @@ const mapProjectResponse = (item: any): ProjectDraft => ({
 export const fetchRemoteProjects = async (workspaceId?: string): Promise<ProjectDraft[]> => {
   const baseUrl = ensureBaseUrl()
   const headers = buildHeaders()
-  const url = workspaceId ? `${baseUrl}/projects?workspace_id=${workspaceId}` : `${baseUrl}/projects`
+  const params = new URLSearchParams({ include: 'summary', limit: '100', offset: '0' })
+  if (workspaceId) params.set('workspace_id', workspaceId)
+  const url = `${baseUrl}/api/v1/projects?${params.toString()}`
   const response = await fetch(url, { headers })
   if (!response.ok) return []
   const data = await response.json()
   return (data || []).map(mapProjectResponse)
+}
+
+export const createGenerationJob = async (
+  projectId: string,
+  payload: { include_mock_server: boolean; include_sdk: boolean; include_data: boolean },
+): Promise<GenerationJob> => {
+  const res = await apiFetch(`/api/v1/projects/${projectId}/generation-jobs`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+  return res.json()
+}
+
+export const getGenerationJob = async (projectId: string, jobId: string): Promise<GenerationJob> => {
+  const res = await apiFetch(`/api/v1/projects/${projectId}/generation-jobs/${jobId}`)
+  return res.json()
 }
 
 /**

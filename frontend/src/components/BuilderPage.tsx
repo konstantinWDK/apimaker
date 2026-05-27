@@ -18,7 +18,8 @@ import { useToast } from './Toast'
 import type { FieldType, GenerationResult, MappingRule } from '../types/schemas'
 import { slugify } from '../lib/slug'
 import { readBackendConfig } from '../lib/backendConfig'
-import { fetchMappings, createMapping, deleteMapping } from '../lib/api'
+import { createGenerationJob, fetchMappings, getGenerationJob, createMapping, deleteMapping } from '../lib/api'
+import type { GenerationJob } from '../lib/api'
 
 export function BuilderPage() {
   const { t } = useTranslation()
@@ -41,6 +42,7 @@ export function BuilderPage() {
 
   const [result, setResult] = useState<GenerationResult | null>(null)
   const [generationWarning, setGenerationWarning] = useState<string | null>(null)
+  const [generationJob, setGenerationJob] = useState<GenerationJob | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
   const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'mappings' | 'connections' | 'result' | 'webhooks' | 'versions'>('datasets')
   const [isImportingDB, setIsImportingDB] = useState(false)
@@ -64,6 +66,19 @@ export function BuilderPage() {
 
   const normalizePath = (path: string) => (path.startsWith('/') ? path : `/${path}`)
 
+  const waitForGenerationJob = async (projectId: string, jobId: string) => {
+    let lastJob = await getGenerationJob(projectId, jobId)
+    setGenerationJob(lastJob)
+
+    for (let attempt = 0; attempt < 60 && ['pending', 'running'].includes(lastJob.status); attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      lastJob = await getGenerationJob(projectId, jobId)
+      setGenerationJob(lastJob)
+    }
+
+    return lastJob
+  }
+
   const handleGenerate = async () => {
     if (project.endpoints.length === 0) {
       setGenerationWarning(t('builder.addEndpointFirst'))
@@ -71,6 +86,7 @@ export function BuilderPage() {
       return
     }
     setIsGenerating(true)
+    setGenerationJob(null)
     try {
       const endpoints = project.endpoints.map((endpoint) => ({
         method: endpoint.method,
@@ -84,22 +100,17 @@ export function BuilderPage() {
         return
       }
 
-      const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('doapi-jwt-token') : null
-      const gr = await fetch(`${backendBaseUrl}/projects/${effectiveProjectId}/generate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          include_mock_server: true,
-          include_sdk: project.includeSdk !== false,
-          include_data: project.includeData !== false
-        }),
+      const createdJob = await createGenerationJob(effectiveProjectId, {
+        include_mock_server: true,
+        include_sdk: project.includeSdk !== false,
+        include_data: project.includeData !== false,
       })
+      setGenerationJob(createdJob)
+      setActiveTab('result')
 
-      if (!gr.ok) {
-        toast(`Error al generar bundle: ${await gr.text()}`, 'error')
+      const completedJob = await waitForGenerationJob(effectiveProjectId, createdJob.id)
+      if (completedJob.status !== 'success') {
+        toast(`Error al generar bundle: ${completedJob.error || 'Job failed'}`, 'error')
         return
       }
 
@@ -412,6 +423,11 @@ export function BuilderPage() {
 
               {effectiveResult ? (
                 <>
+                  {generationJob && (
+                    <p className="muted-text">
+                      {t('generation.jobStatus')}: {t(`generation.jobStatus.${generationJob.status}`)}
+                    </p>
+                  )}
                   <GenerationResultPanel
                     result={effectiveResult}
                     projectId={project.slug || project.remoteId || project.id}
@@ -423,8 +439,14 @@ export function BuilderPage() {
                 </>
               ) : (
                 <div className="empty-state">
-                  <p className="muted-text">{t('builder.generateHint')}</p>
-                  <button type="button" className="btn ghost btn-small" onClick={handleGenerate}>{t('builder.generateNow')}</button>
+                  <p className="muted-text">
+                    {generationJob
+                      ? `${t('generation.jobStatus')}: ${t(`generation.jobStatus.${generationJob.status}`)}`
+                      : t('builder.generateHint')}
+                  </p>
+                  <button type="button" className="btn ghost btn-small" onClick={handleGenerate} disabled={isGenerating || isSyncing}>
+                    {isGenerating ? t('builder.processing') : t('builder.generateNow')}
+                  </button>
                 </div>
               )}
             </div>
