@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Routes, Route, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { LayoutDashboard, Play, Shield, Settings, Rocket, Database, TestTube, BookOpen, Info, Activity, LayoutList, BarChart3 } from 'lucide-react'
@@ -104,13 +104,6 @@ export function App() {
     }
   }, [])
 
-  const handleGenerate = useCallback(async () => {
-    const effectiveProjectId = await saveProject()
-    if (!effectiveProjectId) {
-      toast(t('app.saveError'), 'error')
-    }
-  }, [saveProject, toast])
-
   const prevRemoteIdRef = useRef<string | undefined>()
   useEffect(() => {
     if (!project.remoteId || !isAuthenticated) return
@@ -118,7 +111,7 @@ export function App() {
 
     const syncFromBackend = async () => {
       try {
-        const res = await apiFetch(`/projects/${project.remoteId}/mock/status`).then(r => r.json())
+        await apiFetch(`/projects/${project.remoteId}/mock/status`).then(r => r.json())
         if (!cancelled) checkMockStatus()
       } catch {
         if (!cancelled) checkMockStatus()

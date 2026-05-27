@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-type MessageType = 'success' | 'error' | null
-
 interface Props {
   currentUsername: string
   onUpdate: (newUsername: string, newPassword: string, currentPassword: string) => Promise<void>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Play, Save, Copy, Terminal, Plus, Trash2, ChevronRight, ChevronDown, Clock, Bookmark, FileJson, Code2 } from 'lucide-react'
+import { Play, Save, Terminal, Plus, Trash2, ChevronRight, ChevronDown, Clock, Bookmark, FileJson, Code2 } from 'lucide-react'
 import type { ProjectDraft } from '../types/schemas'
 import { readBackendConfig } from '../lib/backendConfig'
 
@@ -59,7 +59,7 @@ export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, 
   const [collectionsOpen, setCollectionsOpen] = useState(true)
   const [histOpen, setHistOpen] = useState(false)
   const [showSave, setShowSave] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen] = useState(true)
 
   const authKey = project.authMethod === 'apikey' ? 'X-API-Key' : project.authMethod === 'jwt' ? 'Authorization' : null
   const authVal = project.authMethod === 'apikey' ? (project.apiKey || '') : ''

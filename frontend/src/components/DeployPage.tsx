@@ -379,7 +379,9 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
               background: dockerAvail === null ? '#94a3b8' : dockerAvail?.available ? '#22c55e' : '#ef4444',
             }} />
             {dockerAvail === null ? t('deploy.verifyingDocker') : dockerAvail?.available
-              ? t('deploy.dockerAvailable').replace('{version}', dockerAvail.version).replace('{count}', dockerAvail.containers_running)
+              ? t('deploy.dockerAvailable')
+                .replace('{version}', dockerAvail.version || '')
+                .replace('{count}', String(dockerAvail.containers_running ?? 0))
               : t('deploy.dockerNotAvailable').replace('{error}', dockerAvail?.error || t('deploy.unknown'))}
             {dockerAvail?.available && (
               <button type="button" className="btn ghost" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}

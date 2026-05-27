@@ -183,7 +183,7 @@ export function SecurityPage() {
               <span style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
                 {project.authMethod === 'apikey' ? t('security.authApiKeyLabel') :
                  project.authMethod === 'jwt' ? t('security.authJwtLabel') :
-                 project.authMethod === 'basic' ? 'Basic Auth' : t('security.authNoneLabel')}
+                 t('security.authNoneLabel')}
               </span>
             </div>
           </div>
