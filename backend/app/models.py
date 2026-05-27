@@ -205,6 +205,8 @@ class DbConnectionResponse(BaseModel):
 class TableInfo(BaseModel):
     name: str
     kind: str | None = None
+    column_count: int | None = None
+    row_count: int | None = None
 
 
 class ColumnInfo(BaseModel):
@@ -219,6 +221,28 @@ class ColumnInfo(BaseModel):
 class TableSchema(BaseModel):
     table: str
     columns: list[ColumnInfo]
+
+
+class TablePreview(BaseModel):
+    table: str
+    columns: list[str]
+    rows: list[dict]
+
+
+class ImportTableRequest(BaseModel):
+    table_name: str
+    dataset_name: str | None = None
+    sample_limit: int = Field(default=25, ge=0, le=200)
+    create_endpoints: bool = True
+
+
+class ImportTableResult(BaseModel):
+    dataset_id: str
+    dataset_name: str
+    table: str
+    fields_imported: int
+    sample_rows: int
+    endpoints_created: list[dict[str, str]]
 
 
 class QueryRequest(BaseModel):

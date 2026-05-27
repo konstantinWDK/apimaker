@@ -6,11 +6,9 @@ import base64
 import hashlib
 import logging
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import create_engine, inspect, text
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import create_engine, text
 from sqlalchemy.engine import URL
 from sqlmodel import Session, select
 
@@ -18,16 +16,19 @@ from ..config import get_settings
 from ..db import get_session
 from ..db_models import DbConnection
 from ..models import (
-    ColumnInfo,
     DbConnectionCreate,
     DbConnectionResponse,
     DbConnectionUpdate,
+    ImportTableRequest,
+    ImportTableResult,
     QueryRequest,
     TableInfo,
+    TablePreview,
     TableSchema,
     TestConnectionResult,
 )
 from ..security import CurrentUser, get_current_user_from_header, require_connection_access, require_project_access
+from ..services.data_source_explorer import DataSourceExplorer
 
 logger = logging.getLogger("doapi.connections")
 router = APIRouter(prefix="/connections", tags=["connections"])
@@ -92,6 +93,9 @@ def _build_sqlalchemy_url(conn: DbConnection, password: str | None = None) -> st
 
 # ── CRUD Endpoints ──
 
+explorer = DataSourceExplorer(_build_sqlalchemy_url, _decrypt_password)
+
+
 @router.get("/project/{project_id}", response_model=list[DbConnectionResponse])
 def list_connections(project_id: str, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header), _project=Depends(require_project_access)):
     connections = session.exec(select(DbConnection).where(DbConnection.project_id == _project.id)).all()
@@ -153,76 +157,70 @@ def delete_connection(connection_id: str, session: Session = Depends(get_session
 
 @router.post("/{connection_id}/test", response_model=TestConnectionResult)
 def test_connection(connection_id: str, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header), conn: DbConnection = Depends(require_connection_access)):
-
-    password = _decrypt_password(conn.password_encrypted) if conn.password_encrypted else None
-    url = _build_sqlalchemy_url(conn, password)
-
-    try:
-        engine = create_engine(url, pool_pre_ping=True)
-        with engine.connect() as c:
-            result = c.execute(text("SELECT version()"))
-            version = result.scalar() or ""
-        engine.dispose()
-        return TestConnectionResult(success=True, message="Connection successful", server_version=str(version)[:100])
-    except Exception as e:
-        return TestConnectionResult(success=False, message=str(e)[:200])
+    return TestConnectionResult(**explorer.test_connection(conn))
 
 
 # ── Introspect tables ──
 
 @router.get("/{connection_id}/tables", response_model=list[TableInfo])
-def list_tables(connection_id: str, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header), conn: DbConnection = Depends(require_connection_access)):
-
-    password = _decrypt_password(conn.password_encrypted) if conn.password_encrypted else None
-    url = _build_sqlalchemy_url(conn, password)
-
+def list_tables(
+    connection_id: str,
+    include_counts: bool = Query(False),
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(get_current_user_from_header),
+    conn: DbConnection = Depends(require_connection_access),
+):
     try:
-        engine = create_engine(url, pool_pre_ping=True)
-        inspector = inspect(engine)
-        tables = []
-        for tname in inspector.get_table_names():
-            tables.append(TableInfo(name=tname))
-        for vname in inspector.get_view_names():
-            tables.append(TableInfo(name=vname, kind="view"))
-        engine.dispose()
-        return tables
+        return explorer.list_tables(conn, include_counts=include_counts)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Error al conectar: {str(e)[:200]}")
 
 
 @router.get("/{connection_id}/tables/{table_name}/schema", response_model=TableSchema)
 def get_table_schema(connection_id: str, table_name: str, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header), conn: DbConnection = Depends(require_connection_access)):
-
-    password = _decrypt_password(conn.password_encrypted) if conn.password_encrypted else None
-    url = _build_sqlalchemy_url(conn, password)
-
     try:
-        engine = create_engine(url, pool_pre_ping=True)
-        inspector = inspect(engine)
-        columns = inspector.get_columns(table_name)
-        pk_cols = {c["name"] for c in inspector.get_pk_constraint(table_name).get("constrained_columns", [])}
-        fks = inspector.get_foreign_keys(table_name)
-
-        fk_map: dict[str, str] = {}
-        for fk in fks:
-            for col, ref_col in zip(fk.get("constrained_columns", []), fk.get("referred_columns", [])):
-                fk_map[col] = f"{fk['referred_table']}.{ref_col}"
-
-        col_infos = []
-        for col in columns:
-            col_infos.append(ColumnInfo(
-                name=col["name"],
-                type=str(col["type"]),
-                nullable=col.get("nullable", True),
-                is_primary_key=col["name"] in pk_cols,
-                default=str(col.get("default", "")) if col.get("default") is not None else None,
-                foreign_key=fk_map.get(col["name"]),
-            ))
-
-        engine.dispose()
-        return TableSchema(table=table_name, columns=col_infos)
+        return explorer.get_schema(conn, table_name)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Error al obtener esquema: {str(e)[:200]}")
+
+
+@router.get("/{connection_id}/tables/{table_name}/preview", response_model=TablePreview)
+def preview_table(
+    connection_id: str,
+    table_name: str,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(get_current_user_from_header),
+    conn: DbConnection = Depends(require_connection_access),
+):
+    try:
+        return explorer.preview_table(conn, table_name, limit=limit, offset=offset)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Error al previsualizar tabla: {str(e)[:200]}")
+
+
+@router.post("/{connection_id}/import-table", response_model=ImportTableResult, status_code=201)
+def import_table(
+    connection_id: str,
+    req: ImportTableRequest,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(get_current_user_from_header),
+    conn: DbConnection = Depends(require_connection_access),
+):
+    try:
+        result = explorer.import_table(
+            session,
+            project_id=conn.project_id,
+            conn=conn,
+            table_name=req.table_name,
+            dataset_name=req.dataset_name,
+            sample_limit=req.sample_limit,
+            create_endpoints=req.create_endpoints,
+        )
+        return ImportTableResult(**result)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Error al importar tabla: {str(e)[:200]}")
 
 
 # ── Query ──
