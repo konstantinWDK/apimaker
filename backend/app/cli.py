@@ -6,6 +6,7 @@ Commands:
   init    <file.json>   Initialize a project JSON from an existing database project
   init-db               Create database tables for the configured database
   seed-demo             Import the bundled demo project into the database
+  doctor                Check local installation health
   deploy --ssh <host>   Deploy to a remote server via SSH+Docker
 """
 
@@ -18,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from shutil import which
 
 
 def cmd_deploy(args: argparse.Namespace) -> None:
@@ -266,6 +268,114 @@ def cmd_seed_demo(args: argparse.Namespace) -> None:
     print(" Demo data imported successfully.")
 
 
+def _doctor_check(name: str, ok: bool, detail: str, required: bool = True) -> dict:
+    status = "ok" if ok else ("fail" if required else "warn")
+    return {"name": name, "status": status, "detail": detail, "required": required}
+
+
+def cmd_doctor(args: argparse.Namespace) -> None:
+    """Check whether the local DoApi installation is healthy."""
+    checks: list[dict] = []
+
+    try:
+        import sqlalchemy as sa
+        from alembic.config import Config
+        from alembic.runtime.migration import MigrationContext
+        from alembic.script import ScriptDirectory
+        from app.config import get_settings
+        from app.db import DATABASE_URL, engine, get_database_info
+        from sqlmodel import SQLModel
+
+        settings = get_settings()
+        db_info = get_database_info()
+        checks.append(_doctor_check("database-url", bool(DATABASE_URL), f"{db_info.get('type', 'unknown')} configured"))
+
+        with engine.connect() as connection:
+            connection.execute(sa.text("SELECT 1"))
+            inspector = sa.inspect(connection)
+            existing_tables = set(inspector.get_table_names())
+            required_tables = set(SQLModel.metadata.tables.keys())
+            missing = sorted(required_tables - existing_tables)
+            checks.append(_doctor_check("database-connection", True, "connection successful"))
+            checks.append(
+                _doctor_check(
+                    "database-tables",
+                    not missing,
+                    "all required tables found" if not missing else f"missing: {', '.join(missing)}",
+                )
+            )
+
+            alembic_ini = Path(__file__).resolve().parent.parent / "alembic.ini"
+            if alembic_ini.exists():
+                cfg = Config(str(alembic_ini))
+                script = ScriptDirectory.from_config(cfg)
+                head = script.get_current_head()
+                current = MigrationContext.configure(connection).get_current_revision()
+                checks.append(
+                    _doctor_check(
+                        "alembic",
+                        current == head,
+                        f"current={current or 'none'} head={head}",
+                        required=False,
+                    )
+                )
+            else:
+                checks.append(_doctor_check("alembic", False, "alembic.ini not found", required=False))
+
+        artifacts_dir = Path(settings.artifacts_dir)
+        try:
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+            probe = artifacts_dir / ".doctor-write-test"
+            probe.write_text("ok", encoding="utf-8")
+            probe.unlink(missing_ok=True)
+            checks.append(_doctor_check("artifacts-dir", True, str(artifacts_dir)))
+        except Exception as exc:
+            checks.append(_doctor_check("artifacts-dir", False, str(exc)))
+
+        checks.append(_doctor_check("jwt-secret", bool(settings.jwt_secret_key), "configured"))
+        checks.append(
+            _doctor_check(
+                "encryption-key",
+                bool(settings.encryption_key),
+                "configured" if settings.encryption_key else "missing",
+                required=False,
+            )
+        )
+    except Exception as exc:
+        checks.append(_doctor_check("backend", False, str(exc)))
+
+    docker_path = which("docker")
+    if docker_path:
+        result = subprocess.run(["docker", "--version"], capture_output=True, text=True)
+        checks.append(
+            _doctor_check(
+                "docker",
+                result.returncode == 0,
+                result.stdout.strip() or result.stderr.strip(),
+                required=False,
+            )
+        )
+    else:
+        checks.append(_doctor_check("docker", False, "docker command not found", required=False))
+
+    node_path = which("node")
+    checks.append(_doctor_check("node", bool(node_path), node_path or "node command not found", required=False))
+
+    failed = [check for check in checks if check["status"] == "fail"]
+
+    if args.json:
+        print(json.dumps({"ok": not failed, "checks": checks}, indent=2))
+    else:
+        print("DoApi doctor")
+        print("=" * 12)
+        for check in checks:
+            marker = {"ok": "OK", "warn": "WARN", "fail": "FAIL"}[check["status"]]
+            print(f"[{marker}] {check['name']}: {check['detail']}")
+
+    if failed:
+        sys.exit(1)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="doapi",
@@ -299,6 +409,10 @@ def main() -> None:
     seed = subparsers.add_parser("seed-demo", help="Import the bundled demo project")
     seed.add_argument("--force", action="store_true", help="Import even when projects already exist")
 
+    # doctor
+    doctor = subparsers.add_parser("doctor", help="Check local installation health")
+    doctor.add_argument("--json", action="store_true", help="Output checks as JSON")
+
     args = parser.parse_args()
 
     if args.command == "deploy":
@@ -311,6 +425,8 @@ def main() -> None:
         cmd_init_db(args)
     elif args.command == "seed-demo":
         cmd_seed_demo(args)
+    elif args.command == "doctor":
+        cmd_doctor(args)
 
 
 if __name__ == "__main__":

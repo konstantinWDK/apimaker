@@ -5,6 +5,7 @@ from sqlalchemy import pool
 from sqlmodel import SQLModel
 
 from alembic import context
+from app.db import DATABASE_URL
 
 # Import our database models so Alembic can detect them
 from app.db_models import (
@@ -14,15 +15,26 @@ from app.db_models import (
     Project,
     Dataset,
     DatasetField,
+    FieldMappingRule,
     Endpoint,
     ShareSnapshot,
     MockRecord,
     Webhook,
     ProjectVersion,
+    DbConnection,
+    Datasource,
+    SavedQuery,
+    RuntimeLog,
+    ProjectRelease,
+    Automation,
+    AutomationRun,
+    WebhookDelivery,
+    GenerationJob,
 )  # noqa: F401
 
 # this is the Alembic Config object
 config = context.config
+config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 # Interpret the config file for Python logging.
 if config.config_file_name is not None:

@@ -55,15 +55,12 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['workspace_id'], ['workspaces.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.alter_column('dataset_fields', 'dataset_id',
-               existing_type=sa.VARCHAR(),
-               nullable=True)
-    op.alter_column('datasets', 'project_id',
-               existing_type=sa.VARCHAR(),
-               nullable=True)
-    op.alter_column('endpoints', 'project_id',
-               existing_type=sa.VARCHAR(),
-               nullable=True)
+    with op.batch_alter_table('dataset_fields', schema=None) as batch_op:
+        batch_op.alter_column('dataset_id', existing_type=sa.VARCHAR(), nullable=True)
+    with op.batch_alter_table('datasets', schema=None) as batch_op:
+        batch_op.alter_column('project_id', existing_type=sa.VARCHAR(), nullable=True)
+    with op.batch_alter_table('endpoints', schema=None) as batch_op:
+        batch_op.alter_column('project_id', existing_type=sa.VARCHAR(), nullable=True)
     # SQLite requires batch operations for adding columns with foreign keys
     with op.batch_alter_table('projects', schema=None) as batch_op:
         batch_op.add_column(sa.Column('workspace_id', sqlmodel.sql.sqltypes.AutoString(), nullable=True))
@@ -81,15 +78,12 @@ def downgrade() -> None:
         batch_op.drop_constraint('fk_projects_workspace_id', type_='foreignkey')
         batch_op.drop_column('created_by')
         batch_op.drop_column('workspace_id')
-    op.alter_column('endpoints', 'project_id',
-               existing_type=sa.VARCHAR(),
-               nullable=False)
-    op.alter_column('datasets', 'project_id',
-               existing_type=sa.VARCHAR(),
-               nullable=False)
-    op.alter_column('dataset_fields', 'dataset_id',
-               existing_type=sa.VARCHAR(),
-               nullable=False)
+    with op.batch_alter_table('endpoints', schema=None) as batch_op:
+        batch_op.alter_column('project_id', existing_type=sa.VARCHAR(), nullable=False)
+    with op.batch_alter_table('datasets', schema=None) as batch_op:
+        batch_op.alter_column('project_id', existing_type=sa.VARCHAR(), nullable=False)
+    with op.batch_alter_table('dataset_fields', schema=None) as batch_op:
+        batch_op.alter_column('dataset_id', existing_type=sa.VARCHAR(), nullable=False)
     op.drop_table('workspace_members')
     op.drop_index(op.f('ix_workspaces_slug'), table_name='workspaces')
     op.drop_table('workspaces')
