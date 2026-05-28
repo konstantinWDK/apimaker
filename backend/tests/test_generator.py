@@ -196,7 +196,7 @@ def test_fastapi_bundle_renders_nested_relation_endpoint() -> None:
 
     with zipfile.ZipFile(BytesIO(zip_bytes)) as zf:
         main_py = zf.read("main.py").decode("utf-8")
-        assert '@app.get("/customers/{id}/orders"' in main_py
+        assert '"/customers/{id}/orders"' in main_py
         assert "OrdersRecord.customer_id == id" in main_py
         tmp_file = Path(tempfile.gettempdir()) / "doapi_generated_nested_main.py"
         tmp_file.write_text(main_py, encoding="utf-8")
@@ -230,10 +230,12 @@ def test_fastapi_bundle_renders_saved_query_endpoint() -> None:
 
     with zipfile.ZipFile(BytesIO(zip_bytes)) as zf:
         main_py = zf.read("main.py").decode("utf-8")
-        assert '@app.get("/reports/top-customers"' in main_py
+        assert '"/reports/top-customers"' in main_py
         assert 'TOP_CUSTOMERS_SQL = """SELECT :limit as limit_value"""' in main_py
         assert "db.execute(text(TOP_CUSTOMERS_SQL), query_params)" in main_py
-        assert 'query_params.pop("_limit", "500")' in main_py
+        assert 'tags=["Saved queries"]' in main_py
+        assert 'Query(500, ge=1, le=500, description="Maximum rows returned")' in main_py
+        assert 'query_params.pop("_limit", str(_limit))' in main_py
         assert "result.fetchmany(max_rows)" in main_py
         tmp_file = Path(tempfile.gettempdir()) / "doapi_generated_query_main.py"
         tmp_file.write_text(main_py, encoding="utf-8")

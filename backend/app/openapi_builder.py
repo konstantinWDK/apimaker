@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+import re
 
 from .models import FieldType, Project
 
@@ -14,6 +14,74 @@ FIELD_TYPE_MAP: dict[FieldType, dict[str, str]] = {
     FieldType.BOOLEAN: {"type": "boolean"},
     FieldType.DATETIME: {"type": "string", "format": "date-time"},
 }
+
+
+def _get_attr(item, name: str, default=None):
+    if isinstance(item, dict):
+        return item.get(name, default)
+    return getattr(item, name, default)
+
+
+def _operation_id(method: str, path: str) -> str:
+    token = re.sub(r"[^a-zA-Z0-9]+", "_", f"{method}_{path.strip('/')}").strip("_").lower()
+    return token or f"{method}_root"
+
+
+def _path_parameters(path: str) -> list[dict[str, object]]:
+    return [
+        {
+            "name": name,
+            "in": "path",
+            "required": True,
+            "schema": {"type": "string"},
+            "description": f"{name} identifier",
+        }
+        for name in re.findall(r"{([^}]+)}", path)
+    ]
+
+
+def _query_parameters(op_type: str, fields: list) -> list[dict[str, object]]:
+    if op_type not in {"list", "list_related"}:
+        return []
+    parameters: list[dict[str, object]] = [
+        {
+            "name": "page",
+            "in": "query",
+            "required": False,
+            "schema": {"type": "integer", "minimum": 1, "default": 1},
+            "description": "Page number, starting at 1.",
+        },
+        {
+            "name": "limit",
+            "in": "query",
+            "required": False,
+            "schema": {"type": "integer", "minimum": 1, "maximum": 1000, "default": 100},
+            "description": "Maximum records per page.",
+        },
+        {
+            "name": "include",
+            "in": "query",
+            "required": False,
+            "schema": {"type": "string"},
+            "description": "Comma-separated relations to include.",
+        },
+    ]
+    for field in fields:
+        name = _get_attr(field, "name")
+        if not name:
+            continue
+        ftype = _get_attr(field, "type")
+        schema = FIELD_TYPE_MAP.get(ftype, {"type": "string"}).copy()
+        parameters.append(
+            {
+                "name": name,
+                "in": "query",
+                "required": False,
+                "schema": schema,
+                "description": _get_attr(field, "description") or f"Filter by {name}.",
+            }
+        )
+    return parameters
 
 
 def _dataset_schema(fields: list) -> dict | None:
@@ -48,13 +116,17 @@ def _dataset_schema(fields: list) -> dict | None:
     return schema
 
 
-def _response_schema(endpoint_method: str, dataset_schema: dict | None) -> dict:
-    if not dataset_schema:
-        return {"type": "object"}
-    if endpoint_method == "GET":
-        # Heuristic: treat collection endpoints as arrays when no path params are present
-        return dataset_schema
-    return dataset_schema
+def _paginated_schema(component_ref: dict) -> dict:
+    return {
+        "type": "object",
+        "properties": {
+            "data": {"type": "array", "items": component_ref},
+            "total": {"type": "integer"},
+            "page": {"type": "integer"},
+            "pages": {"type": "integer"},
+        },
+        "required": ["data", "total", "page", "pages"],
+    }
 
 
 def _wrap_body(method: str, dataset_schema: dict | None) -> dict | None:
@@ -72,6 +144,7 @@ def _wrap_body(method: str, dataset_schema: dict | None) -> dict | None:
 
 def build_openapi_document(project: Project) -> dict:
     schemas = {}
+    dataset_fields_by_name: dict[str, list] = {}
     dataset_name = "items"
     
     if hasattr(project, 'datasets') and project.datasets:
@@ -82,6 +155,7 @@ def build_openapi_document(project: Project) -> dict:
                 schema = _dataset_schema(ds_fields)
                 if schema:
                     schemas[ds_name] = schema
+                    dataset_fields_by_name[ds_name] = ds_fields
         # Fallback to the first dataset name
         first = project.datasets[0]
         dataset_name = first.name if hasattr(first, 'name') else first.get('name', 'items')
@@ -114,18 +188,36 @@ def build_openapi_document(project: Project) -> dict:
                     break
 
         component_ref = {"$ref": f"#/components/schemas/{ref_name}"} if ref_name in schemas else {"type": "object"}
-        content_schema = {"type": "array", "items": component_ref} if is_list else component_ref
+        content_schema = _paginated_schema(component_ref) if is_list else component_ref
+        fields = dataset_fields_by_name.get(ref_name, [])
+        success_status = "201" if method == "post" else "204" if method == "delete" else "200"
+        responses: dict[str, object] = {
+            success_status: {
+                "description": endpoint.summary or "Successful response",
+            }
+        }
+        if success_status != "204":
+            responses[success_status]["content"] = {"application/json": {"schema": content_schema}}  # type: ignore[index]
+        if op_type in {"get", "update", "delete"} or "{" in endpoint.path:
+            responses["404"] = {
+                "description": "Resource not found",
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}},
+            }
+        if method in {"post", "put", "patch"}:
+            responses["422"] = {
+                "description": "Validation error",
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}},
+            }
 
         operation = {
             "summary": endpoint.summary or endpoint.name,
+            "operationId": _operation_id(method, endpoint.path),
             "tags": [ref_name.capitalize()],
-            "responses": {
-                "200": {
-                    "description": endpoint.summary or "Successful response",
-                    "content": {"application/json": {"schema": content_schema}},
-                }
-            },
+            "parameters": _path_parameters(endpoint.path) + _query_parameters(op_type, fields),
+            "responses": responses,
         }
+        if op_type:
+            operation["description"] = f"Generated {op_type.replace('_', ' ')} endpoint for {ref_name}."
         body_schema = schemas.get(ref_name)
         request_body = _wrap_body(endpoint.method, body_schema)
         if request_body:
@@ -151,7 +243,15 @@ def build_openapi_document(project: Project) -> dict:
         }
         security_global = [{"BearerAuth": []}]
 
-    components: dict[str, object] = {"schemas": schemas} if schemas else {}
+    schemas["Error"] = {
+        "type": "object",
+        "properties": {
+            "detail": {"type": "string"},
+            "error_code": {"type": "string"},
+        },
+        "required": ["detail"],
+    }
+    components: dict[str, object] = {"schemas": schemas}
     if security_schemes:
         components["securitySchemes"] = security_schemes  # type: ignore
 

@@ -297,13 +297,19 @@ def startup():
 {% set model_name = target_ds.name | capitalize | replace(" ", "") %}
 {# --- LIST --- #}
 {% if ep.operation_type == "list" %}
-@app.get("{{ ep.path }}", dependencies=[Depends(verify_auth)])
+@app.get(
+    "{{ ep.path }}",
+    summary="{{ ep.summary or ep.name }}",
+    tags=["{{ target_ds.name }}"],
+    response_description="Paginated {{ target_ds.name }} records",
+    dependencies=[Depends(verify_auth)],
+)
 async def {{ ep.name | lower | replace(" ", "_") }}(
-    page: int = Query(1, ge=1),
-    limit: int = Query(100, ge=1, le=1000),
+    page: int = Query(1, ge=1, description="Page number, starting at 1"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum records per page"),
     include: str = Query(None, description="Comma-separated relations to eager-load"),
     {% for f in target_ds.fields %}
-    {{ f.name }}: Optional[{{ f.python_type }}] = Query(None),
+    {{ f.name }}: Optional[{{ f.python_type }}] = Query(None, description="{{ f.description or 'Filter by ' ~ f.name }}"),
     {% endfor %}
 ):
     with get_{{ target_ds.name | lower | replace(" ", "_") }}_db() if "{{ target_ds.external_database_url_env }}" else get_db() as db:
@@ -331,7 +337,14 @@ async def {{ ep.name | lower | replace(" ", "_") }}(
 
 {# --- GET --- #}
 {% elif ep.operation_type == "get" %}
-@app.get("{{ ep.path }}", response_model={{ model_name }}Response, dependencies=[Depends(verify_auth)])
+@app.get(
+    "{{ ep.path }}",
+    response_model={{ model_name }}Response,
+    summary="{{ ep.summary or ep.name }}",
+    tags=["{{ target_ds.name }}"],
+    response_description="{{ target_ds.name }} record",
+    dependencies=[Depends(verify_auth)],
+)
 async def {{ ep.name | lower | replace(" ", "_") }}({{ ep.path | extract_path_param }}: int):
     with get_{{ target_ds.name | lower | replace(" ", "_") }}_db() if "{{ target_ds.external_database_url_env }}" else get_db() as db:
         item = db.query({{ model_name }}Record).filter({{ model_name }}Record.{{ target_ds.primary_key_field.name }} == {{ ep.path | extract_path_param }}).first()
@@ -340,7 +353,15 @@ async def {{ ep.name | lower | replace(" ", "_") }}({{ ep.path | extract_path_pa
 
 {# --- CREATE --- #}
 {% elif ep.operation_type == "create" %}
-@app.post("{{ ep.path }}", response_model={{ model_name }}Response, status_code=201, dependencies=[Depends(verify_auth)])
+@app.post(
+    "{{ ep.path }}",
+    response_model={{ model_name }}Response,
+    status_code=201,
+    summary="{{ ep.summary or ep.name }}",
+    tags=["{{ target_ds.name }}"],
+    response_description="Created {{ target_ds.name }} record",
+    dependencies=[Depends(verify_auth)],
+)
 async def {{ ep.name | lower | replace(" ", "_") }}(data: {{ model_name }}Create):
     with get_{{ target_ds.name | lower | replace(" ", "_") }}_db() if "{{ target_ds.external_database_url_env }}" else get_db() as db:
         item = {{ model_name }}Record(**data.model_dump())
@@ -351,7 +372,14 @@ async def {{ ep.name | lower | replace(" ", "_") }}(data: {{ model_name }}Create
 
 {# --- UPDATE --- #}
 {% elif ep.operation_type == "update" %}
-@app.{{ ep.method | lower }}("{{ ep.path }}", response_model={{ model_name }}Response, dependencies=[Depends(verify_auth)])
+@app.{{ ep.method | lower }}(
+    "{{ ep.path }}",
+    response_model={{ model_name }}Response,
+    summary="{{ ep.summary or ep.name }}",
+    tags=["{{ target_ds.name }}"],
+    response_description="Updated {{ target_ds.name }} record",
+    dependencies=[Depends(verify_auth)],
+)
 async def {{ ep.name | lower | replace(" ", "_") }}({{ ep.path | extract_path_param }}: int, data: {{ model_name }}Update):
     with get_{{ target_ds.name | lower | replace(" ", "_") }}_db() if "{{ target_ds.external_database_url_env }}" else get_db() as db:
         item = db.query({{ model_name }}Record).filter({{ model_name }}Record.{{ target_ds.primary_key_field.name }} == {{ ep.path | extract_path_param }}).first()
@@ -363,7 +391,14 @@ async def {{ ep.name | lower | replace(" ", "_") }}({{ ep.path | extract_path_pa
 
 {# --- DELETE --- #}
 {% elif ep.operation_type == "delete" %}
-@app.delete("{{ ep.path }}", status_code=204, dependencies=[Depends(verify_auth)])
+@app.delete(
+    "{{ ep.path }}",
+    status_code=204,
+    summary="{{ ep.summary or ep.name }}",
+    tags=["{{ target_ds.name }}"],
+    response_description="Deleted {{ target_ds.name }} record",
+    dependencies=[Depends(verify_auth)],
+)
 async def {{ ep.name | lower | replace(" ", "_") }}({{ ep.path | extract_path_param }}: int):
     with get_{{ target_ds.name | lower | replace(" ", "_") }}_db() if "{{ target_ds.external_database_url_env }}" else get_db() as db:
         item = db.query({{ model_name }}Record).filter({{ model_name }}Record.{{ target_ds.primary_key_field.name }} == {{ ep.path | extract_path_param }}).first()
@@ -388,11 +423,17 @@ async def {{ ep.name | lower | replace(" ", "_") }}({{ ep.path | extract_path_pa
 {% endfor %}
 {% endif %}
 
-@app.get("{{ ep.path }}", dependencies=[Depends(verify_auth)])
+@app.get(
+    "{{ ep.path }}",
+    summary="{{ ep.summary or ep.name }}",
+    tags=["{{ target_ds.name }}"],
+    response_description="Paginated related {{ target_ds.name }} records",
+    dependencies=[Depends(verify_auth)],
+)
 async def {{ ep.name | lower | replace(" ", "_") }}(
     {{ parent_param }}: {{ relation.field.python_type if relation.field else "int" }},
-    page: int = Query(1, ge=1),
-    limit: int = Query(100, ge=1, le=1000),
+    page: int = Query(1, ge=1, description="Page number, starting at 1"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum records per page"),
 ):
     with get_{{ target_ds.name | lower | replace(" ", "_") }}_db() if "{{ target_ds.external_database_url_env }}" else get_db() as db:
         query = db.query({{ model_name }}Record)
@@ -404,7 +445,12 @@ async def {{ ep.name | lower | replace(" ", "_") }}(
         return {"data": [item.__dict__ | {"_sa_instance_state": None} for item in items] if items else [], "total": total, "page": page, "pages": (total + limit - 1) // limit}
 
 {% else %}
-@app.{{ ep.method | lower }}("{{ ep.path }}", dependencies=[Depends(verify_auth)])
+@app.{{ ep.method | lower }}(
+    "{{ ep.path }}",
+    summary="{{ ep.summary or ep.name }}",
+    tags=["{{ target_ds.name }}"],
+    dependencies=[Depends(verify_auth)],
+)
 async def {{ ep.name | lower | replace(" ", "_") }}():
     return {"message": "Custom endpoint for {{ model_name }}"}
 {% endif %}
@@ -412,11 +458,20 @@ async def {{ ep.name | lower | replace(" ", "_") }}():
 {% endfor %}
 
 {% for query in saved_queries %}
-@app.{{ query.method }}("{{ query.path }}", dependencies=[Depends(verify_auth)])
-async def {{ query.function_name }}(request: Request):
+@app.{{ query.method }}(
+    "{{ query.path }}",
+    summary="{{ query.name }}",
+    tags=["Saved queries"],
+    response_description="Saved query result set",
+    dependencies=[Depends(verify_auth)],
+)
+async def {{ query.function_name }}(
+    request: Request,
+    _limit: int = Query({{ query.max_rows }}, ge=1, le={{ query.max_rows }}, description="Maximum rows returned"),
+):
     query_params = dict(request.query_params)
     try:
-        max_rows = min(max(int(query_params.pop("_limit", "{{ query.max_rows }}")), 1), {{ query.max_rows }})
+        max_rows = min(max(int(query_params.pop("_limit", str(_limit))), 1), {{ query.max_rows }})
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid _limit query parameter")
     with {% if query.connection_env %}sessionmaker(bind=create_engine(os.getenv("{{ query.connection_env }}", DATABASE_URL)))(){% else %}SessionLocal(){% endif %} as db:
