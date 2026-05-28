@@ -32,6 +32,7 @@ from ..services.product_ops import (
     json_dumps,
     json_loads,
 )
+from ..services.sql_safety import UnsafeSqlError, extract_named_params, validate_select_statement
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["product-ops"])
 system_router = APIRouter(prefix="/platform", tags=["platform"])
@@ -236,26 +237,36 @@ def create_query(
 ) -> dict:
     _ensure_project_connection(session, project.id, payload.connection_id)
     _ensure_project_datasource(session, project.id, payload.datasource_id)
+    statement = payload.statement
+    query_type = payload.query_type.lower()
+    if query_type == "sql":
+        try:
+            statement = validate_select_statement(payload.statement)
+        except UnsafeSqlError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
     bindings = payload.bindings or {}
     if payload.expose_as_endpoint:
         endpoint_path = payload.endpoint_path or f"/queries/{payload.name.lower().replace(' ', '-')}"
         if not endpoint_path.startswith("/"):
             endpoint_path = f"/{endpoint_path}"
+        params = [{"name": name, "type": "string"} for name in extract_named_params(statement)]
         bindings = {
             **bindings,
             "endpoint": {
                 "enabled": True,
                 "method": "GET",
                 "path": endpoint_path,
+                "max_rows": 500,
             },
+            "params": bindings.get("params") or params,
         }
     query = SavedQuery(
         project_id=project.id,
         datasource_id=payload.datasource_id,
         connection_id=payload.connection_id,
         name=payload.name,
-        query_type=payload.query_type,
-        statement=payload.statement,
+        query_type=query_type,
+        statement=statement,
         bindings=json_dumps(bindings),
     )
     session.add(query)
@@ -276,8 +287,12 @@ def run_query(
     query = session.get(SavedQuery, query_id)
     if not query or query.project_id != project.id:
         raise HTTPException(status_code=404, detail="Query not found")
-    if query.query_type != "sql" or not query.statement.strip().lower().startswith("select"):
+    if query.query_type != "sql":
         raise HTTPException(status_code=400, detail="Only SELECT SQL queries can be run from the builder")
+    try:
+        statement = validate_select_statement(query.statement)
+    except UnsafeSqlError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     conn = _ensure_project_connection(session, project.id, query.connection_id)
     if not conn:
         raise HTTPException(status_code=400, detail="SQL query requires a project connection")
@@ -287,7 +302,7 @@ def run_query(
     engine = create_engine(_build_sqlalchemy_url(conn, password), pool_pre_ping=True)
     try:
         with engine.connect() as c:
-            result = c.execute(text(query.statement), payload.params)
+            result = c.execute(text(statement), payload.params)
             rows = [dict(row._mapping) for row in result.fetchmany(max(1, min(payload.limit, 500)))]
         create_runtime_log(session, project.id, "query.run", message=query.name, metadata={"query_id": query.id, "rows": len(rows)})
         return {"columns": list(rows[0].keys()) if rows else [], "rows": rows}

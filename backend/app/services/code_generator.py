@@ -16,6 +16,7 @@ from ..config import get_settings
 from ..db_models import Dataset, DatasetField, Datasource, Endpoint, SavedQuery
 from ..models import GenerationRequest, GenerationResult
 from .project_service import project_service
+from .sql_safety import UnsafeSqlError, extract_named_params, validate_select_statement
 
 
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent.parent.parent / "generator" / "templates"
@@ -57,6 +58,13 @@ def _query_function_name(name: str, fallback: str) -> str:
     if token[0].isdigit():
         token = f"query_{token}"
     return token
+
+
+def _safe_max_rows(value, default: int = 500) -> int:
+    try:
+        return max(1, min(int(value), default))
+    except (TypeError, ValueError):
+        return default
 
 
 @lru_cache(maxsize=8)
@@ -227,7 +235,11 @@ def _build_context(
     ]
     saved_query_context = []
     for query in saved_queries or []:
-        if query.query_type != "sql" or not query.statement.strip().lower().startswith("select"):
+        if query.query_type != "sql":
+            continue
+        try:
+            safe_statement = validate_select_statement(query.statement)
+        except UnsafeSqlError:
             continue
         try:
             bindings = json.loads(query.bindings or "{}")
@@ -255,9 +267,10 @@ def _build_context(
             "function_name": _query_function_name(query.name, query.id),
             "method": endpoint.get("method", "GET").lower(),
             "path": path,
-            "statement": query.statement,
+            "statement": safe_statement,
             "connection_env": datasource_config.get("database_url_env") or "",
-            "params": bindings.get("params", []),
+            "params": bindings.get("params") or [{"name": name, "type": "string"} for name in extract_named_params(safe_statement)],
+            "max_rows": _safe_max_rows(endpoint.get("max_rows")),
         })
 
     return {

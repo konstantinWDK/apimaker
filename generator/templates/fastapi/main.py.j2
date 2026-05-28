@@ -415,9 +415,13 @@ async def {{ ep.name | lower | replace(" ", "_") }}():
 @app.{{ query.method }}("{{ query.path }}", dependencies=[Depends(verify_auth)])
 async def {{ query.function_name }}(request: Request):
     query_params = dict(request.query_params)
+    try:
+        max_rows = min(max(int(query_params.pop("_limit", "{{ query.max_rows }}")), 1), {{ query.max_rows }})
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid _limit query parameter")
     with {% if query.connection_env %}sessionmaker(bind=create_engine(os.getenv("{{ query.connection_env }}", DATABASE_URL)))(){% else %}SessionLocal(){% endif %} as db:
         result = db.execute(text({{ query.function_name | upper }}_SQL), query_params)
-        rows = [dict(row._mapping) for row in result]
+        rows = [dict(row._mapping) for row in result.fetchmany(max_rows)]
         return {"columns": list(rows[0].keys()) if rows else [], "rows": rows}
 
 {% endfor %}

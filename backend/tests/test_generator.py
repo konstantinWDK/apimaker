@@ -233,6 +233,8 @@ def test_fastapi_bundle_renders_saved_query_endpoint() -> None:
         assert '@app.get("/reports/top-customers"' in main_py
         assert 'TOP_CUSTOMERS_SQL = """SELECT :limit as limit_value"""' in main_py
         assert "db.execute(text(TOP_CUSTOMERS_SQL), query_params)" in main_py
+        assert 'query_params.pop("_limit", "500")' in main_py
+        assert "result.fetchmany(max_rows)" in main_py
         tmp_file = Path(tempfile.gettempdir()) / "doapi_generated_query_main.py"
         tmp_file.write_text(main_py, encoding="utf-8")
         py_compile.compile(str(tmp_file), doraise=True)

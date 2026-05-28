@@ -116,6 +116,26 @@ def test_datasources_queries_releases_automations_and_imports() -> None:
     assert any(row["event_type"] in {"datasource.created", "automation.test", "release.created", "import.completed"} for row in logs.json())
 
 
+def test_saved_sql_query_rejects_unsafe_statement() -> None:
+    headers = _auth_headers()
+    project_id = _create_project(headers)
+
+    query = client.post(
+        f"/projects/{project_id}/queries",
+        headers=headers,
+        json={
+            "name": "Dangerous query",
+            "query_type": "sql",
+            "statement": "SELECT * FROM users; DROP TABLE users",
+            "expose_as_endpoint": True,
+            "endpoint_path": "/reports/danger",
+        },
+    )
+
+    assert query.status_code == 400
+    assert "not allowed" in query.json()["detail"]
+
+
 def test_platform_registry_endpoints() -> None:
     headers = _auth_headers()
     providers = client.get("/api/platform/deploy-providers", headers=headers)
