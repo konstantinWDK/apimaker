@@ -3901,6 +3901,14 @@ input[type='password'] {
   padding: 0.75rem 0;
 }
 
+.empty-state__actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
 /* ─── Schema Diagram ─────────────────────────────────────────── */
 .schema-diagram {
   display: grid;

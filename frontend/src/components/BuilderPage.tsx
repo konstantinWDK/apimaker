@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { DatabaseImportPanel } from './DatabaseImportPanel'
 import { DataMappingPanel } from './DataMappingPanel'
 import { EndpointDesigner } from './EndpointDesigner'
 import { GenerationResultPanel } from './GenerationResultPanel'
@@ -46,7 +45,6 @@ export function BuilderPage() {
   const [generationJob, setGenerationJob] = useState<GenerationJob | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
   const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'mappings' | 'connections' | 'result' | 'webhooks' | 'versions'>('datasets')
-  const [isImportingDB, setIsImportingDB] = useState(false)
   const [editingDatasetId, setEditingDatasetId] = useState<string | null>(null)
   const [mappings, setMappings] = useState<MappingRule[]>([])
   const localBaseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'
@@ -231,43 +229,11 @@ export function BuilderPage() {
       case 'datasets':
         const currentDataset = project.datasets.find(d => d.id === (editingDatasetId || selectedDatasetId)) || project.datasets[0]
 
-        if (isImportingDB) {
-          return (
-            <div className="datasets-tab-new">
-              <div className="dataset-breadcrumb">
-                <button type="button" className="dataset-breadcrumb__link" onClick={() => setIsImportingDB(false)}>
-                  {t('builder.backToDatasets')}
-                </button>
-                <span className="dataset-breadcrumb__sep">&gt;</span>
-                <span className="dataset-breadcrumb__current">{t('builder.importFromDb')}</span>
-              </div>
-              <SectionCard title={t('builder.importDbTitle')} subtitle={t('builder.importDbSubtitle')} accent="sky" fullWidth>
-                <DatabaseImportPanel
-                  onImport={(newDatasets) => {
-                    newDatasets.forEach((ds) => {
-                      upsertDataset(ds)
-                      const basePath = '/' + ds.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')
-                      upsertEndpoint({ id: crypto.randomUUID(), name: 'Listar ' + ds.name, method: 'GET', path: basePath, summary: 'Listar registros de ' + ds.name, operationType: 'list', targetDatasetId: ds.id })
-                      upsertEndpoint({ id: crypto.randomUUID(), name: 'Obtener ' + ds.name, method: 'GET', path: basePath + '/{id}', summary: 'Obtener un registro de ' + ds.name, operationType: 'get', targetDatasetId: ds.id })
-                      upsertEndpoint({ id: crypto.randomUUID(), name: 'Crear ' + ds.name, method: 'POST', path: basePath, summary: 'Crear registro en ' + ds.name, operationType: 'create', targetDatasetId: ds.id })
-                      upsertEndpoint({ id: crypto.randomUUID(), name: 'Actualizar ' + ds.name, method: 'PUT', path: basePath + '/{id}', summary: 'Actualizar registro de ' + ds.name, operationType: 'update', targetDatasetId: ds.id })
-                      upsertEndpoint({ id: crypto.randomUUID(), name: 'Eliminar ' + ds.name, method: 'DELETE', path: basePath + '/{id}', summary: 'Eliminar registro de ' + ds.name, operationType: 'delete', targetDatasetId: ds.id })
-                    })
-                    if (newDatasets.length > 0) { setSelectedDatasetId(newDatasets[0].id); setEditingDatasetId(newDatasets[0].id); }
-                    setIsImportingDB(false)
-                  }}
-                  onCancel={() => setIsImportingDB(false)}
-                />
-              </SectionCard>
-            </div>
-          )
-        }
-
         if (editingDatasetId && currentDataset) {
           return (
             <div className="datasets-tab-new">
               <div className="dataset-breadcrumb">
-                <button type="button" className="dataset-breadcrumb__link" onClick={() => { setEditingDatasetId(null); setIsImportingDB(false); }}>
+                <button type="button" className="dataset-breadcrumb__link" onClick={() => { setEditingDatasetId(null); }}>
                   {t('builder.backToDatasets')}
                 </button>
                 <span className="dataset-breadcrumb__sep">&gt;</span>
@@ -291,7 +257,7 @@ export function BuilderPage() {
                 const newId = crypto.randomUUID()
                 upsertDataset({
                   id: newId,
-                  name: t('builder.newDatasetTable', { n: project.datasets.length + 1 }),
+                  name: t('builder.newDatasetTable', { num: project.datasets.length + 1 }),
                   sourceType: 'manual',
                   fields: [{ id: crypto.randomUUID(), name: 'id', type: 'integer', required: true, isPrimaryKey: true }],
                   sampleRows: []
@@ -300,15 +266,15 @@ export function BuilderPage() {
               }}>
                 {t('builder.newDataset')}
               </button>
-              <button type="button" className="btn ghost" onClick={() => setIsImportingDB(true)}>
-                {t('builder.importFromDb')}
+              <button type="button" className="btn ghost" onClick={() => setActiveTab('connections')}>
+                {t('builder.importFromDatasource')}
               </button>
             </div>
 
             <SectionCard title={t('builder.dataModel')} subtitle={t('builder.dataModelDesc', { count: project.datasets.length })} accent="emerald" fullWidth>
               <SchemaDiagram
                 datasets={project.datasets}
-                onDatasetClick={(id) => { setSelectedDatasetId(id); setEditingDatasetId(id); setIsImportingDB(false); }}
+                onDatasetClick={(id) => { setSelectedDatasetId(id); setEditingDatasetId(id); }}
                 onDeleteDataset={(id) => {
                   if (confirm(t('builder.deleteDatasetConfirm'))) {
                     removeDataset(id)
@@ -323,6 +289,11 @@ export function BuilderPage() {
               <SectionCard title={t('builder.datasets')} subtitle={t('builder.createFirstDataset')} accent="sky" fullWidth>
                 <div className="empty-state">
                   <p className="muted-text">{t('builder.noDatasetsHint')}</p>
+                  <div className="empty-state__actions">
+                    <button type="button" className="btn ghost btn-small" onClick={() => setActiveTab('connections')}>
+                      {t('builder.goToDatasources')}
+                    </button>
+                  </div>
                 </div>
               </SectionCard>
             )}
