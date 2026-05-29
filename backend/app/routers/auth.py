@@ -25,7 +25,8 @@ from ..security import CurrentUser, get_current_user_from_header, get_optional_c
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 limiter = Limiter(key_func=get_remote_address)
-
+WORKSPACE_MEMBER_ROLES = {"viewer", "member", "editor", "admin", "owner"}
+WORKSPACE_ADMIN_ROLES = {"admin", "owner"}
 
 class WorkspaceResponse(BaseModel):
     id: str
@@ -34,9 +35,27 @@ class WorkspaceResponse(BaseModel):
     role: str
 
 
+class WorkspaceMemberResponse(BaseModel):
+    id: str
+    user_id: str
+    username: str
+    email: str | None = None
+    role: str
+    joined_at: str
+
+
 class CreateWorkspaceRequest(BaseModel):
     name: str
     slug: str | None = None
+
+
+class AddWorkspaceMemberRequest(BaseModel):
+    username: str
+    role: str = "viewer"
+
+
+class UpdateWorkspaceMemberRequest(BaseModel):
+    role: str
 
 
 class LoginRequest(BaseModel):
@@ -70,6 +89,79 @@ class RefreshResponse(BaseModel):
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
+
+
+def _workspace_member_to_response(session: Session, member: WorkspaceMember) -> WorkspaceMemberResponse:
+    user = session.get(User, member.user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Workspace member user not found")
+    return WorkspaceMemberResponse(
+        id=member.id,
+        user_id=user.id,
+        username=user.username,
+        email=user.email,
+        role=member.role,
+        joined_at=member.joined_at.isoformat(),
+    )
+
+
+def _get_workspace(session: Session, workspace_id: str) -> Workspace:
+    workspace = session.get(Workspace, workspace_id)
+    if workspace is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    return workspace
+
+
+def _get_workspace_membership(session: Session, workspace_id: str, user_id: str) -> WorkspaceMember | None:
+    return session.exec(
+        select(WorkspaceMember).where(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id == user_id,
+        )
+    ).first()
+
+
+def _require_workspace_member(session: Session, workspace_id: str, user: CurrentUser) -> WorkspaceMember | None:
+    _get_workspace(session, workspace_id)
+    membership = _get_workspace_membership(session, workspace_id, user.user_id)
+    if user.role != "admin" and membership is None:
+        raise HTTPException(status_code=403, detail="Not a member of this workspace")
+    return membership
+
+
+def _require_workspace_admin(session: Session, workspace_id: str, user: CurrentUser) -> WorkspaceMember | None:
+    membership = _require_workspace_member(session, workspace_id, user)
+    if user.role == "admin":
+        return membership
+    if membership is None or membership.role not in WORKSPACE_ADMIN_ROLES:
+        raise HTTPException(status_code=403, detail="Workspace admin access required")
+    return membership
+
+
+def _validate_workspace_role(role: str) -> str:
+    if role not in WORKSPACE_MEMBER_ROLES:
+        raise HTTPException(status_code=422, detail="Invalid workspace role")
+    return role
+
+
+def _count_workspace_owners(session: Session, workspace_id: str) -> int:
+    return len(
+        session.exec(
+            select(WorkspaceMember).where(
+                WorkspaceMember.workspace_id == workspace_id,
+                WorkspaceMember.role == "owner",
+            )
+        ).all()
+    )
+
+
+def _ensure_owner_can_change(session: Session, member: WorkspaceMember, new_role: str | None = None) -> None:
+    if member.role != "owner":
+        return
+    if new_role == "owner":
+        return
+    if _count_workspace_owners(session, member.workspace_id) <= 1:
+        raise HTTPException(status_code=400, detail="Workspace must keep at least one owner")
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -307,3 +399,79 @@ def create_workspace(
     session.add(WorkspaceMember(workspace_id=ws.id, user_id=user.user_id, role="owner"))
     session.commit()
     return WorkspaceResponse(id=ws.id, name=ws.name, slug=ws.slug, role="owner")
+
+
+@router.get("/workspaces/{workspace_id}/members", response_model=list[WorkspaceMemberResponse])
+def list_workspace_members(
+    workspace_id: str,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(get_current_user_from_header),
+) -> list[WorkspaceMemberResponse]:
+    """List workspace members for any member of the workspace."""
+    _require_workspace_member(session, workspace_id, user)
+    members = session.exec(
+        select(WorkspaceMember).where(WorkspaceMember.workspace_id == workspace_id)
+    ).all()
+    return [_workspace_member_to_response(session, member) for member in members]
+
+
+@router.post("/workspaces/{workspace_id}/members", response_model=WorkspaceMemberResponse, status_code=status.HTTP_201_CREATED)
+def add_workspace_member(
+    workspace_id: str,
+    payload: AddWorkspaceMemberRequest,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(get_current_user_from_header),
+) -> WorkspaceMemberResponse:
+    """Add an existing user to a workspace."""
+    _require_workspace_admin(session, workspace_id, user)
+    role = _validate_workspace_role(payload.role)
+    target_user = session.exec(select(User).where(User.username == payload.username)).first()
+    if target_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    existing = _get_workspace_membership(session, workspace_id, target_user.id)
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="User is already a workspace member")
+    member = WorkspaceMember(workspace_id=workspace_id, user_id=target_user.id, role=role)
+    session.add(member)
+    session.commit()
+    session.refresh(member)
+    return _workspace_member_to_response(session, member)
+
+
+@router.patch("/workspaces/{workspace_id}/members/{member_id}", response_model=WorkspaceMemberResponse)
+def update_workspace_member(
+    workspace_id: str,
+    member_id: str,
+    payload: UpdateWorkspaceMemberRequest,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(get_current_user_from_header),
+) -> WorkspaceMemberResponse:
+    """Update a member role inside a workspace."""
+    _require_workspace_admin(session, workspace_id, user)
+    role = _validate_workspace_role(payload.role)
+    member = session.get(WorkspaceMember, member_id)
+    if member is None or member.workspace_id != workspace_id:
+        raise HTTPException(status_code=404, detail="Workspace member not found")
+    _ensure_owner_can_change(session, member, role)
+    member.role = role
+    session.add(member)
+    session.commit()
+    session.refresh(member)
+    return _workspace_member_to_response(session, member)
+
+
+@router.delete("/workspaces/{workspace_id}/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+def remove_workspace_member(
+    workspace_id: str,
+    member_id: str,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(get_current_user_from_header),
+) -> None:
+    """Remove a member from a workspace."""
+    _require_workspace_admin(session, workspace_id, user)
+    member = session.get(WorkspaceMember, member_id)
+    if member is None or member.workspace_id != workspace_id:
+        raise HTTPException(status_code=404, detail="Workspace member not found")
+    _ensure_owner_can_change(session, member)
+    session.delete(member)
+    session.commit()
