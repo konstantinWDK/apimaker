@@ -13,6 +13,11 @@ from .db_models import DbConnection, Project, User, Workspace, WorkspaceMember
 from .services.jwt_service import decode_token
 
 
+PROJECT_READ_ROLES = {"viewer", "member", "editor", "admin", "owner"}
+PROJECT_WRITE_ROLES = {"member", "editor", "admin", "owner"}
+PROJECT_ADMIN_ROLES = {"admin", "owner"}
+
+
 class CurrentUser:
     """Represents the authenticated user from JWT token."""
 
@@ -125,10 +130,15 @@ def _resolve_project(session: Session, project_id: str) -> Project:
 
 def user_can_access_project(session: Session, project: Project, user: CurrentUser) -> bool:
     """Check whether the user can access a project."""
+    return get_project_role(session, project, user) in PROJECT_READ_ROLES
+
+
+def get_project_role(session: Session, project: Project, user: CurrentUser) -> str | None:
+    """Return the user's effective role for a project."""
     if user.role == "admin":
-        return True
+        return "admin"
     if project.created_by == user.user_id:
-        return True
+        return "owner"
     if project.workspace_id:
         membership = session.exec(
             select(WorkspaceMember).where(
@@ -136,8 +146,18 @@ def user_can_access_project(session: Session, project: Project, user: CurrentUse
                 WorkspaceMember.user_id == user.user_id,
             )
         ).first()
-        return membership is not None
-    return False
+        return membership.role if membership else None
+    return None
+
+
+def user_can_write_project(session: Session, project: Project, user: CurrentUser) -> bool:
+    """Check whether the user can mutate project resources."""
+    return get_project_role(session, project, user) in PROJECT_WRITE_ROLES
+
+
+def user_can_admin_project(session: Session, project: Project, user: CurrentUser) -> bool:
+    """Check whether the user can perform project administration actions."""
+    return get_project_role(session, project, user) in PROJECT_ADMIN_ROLES
 
 
 def require_project_access(
@@ -149,6 +169,30 @@ def require_project_access(
     project = _resolve_project(session, project_id)
     if not user_can_access_project(session, project, user):
         raise HTTPException(status_code=403, detail="Not allowed to access this project")
+    return project
+
+
+def require_project_write_access(
+    project_id: str,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(get_current_user_from_header),
+) -> Project:
+    """Resolve a project and require write permissions."""
+    project = _resolve_project(session, project_id)
+    if not user_can_write_project(session, project, user):
+        raise HTTPException(status_code=403, detail="Write access required for this project")
+    return project
+
+
+def require_project_admin_access(
+    project_id: str,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(get_current_user_from_header),
+) -> Project:
+    """Resolve a project and require owner/admin permissions."""
+    project = _resolve_project(session, project_id)
+    if not user_can_admin_project(session, project, user):
+        raise HTTPException(status_code=403, detail="Project admin access required")
     return project
 
 
@@ -164,6 +208,21 @@ def require_connection_access(
     project = _resolve_project(session, conn.project_id)
     if not user_can_access_project(session, project, user):
         raise HTTPException(status_code=403, detail="Not allowed to access this connection")
+    return conn
+
+
+def require_connection_write_access(
+    connection_id: str,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(get_current_user_from_header),
+) -> DbConnection:
+    """Resolve a database connection and require write access to its project."""
+    conn = session.get(DbConnection, connection_id)
+    if conn is None:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    project = _resolve_project(session, conn.project_id)
+    if not user_can_write_project(session, project, user):
+        raise HTTPException(status_code=403, detail="Write access required for this connection")
     return conn
 
 

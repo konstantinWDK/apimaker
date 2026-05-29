@@ -27,7 +27,14 @@ from ..models import (
     TableSchema,
     TestConnectionResult,
 )
-from ..security import CurrentUser, get_current_user_from_header, require_connection_access, require_project_access
+from ..security import (
+    CurrentUser,
+    get_current_user_from_header,
+    require_connection_access,
+    require_connection_write_access,
+    require_project_access,
+    require_project_write_access,
+)
 from ..services.data_source_explorer import DataSourceExplorer
 
 logger = logging.getLogger("doapi.connections")
@@ -103,7 +110,7 @@ def list_connections(project_id: str, session: Session = Depends(get_session), u
 
 
 @router.post("/project/{project_id}", response_model=DbConnectionResponse, status_code=201)
-def create_connection(project_id: str, req: DbConnectionCreate, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header), _project=Depends(require_project_access)):
+def create_connection(project_id: str, req: DbConnectionCreate, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header), _project=Depends(require_project_write_access)):
     conn = DbConnection(
         project_id=_project.id,
         name=req.name,
@@ -122,7 +129,7 @@ def create_connection(project_id: str, req: DbConnectionCreate, session: Session
 
 
 @router.put("/{connection_id}", response_model=DbConnectionResponse)
-def update_connection(connection_id: str, req: DbConnectionUpdate, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header), conn: DbConnection = Depends(require_connection_access)):
+def update_connection(connection_id: str, req: DbConnectionUpdate, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header), conn: DbConnection = Depends(require_connection_write_access)):
     if req.name is not None:
         conn.name = req.name
     if req.db_type is not None:
@@ -147,7 +154,7 @@ def update_connection(connection_id: str, req: DbConnectionUpdate, session: Sess
 
 
 @router.delete("/{connection_id}")
-def delete_connection(connection_id: str, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header), conn: DbConnection = Depends(require_connection_access)):
+def delete_connection(connection_id: str, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user_from_header), conn: DbConnection = Depends(require_connection_write_access)):
     session.delete(conn)
     session.commit()
     return {"ok": True}
@@ -206,7 +213,7 @@ def import_table(
     req: ImportTableRequest,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    conn: DbConnection = Depends(require_connection_access),
+    conn: DbConnection = Depends(require_connection_write_access),
 ):
     try:
         result = explorer.import_table(

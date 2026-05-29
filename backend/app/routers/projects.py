@@ -22,7 +22,15 @@ from ..models import (
     MappingRule as PydanticMappingRule,
     CreateMappingRuleRequest,
 )
-from ..security import CurrentUser, get_current_user_from_header, require_project_access
+from ..security import (
+    CurrentUser,
+    PROJECT_WRITE_ROLES,
+    get_current_user_from_header,
+    require_project_access,
+    require_project_admin_access,
+    require_project_write_access,
+    user_can_admin_project,
+)
 from ..openapi_builder import build_openapi_document
 from ..services.generation import run_generation
 from ..services.code_generator import get_latest_bundle_path
@@ -168,6 +176,8 @@ def create_project(
         ).first()
         if membership is None:
             raise HTTPException(status_code=403, detail="Not allowed to create projects in this workspace")
+        if membership.role not in PROJECT_WRITE_ROLES:
+            raise HTTPException(status_code=403, detail="Write access required for this workspace")
     db_project = project_service.create_project(
         session,
         name=payload.name,
@@ -236,7 +246,7 @@ def update_project(
     payload: UpdateProjectRequest,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    _project: DBProject = Depends(require_project_access),
+    _project: DBProject = Depends(require_project_write_access),
 ) -> PydanticProject:
     """Update project name, description, or target stack."""
     try:
@@ -281,7 +291,7 @@ def delete_project(
     project_id: str,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    _project: DBProject = Depends(require_project_access),
+    _project: DBProject = Depends(require_project_admin_access),
 ) -> None:
     try:
         resolved_id = project_service.resolve_id(session, project_id)
@@ -299,7 +309,7 @@ def upload_dataset(
     payload: UploadDatasetRequest,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    _project: DBProject = Depends(require_project_access),
+    _project: DBProject = Depends(require_project_write_access),
 ) -> PydanticProject:
     try:
         resolved_id = project_service.resolve_id(session, project_id)
@@ -340,7 +350,7 @@ def define_endpoints(
     payload: DefineEndpointsRequest,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    _project: DBProject = Depends(require_project_access),
+    _project: DBProject = Depends(require_project_write_access),
 ) -> PydanticProject:
     try:
         resolved_id = project_service.resolve_id(session, project_id)
@@ -411,7 +421,7 @@ def create_mapping(
     payload: CreateMappingRuleRequest,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    _project: DBProject = Depends(require_project_access),
+    _project: DBProject = Depends(require_project_write_access),
 ) -> PydanticMappingRule:
     try:
         resolved_id = project_service.resolve_id(session, project_id)
@@ -439,7 +449,7 @@ def delete_mapping(
     mapping_id: str,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    _project: DBProject = Depends(require_project_access),
+    _project: DBProject = Depends(require_project_write_access),
 ) -> None:
     try:
         resolved_id = project_service.resolve_id(session, project_id)
@@ -457,7 +467,7 @@ def generate_artifacts(
     payload: GenerationRequest,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    _project: DBProject = Depends(require_project_access),
+    _project: DBProject = Depends(require_project_write_access),
 ) -> GenerationResult:
     try:
         resolved_id = project_service.resolve_id(session, project_id)
@@ -477,7 +487,7 @@ def create_generation_job(
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    _project: DBProject = Depends(require_project_access),
+    _project: DBProject = Depends(require_project_write_access),
 ) -> GenerationJobResponse:
     try:
         resolved_id = project_service.resolve_id(session, project_id)
@@ -537,6 +547,8 @@ def project_docs(
     request: Request,
     project_id: str,
     session: Session = Depends(get_session),
+    user: CurrentUser = Depends(get_current_user_from_header),
+    _project: DBProject = Depends(require_project_access),
 ) -> HTMLResponse:
     try:
         resolved_id = project_service.resolve_id(session, project_id)
@@ -633,8 +645,8 @@ def export_project(
             "slug": db_project.slug,
             "description": db_project.description,
             "auth_method": db_project.auth_method,
-            "api_key": db_project.api_key if include_secrets and user.role == "admin" else None,
-            "jwt_secret": db_project.jwt_secret if include_secrets and user.role == "admin" else None,
+            "api_key": db_project.api_key if include_secrets and user_can_admin_project(session, db_project, user) else None,
+            "jwt_secret": db_project.jwt_secret if include_secrets and user_can_admin_project(session, db_project, user) else None,
             "rate_limit": db_project.rate_limit,
             "target_stack": db_project.target_stack,
             "include_data": db_project.include_data,

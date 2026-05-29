@@ -7,7 +7,7 @@ from sqlmodel import Session, select
 
 from ..db import get_session
 from ..db_models import Project
-from ..security import CurrentUser, get_current_user_from_header, require_admin, require_project_access
+from ..security import CurrentUser, get_current_user_from_header, require_admin, require_project_access, require_project_write_access
 from ..services.mock_server import get_mock_status_fn, start_mock_server_fn, stop_mock_server_fn, router as mock_api_router
 
 
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/projects", tags=["mock"])
 def mock_start(
     project_id: str,
     session: Session = Depends(get_session),
-    _project: Project = Depends(require_project_access),
+    _project: Project = Depends(require_project_write_access),
 ) -> dict:
     """Start mock server for a project."""
     try:
@@ -34,7 +34,7 @@ def mock_start(
 def mock_stop(
     project_id: str,
     session: Session = Depends(get_session),
-    _project: Project = Depends(require_project_access),
+    _project: Project = Depends(require_project_write_access),
 ) -> dict:
     """Stop mock server for a project."""
     try:

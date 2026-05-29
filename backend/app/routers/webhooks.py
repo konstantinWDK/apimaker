@@ -18,7 +18,7 @@ from sqlmodel import Session, select
 from ..db import get_session
 from ..db_models import Webhook as DBWebhook, WebhookDelivery
 from ..db_models import Project as DBProject
-from ..security import CurrentUser, get_current_user_from_header, require_project_access
+from ..security import CurrentUser, get_current_user_from_header, require_project_access, require_project_write_access
 from ..services.product_ops import create_runtime_log, json_dumps
 
 router = APIRouter(prefix="/projects/{project_id}/webhooks", tags=["webhooks"])
@@ -125,7 +125,7 @@ def create_webhook(
     payload: CreateWebhookRequest,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    _project: DBProject = Depends(require_project_access),
+    _project: DBProject = Depends(require_project_write_access),
 ) -> WebhookResponse:
     from ..services.project_service import project_service
     resolved_id = project_service.resolve_id(session, project_id)
@@ -154,7 +154,7 @@ def update_webhook(
     payload: UpdateWebhookRequest,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    project: DBProject = Depends(require_project_access),
+    project: DBProject = Depends(require_project_write_access),
 ) -> WebhookResponse:
     webhook = session.get(DBWebhook, webhook_id)
     if not webhook or webhook.project_id != project.id:
@@ -185,7 +185,7 @@ def delete_webhook(
     webhook_id: str,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    project: DBProject = Depends(require_project_access),
+    project: DBProject = Depends(require_project_write_access),
 ) -> None:
     webhook = session.get(DBWebhook, webhook_id)
     if not webhook or webhook.project_id != project.id:

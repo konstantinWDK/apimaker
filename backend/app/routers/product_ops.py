@@ -22,7 +22,7 @@ from ..db_models import (
     RuntimeLog,
     SavedQuery,
 )
-from ..security import CurrentUser, get_current_user_from_header, require_project_access
+from ..security import CurrentUser, get_current_user_from_header, require_project_access, require_project_write_access
 from ..services.project_service import project_service
 from ..services.product_ops import (
     build_project_snapshot,
@@ -158,7 +158,7 @@ def create_datasource(
     payload: DatasourcePayload,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    project: DBProject = Depends(require_project_access),
+    project: DBProject = Depends(require_project_write_access),
 ) -> dict:
     _ensure_project_connection(session, project.id, payload.connection_id)
     ds = Datasource(
@@ -183,7 +183,7 @@ def update_datasource(
     payload: DatasourcePayload,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    project: DBProject = Depends(require_project_access),
+    project: DBProject = Depends(require_project_write_access),
 ) -> dict:
     ds = session.get(Datasource, datasource_id)
     if not ds or ds.project_id != project.id:
@@ -207,7 +207,7 @@ def delete_datasource(
     datasource_id: str,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    project: DBProject = Depends(require_project_access),
+    project: DBProject = Depends(require_project_write_access),
 ) -> None:
     ds = session.get(Datasource, datasource_id)
     if not ds or ds.project_id != project.id:
@@ -233,7 +233,7 @@ def create_query(
     payload: QueryPayload,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    project: DBProject = Depends(require_project_access),
+    project: DBProject = Depends(require_project_write_access),
 ) -> dict:
     _ensure_project_connection(session, project.id, payload.connection_id)
     _ensure_project_datasource(session, project.id, payload.datasource_id)
@@ -367,7 +367,7 @@ def create_release(
     payload: ReleasePayload,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    project: DBProject = Depends(require_project_access),
+    project: DBProject = Depends(require_project_write_access),
 ) -> dict:
     release = create_project_release(session, project.id, payload.message, user.user_id)
     return {"id": release.id, "version": release.version, "is_active": release.is_active, "created_at": release.created_at.isoformat()}
@@ -411,7 +411,7 @@ def create_automation(
     payload: AutomationPayload,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    project: DBProject = Depends(require_project_access),
+    project: DBProject = Depends(require_project_write_access),
 ) -> dict:
     automation = Automation(
         project_id=project.id,
@@ -433,7 +433,7 @@ async def test_automation(
     payload: dict[str, Any] | None = None,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    project: DBProject = Depends(require_project_access),
+    project: DBProject = Depends(require_project_write_access),
 ) -> dict:
     automation = session.get(Automation, automation_id)
     if not automation or automation.project_id != project.id:
@@ -484,7 +484,7 @@ def import_contract(
     payload: ImportPayload,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    project: DBProject = Depends(require_project_access),
+    project: DBProject = Depends(require_project_write_access),
 ) -> dict:
     """Import OpenAPI/Postman routes as endpoint definitions in the current project."""
     endpoints: list[dict] = []

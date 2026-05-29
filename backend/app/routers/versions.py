@@ -10,7 +10,7 @@ from sqlmodel import Session
 
 from ..db import get_session
 from ..db_models import Project as DBProject
-from ..security import CurrentUser, get_current_user_from_header, require_project_access
+from ..security import CurrentUser, get_current_user_from_header, require_project_access, require_project_write_access
 from ..services.project_service import project_service
 from ..services.version_service import version_service
 
@@ -80,7 +80,7 @@ def create_version(
     payload: CreateVersionRequest,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    _project: DBProject = Depends(require_project_access),
+    _project: DBProject = Depends(require_project_write_access),
 ) -> VersionResponse:
     resolved_id = project_service.resolve_id(session, project_id)
     version = version_service.create_version(session, resolved_id, payload.message)
@@ -99,7 +99,7 @@ def restore_version(
     version_id: str,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user_from_header),
-    _project: DBProject = Depends(require_project_access),
+    _project: DBProject = Depends(require_project_write_access),
 ) -> dict:
     resolved_id = project_service.resolve_id(session, project_id)
     try:
