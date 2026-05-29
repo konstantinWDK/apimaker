@@ -7,16 +7,15 @@ import hashlib
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine import URL, make_url
+from sqlalchemy.engine import URL
 from sqlmodel import Session, select
 
 from ..config import get_settings
-from ..db import DATABASE_URL, get_session
+from ..db import get_session
 from ..db_models import DbConnection
 from ..models import (
-    AppDatabaseConnectionCreate,
     DbConnectionCreate,
     DbConnectionResponse,
     DbConnectionUpdate,
@@ -101,62 +100,6 @@ def _build_sqlalchemy_url(conn: DbConnection, password: str | None = None) -> st
 
 # ── CRUD Endpoints ──
 
-def _db_connection_from_database_url(project_id: str, name: str, database_url: str) -> DbConnection:
-    """Create a connection from the app database URL without exposing secrets."""
-    url = make_url(database_url)
-    driver = url.drivername.split("+", 1)[0]
-    db_type = {
-        "postgresql": "postgresql",
-        "postgres": "postgresql",
-        "mysql": "mysql",
-        "sqlite": "sqlite",
-        "mssql": "mssql",
-    }.get(driver)
-    if not db_type:
-        raise HTTPException(status_code=400, detail=f"Tipo de base de datos no soportado: {url.drivername}")
-
-    query = dict(url.query)
-    return DbConnection(
-        project_id=project_id,
-        name=name,
-        db_type=db_type,
-        host=url.host if db_type != "sqlite" else None,
-        port=url.port,
-        username=url.username,
-        password_encrypted=_encrypt_password(url.password) if url.password else None,
-        database=url.database,
-        ssl_mode=query.get("sslmode") or query.get("ssl"),
-    )
-
-
-def _upsert_connection_from_app_database(session: Session, project_id: str, name: str) -> DbConnection:
-    existing = session.exec(
-        select(DbConnection).where(
-            DbConnection.project_id == project_id,
-            DbConnection.name == name,
-        )
-    ).first()
-    parsed = _db_connection_from_database_url(project_id, name, DATABASE_URL)
-    if existing:
-        existing.db_type = parsed.db_type
-        existing.host = parsed.host
-        existing.port = parsed.port
-        existing.username = parsed.username
-        existing.password_encrypted = parsed.password_encrypted
-        existing.database = parsed.database
-        existing.ssl_mode = parsed.ssl_mode
-        existing.updated_at = datetime.now(timezone.utc)
-        session.add(existing)
-        session.commit()
-        session.refresh(existing)
-        return existing
-
-    session.add(parsed)
-    session.commit()
-    session.refresh(parsed)
-    return parsed
-
-
 explorer = DataSourceExplorer(_build_sqlalchemy_url, _decrypt_password)
 
 
@@ -182,19 +125,6 @@ def create_connection(project_id: str, req: DbConnectionCreate, session: Session
     session.add(conn)
     session.commit()
     session.refresh(conn)
-    return _db_connection_to_response(conn)
-
-
-@router.post("/project/{project_id}/app-database", response_model=DbConnectionResponse, status_code=201)
-def create_app_database_connection(
-    project_id: str,
-    req: AppDatabaseConnectionCreate | None = Body(default=None),
-    session: Session = Depends(get_session),
-    user: CurrentUser = Depends(get_current_user_from_header),
-    _project=Depends(require_project_write_access),
-):
-    name = (req.name if req else "Base de datos de la app").strip() or "Base de datos de la app"
-    conn = _upsert_connection_from_app_database(session, _project.id, name)
     return _db_connection_to_response(conn)
 
 

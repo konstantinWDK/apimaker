@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ColumnInfo, DbConnectionInfo, ImportTableResult, TableInfo, TablePreview } from '../lib/api'
 import {
-  createAppDatabaseConnection,
   createConnection,
   deleteConnection,
   getTableSchema,
@@ -26,7 +25,6 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({ name: '', db_type: 'postgresql', host: '', port: 5432, username: '', password: '', database: '' })
-  const [creatingAppDb, setCreatingAppDb] = useState(false)
   const [testingId, setTestingId] = useState<string | null>(null)
   const [testResults, setTestResults] = useState<Record<string, { success: boolean; message: string }>>({})
   const [exploringId, setExploringId] = useState<string | null>(null)
@@ -60,6 +58,7 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
   const handleSave = async () => {
     if (!form.name.trim()) { toast(t('connectionManager.nameRequired'), 'error'); return }
     try {
+      let saved: DbConnectionInfo
       if (editingId) {
         const updates: any = { name: form.name, db_type: form.db_type }
         if (form.host) updates.host = form.host
@@ -67,14 +66,15 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
         if (form.username) updates.username = form.username
         if (form.password) updates.password = form.password
         if (form.database) updates.database = form.database
-        await updateConnection(editingId, updates)
+        saved = await updateConnection(editingId, updates)
         toast(t('connectionManager.updated'), 'info')
       } else {
-        await createConnection(projectId, form)
+        saved = await createConnection(projectId, form)
         toast(t('connectionManager.created'), 'info')
       }
       resetForm()
-      load()
+      await load()
+      await handleTest(saved.id)
     } catch (e: any) { toast(e.message, 'error') }
   }
 
@@ -87,20 +87,6 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
       setTestResults(prev => ({ ...prev, [id]: { success: false, message: e.message } }))
     }
     setTestingId(null)
-  }
-
-  const handleUseAppDatabase = async () => {
-    setCreatingAppDb(true)
-    try {
-      const connection = await createAppDatabaseConnection(projectId)
-      await load()
-      await handleTest(connection.id)
-      toast(t('connectionManager.appDbCreated'), 'info')
-    } catch (e: any) {
-      toast(e.message, 'error')
-    } finally {
-      setCreatingAppDb(false)
-    }
   }
 
   const handleDelete = async (id: string, name: string) => {
@@ -169,9 +155,6 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
           <p className="conn-mgr__subtitle">{t('connectionManager.subtitle')}</p>
         </div>
         <div className="conn-mgr__header-actions">
-          <button type="button" className="btn ghost btn-small" onClick={handleUseAppDatabase} disabled={creatingAppDb}>
-            {creatingAppDb ? t('connectionManager.creatingAppDb') : t('connectionManager.useAppDatabase')}
-          </button>
           <button type="button" className="btn primary btn-small" onClick={startNewConnection}>
             + {t('connectionManager.newConnection')}
           </button>

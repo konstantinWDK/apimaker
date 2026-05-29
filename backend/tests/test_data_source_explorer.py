@@ -13,7 +13,6 @@ from sqlmodel import Session, select
 from app.db import engine
 from app.db_models import Dataset, DatasetField, Endpoint, User
 from app.main import app
-from app.routers.connections import _db_connection_from_database_url, _decrypt_password
 from app.services.jwt_service import hash_password
 
 
@@ -68,40 +67,6 @@ def _create_external_sqlite(path: Path) -> None:
         connection.commit()
     finally:
         connection.close()
-
-
-def test_app_database_url_can_be_converted_to_safe_connection() -> None:
-    conn = _db_connection_from_database_url(
-        project_id="project-1",
-        name="App DB",
-        database_url="postgresql+psycopg2://doapi:secret@localhost:5432/doapi?sslmode=prefer",
-    )
-
-    assert conn.project_id == "project-1"
-    assert conn.name == "App DB"
-    assert conn.db_type == "postgresql"
-    assert conn.host == "localhost"
-    assert conn.port == 5432
-    assert conn.username == "doapi"
-    assert conn.database == "doapi"
-    assert conn.ssl_mode == "prefer"
-    assert conn.password_encrypted != "secret"
-    assert _decrypt_password(conn.password_encrypted or "") == "secret"
-
-
-def test_sqlite_app_database_url_can_be_converted_to_connection() -> None:
-    conn = _db_connection_from_database_url(
-        project_id="project-1",
-        name="SQLite App DB",
-        database_url="sqlite:///./app/data/doapi.db",
-    )
-
-    assert conn.db_type == "sqlite"
-    assert conn.host is None
-    assert conn.port is None
-    assert conn.username is None
-    assert conn.database == "./app/data/doapi.db"
-    assert conn.password_encrypted is None
 
 
 def test_sqlite_datasource_explorer_imports_table_as_dataset(tmp_path: Path) -> None:
