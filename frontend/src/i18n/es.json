@@ -897,7 +897,7 @@
   "connectionManager.created": "Conexión creada",
   "connectionManager.database": "Base de datos",
   "connectionManager.deleted": "Conexión eliminada",
-  "connectionManager.dockerHostHint": "Introduce los datos tal como los puede alcanzar el backend. En local con PostgreSQL en Docker suele funcionar localhost:5432; si el backend corre dentro de Docker, usa el nombre del servicio o una IP accesible.",
+  "connectionManager.dockerHostHint": "Introduce los datos tal como los puede alcanzar el backend. En Windows/local con PostgreSQL en Docker usa 127.0.0.1:5432 para evitar problemas con localhost/IPv6; si el backend corre dentro de Docker, usa el nombre del servicio o una IP accesible.",
   "connectionManager.filePath": "Ruta del archivo",
   "connectionManager.host": "Host",
   "connectionManager.importAsDataset": "Importar tabla como dataset",

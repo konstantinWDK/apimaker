@@ -85,7 +85,7 @@ def _build_sqlalchemy_url(conn: DbConnection, password: str | None = None) -> st
             return f"sqlite:///{conn.database}"
         return "sqlite://"
 
-    host = conn.host or "localhost"
+    host = _normalize_host(conn.host or "localhost")
     port = conn.port or {"postgresql": 5432, "mysql": 3306, "mssql": 1433}.get(db_type, 5432)
     db = conn.database or ""
 
@@ -99,6 +99,10 @@ def _build_sqlalchemy_url(conn: DbConnection, password: str | None = None) -> st
 
 
 # ── CRUD Endpoints ──
+
+def _normalize_host(host: str) -> str:
+    return "127.0.0.1" if host.strip().lower() in {"localhost", "::1"} else host.strip()
+
 
 explorer = DataSourceExplorer(_build_sqlalchemy_url, _decrypt_password)
 

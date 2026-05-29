@@ -24,7 +24,7 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
   const [connections, setConnections] = useState<DbConnectionInfo[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState({ name: '', db_type: 'postgresql', host: '', port: 5432, username: '', password: '', database: '' })
+  const [form, setForm] = useState({ name: '', db_type: 'postgresql', host: '127.0.0.1', port: 5432, username: '', password: '', database: '' })
   const [testingId, setTestingId] = useState<string | null>(null)
   const [testResults, setTestResults] = useState<Record<string, { success: boolean; message: string }>>({})
   const [exploringId, setExploringId] = useState<string | null>(null)
@@ -47,7 +47,7 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
   const resetForm = () => {
     setShowForm(false)
     setEditingId(null)
-    setForm({ name: '', db_type: 'postgresql', host: '', port: 5432, username: '', password: '', database: '' })
+    setForm({ name: '', db_type: 'postgresql', host: '127.0.0.1', port: 5432, username: '', password: '', database: '' })
   }
 
   const startNewConnection = () => {
@@ -178,7 +178,7 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
             {form.db_type !== 'sqlite' && (
               <>
                 <label className="form-field"><span className="label">{t('connectionManager.host')}</span>
-                  <input className="field" value={form.host} onChange={e => setForm({ ...form, host: e.target.value })} placeholder="localhost" /></label>
+                  <input className="field" value={form.host} onChange={e => setForm({ ...form, host: e.target.value })} placeholder="127.0.0.1" /></label>
                 <label className="form-field"><span className="label">{t('connectionManager.port')}</span>
                   <input className="field" type="number" value={form.port} onChange={e => setForm({ ...form, port: parseInt(e.target.value) || 5432 })} /></label>
                 <label className="form-field"><span className="label">{t('connectionManager.user')}</span>

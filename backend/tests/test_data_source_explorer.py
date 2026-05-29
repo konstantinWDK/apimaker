@@ -11,8 +11,9 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from app.db import engine
-from app.db_models import Dataset, DatasetField, Endpoint, User
+from app.db_models import Dataset, DatasetField, DbConnection, Endpoint, User
 from app.main import app
+from app.routers.connections import _build_sqlalchemy_url
 from app.services.jwt_service import hash_password
 
 
@@ -67,6 +68,23 @@ def _create_external_sqlite(path: Path) -> None:
         connection.commit()
     finally:
         connection.close()
+
+
+def test_connection_url_normalizes_localhost_to_ipv4() -> None:
+    connection = DbConnection(
+        project_id="project-1",
+        name="Local Postgres",
+        db_type="postgresql",
+        host="localhost",
+        port=5432,
+        username="doapi",
+        database="doapi",
+    )
+
+    url = _build_sqlalchemy_url(connection, "secret")
+
+    assert "127.0.0.1" in url
+    assert "localhost" not in url
 
 
 def test_sqlite_datasource_explorer_imports_table_as_dataset(tmp_path: Path) -> None:

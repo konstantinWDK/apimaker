@@ -896,7 +896,7 @@
   "connectionManager.created": "Connection created",
   "connectionManager.database": "Database",
   "connectionManager.deleted": "Connection deleted",
-  "connectionManager.dockerHostHint": "Enter connection details as reachable by the backend. In local mode with PostgreSQL in Docker, localhost:5432 usually works; if the backend runs inside Docker, use the service name or a reachable IP.",
+  "connectionManager.dockerHostHint": "Enter connection details as reachable by the backend. On Windows/local with PostgreSQL in Docker, use 127.0.0.1:5432 to avoid localhost/IPv6 issues; if the backend runs inside Docker, use the service name or a reachable IP.",
   "connectionManager.filePath": "File Path",
   "connectionManager.host": "Host",
   "connectionManager.importAsDataset": "Import table as dataset",
