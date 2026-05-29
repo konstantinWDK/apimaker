@@ -398,7 +398,45 @@ class ProjectService:
     def delete_project(self, session: Session, project_id: str) -> None:
         project = self.get_project(session, project_id)
 
-        # Cascade delete related data
+        from ..db_models import (
+            Automation,
+            AutomationRun,
+            DbConnection,
+            Datasource,
+            GenerationJob,
+            MockRecord,
+            ProjectRelease,
+            ProjectVersion,
+            RuntimeLog,
+            SavedQuery,
+            ShareSnapshot,
+            Webhook,
+            WebhookDelivery,
+        )
+
+        # Delete runtime/dependent resources before their parents.
+        for model in (AutomationRun, WebhookDelivery):
+            rows = session.exec(select(model).where(model.project_id == str(project_id))).all()
+            for row in rows:
+                session.delete(row)
+
+        for model in (
+            SavedQuery,
+            Automation,
+            ProjectRelease,
+            ProjectVersion,
+            RuntimeLog,
+            Webhook,
+            MockRecord,
+            GenerationJob,
+            Datasource,
+            DbConnection,
+            ShareSnapshot,
+        ):
+            rows = session.exec(select(model).where(model.project_id == str(project_id))).all()
+            for row in rows:
+                session.delete(row)
+
         existing_endpoints = session.exec(
             select(Endpoint).where(Endpoint.project_id == str(project_id))
         ).all()

@@ -443,24 +443,20 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
   },
 
   deleteProject: async (id: string) => {
-    // First try to delete from DB (requires remoteId)
     const project = get().projects.find(p => p.id === id)
     if (project && (project.remoteId || project.id)) {
-      try {
-        await deleteRemoteProject(project.remoteId || project.id)
-      } catch {
-        // Ignore backend errors during local deletion
-      }
+      await deleteRemoteProject(project.remoteId || project.id)
     }
-    // Also clear from localStorage if it's the current project
+
     const state = get()
+    const remaining = state.projects.filter(p => p.id !== id)
     if (state.project.id === id) {
-      const remaining = get().projects.filter(p => p.id !== id)
       const next = remaining.length > 0 ? remaining[0] : createDefaultProject()
       persist(next, null)
-      set({ project: next, selectedDatasetId: null })
+      set({ project: next, projects: remaining, selectedDatasetId: null })
+    } else {
+      set({ projects: remaining })
     }
-    // Refresh projects list
     await get().refreshProjects()
   },
 

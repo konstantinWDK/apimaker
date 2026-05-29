@@ -178,6 +178,10 @@ class DbConnectionCreate(BaseModel):
     ssl_mode: str | None = None
 
 
+class AppDatabaseConnectionCreate(BaseModel):
+    name: str = "Base de datos de la app"
+
+
 class DbConnectionUpdate(BaseModel):
     name: str | None = None
     db_type: str | None = None

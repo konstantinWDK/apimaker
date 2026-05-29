@@ -67,4 +67,36 @@ describe('useProjectBuilder store', () => {
     
     expect(useProjectBuilder.getState().mockRunning).toBe(false)
   })
+
+  it('should keep project visible when remote deletion fails', async () => {
+    vi.mocked(api.deleteRemoteProject).mockRejectedValue(new Error('Project admin access required'))
+    vi.mocked(api.fetchRemoteProjects).mockResolvedValue([])
+    useProjectBuilder.setState({
+      project: {
+        id: 'project-1',
+        remoteId: 'remote-1',
+        name: 'Protected Project',
+        description: '',
+        authMethod: 'none',
+        targetStack: 'fastapi',
+        endpoints: [],
+        datasets: [],
+      },
+      projects: [
+        {
+          id: 'project-1',
+          remoteId: 'remote-1',
+          name: 'Protected Project',
+          description: '',
+          authMethod: 'none',
+          targetStack: 'fastapi',
+          endpoints: [],
+          datasets: [],
+        },
+      ],
+    })
+
+    await expect(useProjectBuilder.getState().deleteProject('project-1')).rejects.toThrow('Project admin access required')
+    expect(useProjectBuilder.getState().projects).toHaveLength(1)
+  })
 })

@@ -187,8 +187,12 @@ export function App() {
             const p = projects.find(p => p.id === id)
             const name = p?.name || t('sidebar.newProject')
             if (window.confirm(t('app.deleteConfirm', { name }))) {
-              await deleteProject(id)
-              toast(t('app.deleted', { name }), 'info')
+              try {
+                await deleteProject(id)
+                toast(t('app.deleted', { name }), 'info')
+              } catch (error) {
+                toast(error instanceof Error ? error.message : 'No se pudo eliminar el proyecto', 'error')
+              }
             }
           }}
         />

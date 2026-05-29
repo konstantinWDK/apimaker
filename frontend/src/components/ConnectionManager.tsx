@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ColumnInfo, DbConnectionInfo, ImportTableResult, TableInfo, TablePreview } from '../lib/api'
 import {
+  createAppDatabaseConnection,
   createConnection,
   deleteConnection,
   getTableSchema,
@@ -25,6 +26,7 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({ name: '', db_type: 'postgresql', host: '', port: 5432, username: '', password: '', database: '' })
+  const [creatingAppDb, setCreatingAppDb] = useState(false)
   const [testingId, setTestingId] = useState<string | null>(null)
   const [testResults, setTestResults] = useState<Record<string, { success: boolean; message: string }>>({})
   const [exploringId, setExploringId] = useState<string | null>(null)
@@ -76,15 +78,6 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
     } catch (e: any) { toast(e.message, 'error') }
   }
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(t('connectionManager.confirmDelete').replace('{name}', name))) return
-    try {
-      await deleteConnection(id)
-      toast(t('connectionManager.deleted'), 'info')
-      load()
-    } catch (e: any) { toast(e.message, 'error') }
-  }
-
   const handleTest = async (id: string) => {
     setTestingId(id)
     try {
@@ -94,6 +87,29 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
       setTestResults(prev => ({ ...prev, [id]: { success: false, message: e.message } }))
     }
     setTestingId(null)
+  }
+
+  const handleUseAppDatabase = async () => {
+    setCreatingAppDb(true)
+    try {
+      const connection = await createAppDatabaseConnection(projectId)
+      await load()
+      await handleTest(connection.id)
+      toast(t('connectionManager.appDbCreated'), 'info')
+    } catch (e: any) {
+      toast(e.message, 'error')
+    } finally {
+      setCreatingAppDb(false)
+    }
+  }
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!window.confirm(t('connectionManager.confirmDelete').replace('{name}', name))) return
+    try {
+      await deleteConnection(id)
+      toast(t('connectionManager.deleted'), 'info')
+      load()
+    } catch (e: any) { toast(e.message, 'error') }
   }
 
   const handleExplore = async (id: string) => {
@@ -148,15 +164,24 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
   return (
     <div className="conn-mgr">
       <div className="conn-mgr__header">
-        <p className="conn-mgr__title">{t('connectionManager.title')}</p>
-        <button type="button" className="btn primary btn-small" onClick={startNewConnection}>
-          + {t('connectionManager.newConnection')}
-        </button>
+        <div>
+          <p className="conn-mgr__title">{t('connectionManager.title')}</p>
+          <p className="conn-mgr__subtitle">{t('connectionManager.subtitle')}</p>
+        </div>
+        <div className="conn-mgr__header-actions">
+          <button type="button" className="btn ghost btn-small" onClick={handleUseAppDatabase} disabled={creatingAppDb}>
+            {creatingAppDb ? t('connectionManager.creatingAppDb') : t('connectionManager.useAppDatabase')}
+          </button>
+          <button type="button" className="btn primary btn-small" onClick={startNewConnection}>
+            + {t('connectionManager.newConnection')}
+          </button>
+        </div>
       </div>
 
       {/* Form */}
       {showForm && (
         <div className="conn-mgr__form">
+          <p className="conn-mgr__hint">{t('connectionManager.dockerHostHint')}</p>
           <div className="conn-mgr__form-grid">
             <label className="form-field"><span className="label">{t('connectionManager.name')}</span>
               <input className="field" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder={t('connectionManager.namePlaceholder')} /></label>
@@ -303,8 +328,11 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
       <style>{`
         .conn-mgr { display: flex; flex-direction: column; gap: 0.75rem; }
         .conn-mgr__header { display: flex; justify-content: space-between; align-items: center; }
+        .conn-mgr__header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end; }
         .conn-mgr__title { margin: 0; font-size: 0.95rem; font-weight: 600; color: #1e293b; }
+        .conn-mgr__subtitle { margin: 0.15rem 0 0; font-size: 0.76rem; color: #64748b; max-width: 36rem; }
         .conn-mgr__form { border: 1px solid #e2e8f0; border-radius: 10px; padding: 1rem; background: #f8fafc; }
+        .conn-mgr__hint { margin: 0 0 0.75rem; font-size: 0.76rem; color: #475569; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 0.55rem 0.7rem; }
         .conn-mgr__form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.75rem; }
         .conn-mgr__form-actions { display: flex; gap: 0.5rem; }
         .conn-mgr__list { display: flex; flex-direction: column; gap: 0.5rem; }

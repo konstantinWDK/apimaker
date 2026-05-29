@@ -679,6 +679,14 @@ export const createConnection = async (projectId: string, data: any): Promise<Db
   return res.json()
 }
 
+export const createAppDatabaseConnection = async (projectId: string, name = 'Base de datos de la app'): Promise<DbConnectionInfo> => {
+  const res = await apiFetch(`/api/connections/project/${projectId}/app-database`, {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  })
+  return res.json()
+}
+
 export const updateConnection = async (id: string, data: any): Promise<DbConnectionInfo> => {
   const res = await apiFetch(`/api/connections/${id}`, {
     method: 'PUT', body: JSON.stringify(data),
