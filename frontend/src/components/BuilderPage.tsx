@@ -45,6 +45,9 @@ export function BuilderPage() {
   const [generationJob, setGenerationJob] = useState<GenerationJob | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
   const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'mappings' | 'connections' | 'result' | 'webhooks' | 'versions'>('datasets')
+  const [connectionsProjectId, setConnectionsProjectId] = useState<string | null>(project.slug || project.remoteId || null)
+  const [isPreparingConnections, setIsPreparingConnections] = useState(false)
+  const [connectionsError, setConnectionsError] = useState<string | null>(null)
   const [editingDatasetId, setEditingDatasetId] = useState<string | null>(null)
   const [mappings, setMappings] = useState<MappingRule[]>([])
   const localBaseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'
@@ -64,6 +67,22 @@ export function BuilderPage() {
   )
 
   const normalizePath = (path: string) => (path.startsWith('/') ? path : `/${path}`)
+
+  const openConnectionsTab = useCallback(async () => {
+    setActiveTab('connections')
+    setConnectionsError(null)
+    setIsPreparingConnections(true)
+    try {
+      const effectiveProjectId = await saveProject()
+      if (!effectiveProjectId) {
+        setConnectionsError(t('builder.datasourcesProjectError'))
+        return
+      }
+      setConnectionsProjectId(effectiveProjectId)
+    } finally {
+      setIsPreparingConnections(false)
+    }
+  }, [saveProject, t])
 
   const waitForGenerationJob = async (projectId: string, jobId: string) => {
     let lastJob = await getGenerationJob(projectId, jobId)
@@ -145,6 +164,11 @@ export function BuilderPage() {
   }, [project.lastGeneration])
 
   useEffect(() => {
+    setConnectionsProjectId(project.slug || project.remoteId || null)
+    setConnectionsError(null)
+  }, [project.id, project.slug, project.remoteId])
+
+  useEffect(() => {
     if (project.name) {
       document.title = `${project.name} | DoApi Studio`
     } else {
@@ -184,13 +208,13 @@ export function BuilderPage() {
   }, [project.slug, project.remoteId, project.datasets, toast, t])
 
   const handleImportTable = useCallback(async (result: ImportTableResult) => {
-    const pid = project.slug || project.remoteId || project.id
+    const pid = connectionsProjectId || project.slug || project.remoteId || project.id
     const updated = await fetchRemoteProject(pid)
     replaceProject(updated)
     setEditingDatasetId(result.dataset_id)
     setSelectedDatasetId(result.dataset_id)
     setActiveTab('datasets')
-  }, [project.slug, project.remoteId, project.id, replaceProject, setSelectedDatasetId])
+  }, [connectionsProjectId, project.slug, project.remoteId, project.id, replaceProject, setSelectedDatasetId])
 
   const handleRemoveMapping = useCallback(async (mappingId: string) => {
     const pid = project.slug || project.remoteId
@@ -266,7 +290,7 @@ export function BuilderPage() {
               }}>
                 {t('builder.newDataset')}
               </button>
-              <button type="button" className="btn ghost" onClick={() => setActiveTab('connections')}>
+              <button type="button" className="btn ghost" onClick={openConnectionsTab}>
                 {t('builder.importFromDatasource')}
               </button>
             </div>
@@ -290,7 +314,7 @@ export function BuilderPage() {
                 <div className="empty-state">
                   <p className="muted-text">{t('builder.noDatasetsHint')}</p>
                   <div className="empty-state__actions">
-                    <button type="button" className="btn ghost btn-small" onClick={() => setActiveTab('connections')}>
+                    <button type="button" className="btn ghost btn-small" onClick={openConnectionsTab}>
                       {t('builder.goToDatasources')}
                     </button>
                   </div>
@@ -334,10 +358,23 @@ export function BuilderPage() {
       case 'connections':
         return (
           <SectionCard title={t('builder.dataSources')} subtitle={t('builder.externalSourcesDesc')} accent="sky" fullWidth>
-            <ConnectionManager
-              projectId={project.slug || project.remoteId || project.id}
-              onImportTable={handleImportTable}
-            />
+            {isPreparingConnections ? (
+              <div className="empty-state">
+                <p className="muted-text">{t('builder.preparingDatasources')}</p>
+              </div>
+            ) : connectionsError || !connectionsProjectId ? (
+              <div className="empty-state">
+                <p className="error-text">{connectionsError || t('builder.datasourcesProjectError')}</p>
+                <button type="button" className="btn ghost btn-small" onClick={openConnectionsTab}>
+                  {t('builder.retryDatasources')}
+                </button>
+              </div>
+            ) : (
+              <ConnectionManager
+                projectId={connectionsProjectId}
+                onImportTable={handleImportTable}
+              />
+            )}
           </SectionCard>
         )
       case 'webhooks':
@@ -433,7 +470,11 @@ export function BuilderPage() {
             type="button"
             className={tab.id === activeTab ? 'tab-button active' : 'tab-button'}
             onClick={() => {
-              setActiveTab(tab.id as typeof activeTab)
+              if (tab.id === 'connections') {
+                void openConnectionsTab()
+              } else {
+                setActiveTab(tab.id as typeof activeTab)
+              }
               if (tab.id === 'endpoints') setSelectedDatasetId(null)
             }}
           >
