@@ -11,6 +11,12 @@ interface Props {
   onDelete: (id: string) => void
 }
 
+const isSameProject = (left: ProjectDraft, right: ProjectDraft) => {
+  const leftKeys = [left.id, left.remoteId, left.slug].filter(Boolean)
+  const rightKeys = [right.id, right.remoteId, right.slug].filter(Boolean)
+  return leftKeys.some((key) => rightKeys.includes(key))
+}
+
 export function ProjectSelector({ project, projects, onCreate, onSwitchProject, onDelete }: Props) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -68,7 +74,7 @@ export function ProjectSelector({ project, projects, onCreate, onSwitchProject, 
           {sorted.length === 0 ? (
             <p style={{ padding: '1rem', fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>{t('sidebar.saveHint')}</p>
           ) : sorted.map(item => {
-            const active = item.id === project.id
+            const active = isSameProject(item, project)
             return (
               <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                 <button

@@ -157,6 +157,35 @@ const isSameProject = (left: ProjectDraft, right: ProjectDraft) => {
   return leftKeys.some((key) => rightKeys.includes(key))
 }
 
+const upsertProject = (projects: ProjectDraft[], next: ProjectDraft) => {
+  let replaced = false
+  const merged: ProjectDraft[] = []
+
+  for (const project of projects) {
+    if (isSameProject(project, next)) {
+      if (!replaced) {
+        merged.push(next)
+        replaced = true
+      }
+      continue
+    }
+    merged.push(project)
+  }
+
+  return replaced ? merged : [next, ...merged]
+}
+
+const mergeProjectLists = (primary: ProjectDraft[], secondary: ProjectDraft[] = []) => {
+  let merged: ProjectDraft[] = []
+  for (const project of [...primary, ...secondary]) {
+    merged = upsertProject(merged, project)
+  }
+  return merged
+}
+
+const removeProject = (projects: ProjectDraft[], target: ProjectDraft) =>
+  projects.filter(project => !isSameProject(project, target))
+
 const initialProject = loadFromStorage()
 
 export const useProjectBuilder = create<BuilderState>((set, get) => ({
@@ -187,7 +216,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       persist(nextProject, state.selectedDatasetId)
 
       // Update the project in the projects list too
-      const nextProjects = state.projects.map(p => p.id === nextProject.id ? nextProject : p)
+      const nextProjects = upsertProject(state.projects, nextProject)
 
       // Queue API save
       if (nextProject.remoteId) {
@@ -220,7 +249,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       const nextProject = { ...state.project, datasets: nextDatasets, updatedAt: new Date().toISOString() }
       persist(nextProject, state.selectedDatasetId)
 
-      const nextProjects = state.projects.map(p => p.id === nextProject.id ? nextProject : p)
+      const nextProjects = upsertProject(state.projects, nextProject)
       if (nextProject.remoteId) {
         const saveId = nextProject.remoteId
         queueSave(async () => {
@@ -235,7 +264,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       const nextDatasets = state.project.datasets.filter((d) => d.id !== id)
       const nextProject = { ...state.project, datasets: nextDatasets, updatedAt: new Date().toISOString() }
       persist(nextProject, state.selectedDatasetId)
-      const nextProjects = state.projects.map(p => p.id === nextProject.id ? nextProject : p)
+      const nextProjects = upsertProject(state.projects, nextProject)
       return { project: nextProject, projects: nextProjects }
     }),
 
@@ -250,7 +279,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       persist(nextProject, state.selectedDatasetId)
 
       // Update the project in the projects list too
-      const nextProjects = state.projects.map(p => p.id === nextProject.id ? nextProject : p)
+      const nextProjects = upsertProject(state.projects, nextProject)
 
       // Queue API save
       if (nextProject.remoteId) {
@@ -269,7 +298,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       persist(nextProject, state.selectedDatasetId)
 
       // Update the project in the projects list too
-      const nextProjects = state.projects.map(p => p.id === nextProject.id ? nextProject : p)
+      const nextProjects = upsertProject(state.projects, nextProject)
 
       // Queue API save
       const saveId = nextProject.remoteId || nextProject.id
@@ -294,10 +323,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       // Auto-select first dataset
       const firstDsId = next.datasets.length > 0 ? next.datasets[0].id : null
 
-      const foundProject = state.projects.find(p => isSameProject(p, next))
-      const projects = foundProject
-        ? state.projects.map(p => (isSameProject(p, next) ? next : p))
-        : [next, ...state.projects]
+      const projects = upsertProject(state.projects, next)
 
       return { project: next, projects, history: state.history, mockRunning: false, selectedDatasetId: firstDsId }
     }),
@@ -380,23 +406,16 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
 
   loadProjects: (projects) =>
     set((state) => {
-      // SAFEGUARD: Always preserve the current localStorage project
-      let unifiedProjects = [...projects]
       const currentProject = state.project
-      const currentInBackend = projects.find(p => p.id === currentProject.id)
-
-      // Add current project to list if not already present
-      if (!currentInBackend) {
-        unifiedProjects = [currentProject, ...projects]
-      }
+      const currentInBackend = projects.find(p => isSameProject(p, currentProject))
+      const unifiedProjects = currentInBackend
+        ? mergeProjectLists(projects, [])
+        : upsertProject(projects, currentProject)
 
       const nextState: Partial<BuilderState> = { projects: unifiedProjects }
-
-      // Only replace current project if we have a valid backend project
-      // AND the current one is a stale remote project (not localStorage)
-      const currentExists = unifiedProjects.find(p => p.id === currentProject.id)
-      if (!currentExists && currentProject.remoteId && unifiedProjects.length > 0) {
-        nextState.project = unifiedProjects[0]
+      if (currentInBackend && currentProject.remoteId && currentProject.id !== currentInBackend.id) {
+        nextState.project = currentInBackend
+        persist(currentInBackend, state.selectedDatasetId)
       }
 
       return nextState as BuilderState
@@ -455,8 +474,9 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
     }
 
     const state = get()
-    const remaining = state.projects.filter(p => p.id !== id)
-    if (state.project.id === id) {
+    const target = project || state.projects.find(p => p.id === id)
+    const remaining = target ? removeProject(state.projects, target) : state.projects.filter(p => p.id !== id)
+    if (target && isSameProject(state.project, target)) {
       const next = remaining.length > 0 ? remaining[0] : createDefaultProject()
       persist(next, null)
       set({ project: next, projects: remaining, selectedDatasetId: null })
@@ -549,7 +569,7 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
         const finalId = currentProject.slug || effectiveId
         set((state) => ({
           project: { ...state.project, remoteId: finalId },
-          projects: state.projects.map(p => p.id === state.project.id ? { ...p, remoteId: finalId, slug: currentProject.slug } : p)
+          projects: upsertProject(state.projects, { ...state.project, remoteId: finalId, slug: currentProject.slug })
         }))
         effectiveId = finalId
       }

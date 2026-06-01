@@ -145,4 +145,53 @@ describe('useProjectBuilder store', () => {
     expect(state.projects).toHaveLength(1)
     expect(state.projects[0].datasets).toHaveLength(1)
   })
+
+  it('should deduplicate local and remote project entries when loading projects', () => {
+    useProjectBuilder.setState({
+      project: {
+        id: 'local-id',
+        remoteId: 'my-api',
+        slug: 'my-api',
+        name: 'My API Local',
+        description: '',
+        authMethod: 'none',
+        targetStack: 'fastapi',
+        endpoints: [],
+        datasets: [],
+      },
+      projects: [
+        {
+          id: 'local-id',
+          remoteId: 'my-api',
+          slug: 'my-api',
+          name: 'My API Local',
+          description: '',
+          authMethod: 'none',
+          targetStack: 'fastapi',
+          endpoints: [],
+          datasets: [],
+        },
+      ],
+    })
+
+    useProjectBuilder.getState().loadProjects([
+      {
+        id: 'backend-id',
+        remoteId: 'my-api',
+        slug: 'my-api',
+        name: 'My API Remote',
+        description: '',
+        authMethod: 'none',
+        targetStack: 'fastapi',
+        endpoints: [],
+        datasets: [{ id: 'remote-dataset', name: 'Remote', sourceType: 'database', fields: [], sampleRows: [] }],
+      },
+    ])
+
+    const state = useProjectBuilder.getState()
+    expect(state.project.id).toBe('backend-id')
+    expect(state.projects).toHaveLength(1)
+    expect(state.projects[0].id).toBe('backend-id')
+    expect(state.projects[0].datasets).toHaveLength(1)
+  })
 })
