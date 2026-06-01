@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import Any
 
 import sqlalchemy as sa
+from cryptography.fernet import InvalidToken
 from sqlalchemy import MetaData, Table, create_engine, inspect, select as sa_select, text
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, select as sqlmodel_select
@@ -31,18 +32,26 @@ class DataSourceExplorer:
         return create_engine(self._url_builder(conn, password), pool_pre_ping=True)
 
     def test_connection(self, conn: DbConnection) -> dict[str, Any]:
-        engine = self.build_engine(conn)
+        engine = None
         try:
+            engine = self.build_engine(conn)
             with engine.connect() as connection:
                 if conn.db_type == "sqlite":
                     version = connection.execute(text("select sqlite_version()")).scalar()
                 else:
                     version = connection.execute(text("select version()")).scalar()
             return {"success": True, "message": "Connection successful", "server_version": str(version or "")[:100]}
+        except InvalidToken:
+            return {
+                "success": False,
+                "message": "La contraseña guardada no se puede descifrar. Vuelve a introducir la contraseña o recrea la conexión.",
+                "server_version": None,
+            }
         except Exception as exc:
             return {"success": False, "message": str(exc)[:200], "server_version": None}
         finally:
-            engine.dispose()
+            if engine:
+                engine.dispose()
 
     def list_tables(self, conn: DbConnection, include_counts: bool = False) -> list[TableInfo]:
         engine = self.build_engine(conn)

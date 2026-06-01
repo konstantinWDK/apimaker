@@ -911,6 +911,7 @@
   "connectionManager.noTables": "No tables available",
   "connectionManager.nullable": "Nullable",
   "connectionManager.password": "Password",
+  "connectionManager.passwordRequired": "Password is required to save a database connection.",
   "connectionManager.port": "Port",
   "connectionManager.preview": "Preview",
   "connectionManager.save": "Save",

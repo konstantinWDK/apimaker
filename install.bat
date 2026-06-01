@@ -103,10 +103,12 @@ if /i "%USE_DOCKER%"=="y" (
 )
 
 call :random_hex JWT_SECRET 64
+call :random_urlsafe ENCRYPTION_KEY 48
 (
     echo APIMAKER_ENVIRONMENT=development
     echo APIMAKER_DATABASE_URL=%DB_URL_DOCKER%
     echo APIMAKER_JWT_SECRET_KEY=%JWT_SECRET%
+    echo APIMAKER_ENCRYPTION_KEY=%ENCRYPTION_KEY%
 ) > ".env"
 
 if "%NEED_DOCKER_DB%"=="true" (
@@ -305,6 +307,10 @@ exit /b 0
 
 :random_hex
 for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "([guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString('N')).Substring(0,%~2)"`) do set "%~1=%%A"
+exit /b 0
+
+:random_urlsafe
+for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "[Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(%~2)).TrimEnd('=').Replace('+','-').Replace('/','_')"`) do set "%~1=%%A"
 exit /b 0
 
 :require_cmd

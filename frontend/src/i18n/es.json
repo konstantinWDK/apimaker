@@ -912,6 +912,7 @@
   "connectionManager.noTables": "No hay tablas disponibles",
   "connectionManager.nullable": "Nullable",
   "connectionManager.password": "Contraseña",
+  "connectionManager.passwordRequired": "La contraseña es obligatoria para guardar una conexión de base de datos.",
   "connectionManager.port": "Puerto",
   "connectionManager.preview": "Vista previa",
   "connectionManager.save": "Guardar",

@@ -57,6 +57,10 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
 
   const handleSave = async () => {
     if (!form.name.trim()) { toast(t('connectionManager.nameRequired'), 'error'); return }
+    if (!editingId && form.db_type !== 'sqlite' && !form.password.trim()) {
+      toast(t('connectionManager.passwordRequired'), 'error')
+      return
+    }
     try {
       let saved: DbConnectionInfo
       if (editingId) {
