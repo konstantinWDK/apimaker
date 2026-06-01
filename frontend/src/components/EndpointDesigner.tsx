@@ -16,14 +16,16 @@ interface Props {
   clearWarning: () => void
 }
 
-const emptyEndpoint = (datasetId?: string): ApiEndpoint => ({
+const resourcePathFromName = (datasetName: string) => `/${datasetName.toLowerCase().replace(/\s+/g, '-')}`
+
+const emptyEndpoint = (dataset?: ProjectDraft['datasets'][number]): ApiEndpoint => ({
   id: crypto.randomUUID(),
-  name: '',
+  name: dataset ? `Listar ${dataset.name}` : '',
   method: 'GET',
-  path: '',
+  path: dataset ? resourcePathFromName(dataset.name) : '',
   summary: '',
-  operationType: 'custom',
-  targetDatasetId: datasetId,
+  operationType: 'list',
+  targetDatasetId: dataset?.id,
 })
 
 const METHOD_OPTIONS: ApiEndpoint['method'][] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
@@ -38,7 +40,7 @@ const METHOD_COLORS: Record<ApiEndpoint['method'], string> = {
 
 export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewBase, warningMessage, clearWarning }: Props) {
   const { t } = useTranslation()
-  const [draft, setDraft] = useState<ApiEndpoint>(emptyEndpoint(project.datasets[0]?.id))
+  const [draft, setDraft] = useState<ApiEndpoint>(emptyEndpoint(project.datasets[0]))
   const [editDraft, setEditDraft] = useState<ApiEndpoint | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -63,7 +65,7 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
       return
     }
     onAdd(draft)
-    setDraft(emptyEndpoint(draft.targetDatasetId))
+    setDraft(emptyEndpoint(project.datasets.find(d => d.id === draft.targetDatasetId)))
     setError(null)
     clearWarning()
   }
@@ -107,7 +109,7 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
   }
 
   const getOperationUpdates = (opType: ApiEndpoint['operationType'], datasetName: string): Partial<ApiEndpoint> => {
-    const resourcePath = `/${datasetName.toLowerCase().replace(/\s+/g, '-')}`
+    const resourcePath = resourcePathFromName(datasetName)
     switch (opType) {
       case 'list':
         return { method: 'GET', path: resourcePath, name: `Listar ${datasetName}`, summary: `Obtiene la lista de ${datasetName}` }
