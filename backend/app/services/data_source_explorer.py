@@ -166,6 +166,7 @@ class DataSourceExplorer:
             metadata={"connection_id": conn.id, "dataset_id": dataset.id, "table": table_name},
         )
         return {
+            "project_id": project_id,
             "dataset_id": dataset.id,
             "dataset_name": dataset.name,
             "table": table_name,

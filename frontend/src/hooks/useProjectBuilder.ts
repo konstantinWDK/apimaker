@@ -151,6 +151,12 @@ const persist = (project: ProjectDraft, selectedDatasetId: string | null) => {
   }
 }
 
+const isSameProject = (left: ProjectDraft, right: ProjectDraft) => {
+  const leftKeys = [left.id, left.remoteId, left.slug].filter(Boolean)
+  const rightKeys = [right.id, right.remoteId, right.slug].filter(Boolean)
+  return leftKeys.some((key) => rightKeys.includes(key))
+}
+
 const initialProject = loadFromStorage()
 
 export const useProjectBuilder = create<BuilderState>((set, get) => ({
@@ -288,9 +294,9 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
       // Auto-select first dataset
       const firstDsId = next.datasets.length > 0 ? next.datasets[0].id : null
 
-      // Ensure the project list also reflects this new project if it's not already there
-      const projects = state.projects.find(p => p.id === next.id)
-        ? state.projects
+      const foundProject = state.projects.find(p => isSameProject(p, next))
+      const projects = foundProject
+        ? state.projects.map(p => (isSameProject(p, next) ? next : p))
         : [next, ...state.projects]
 
       return { project: next, projects, history: state.history, mockRunning: false, selectedDatasetId: firstDsId }

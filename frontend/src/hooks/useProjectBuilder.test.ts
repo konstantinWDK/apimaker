@@ -99,4 +99,50 @@ describe('useProjectBuilder store', () => {
     await expect(useProjectBuilder.getState().deleteProject('project-1')).rejects.toThrow('Project admin access required')
     expect(useProjectBuilder.getState().projects).toHaveLength(1)
   })
+
+  it('should replace matching project by slug without duplicating it', () => {
+    useProjectBuilder.setState({
+      project: {
+        id: 'local-id',
+        remoteId: 'my-api',
+        slug: 'my-api',
+        name: 'My API',
+        description: '',
+        authMethod: 'none',
+        targetStack: 'fastapi',
+        endpoints: [],
+        datasets: [],
+      },
+      projects: [
+        {
+          id: 'local-id',
+          remoteId: 'my-api',
+          slug: 'my-api',
+          name: 'My API',
+          description: '',
+          authMethod: 'none',
+          targetStack: 'fastapi',
+          endpoints: [],
+          datasets: [],
+        },
+      ],
+    })
+
+    useProjectBuilder.getState().replaceProject({
+      id: 'backend-id',
+      remoteId: 'my-api',
+      slug: 'my-api',
+      name: 'My API',
+      description: '',
+      authMethod: 'none',
+      targetStack: 'fastapi',
+      endpoints: [],
+      datasets: [{ id: 'imported-dataset', name: 'Imported', sourceType: 'database', fields: [], sampleRows: [] }],
+    })
+
+    const state = useProjectBuilder.getState()
+    expect(state.project.id).toBe('backend-id')
+    expect(state.projects).toHaveLength(1)
+    expect(state.projects[0].datasets).toHaveLength(1)
+  })
 })

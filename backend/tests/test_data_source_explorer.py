@@ -144,6 +144,7 @@ def test_sqlite_datasource_explorer_imports_table_as_dataset(tmp_path: Path) -> 
     )
     assert imported.status_code == 201
     body = imported.json()
+    assert body["project_id"] == project_id
     assert body["fields_imported"] == 3
     assert len(body["endpoints_created"]) == 5
 

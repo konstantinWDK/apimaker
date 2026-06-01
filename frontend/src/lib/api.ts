@@ -665,6 +665,7 @@ export interface TablePreview {
 }
 
 export interface ImportTableResult {
+  project_id: string
   dataset_id: string
   dataset_name: string
   table: string

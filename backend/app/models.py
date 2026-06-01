@@ -237,6 +237,7 @@ class ImportTableRequest(BaseModel):
 
 
 class ImportTableResult(BaseModel):
+    project_id: str
     dataset_id: str
     dataset_name: str
     table: str

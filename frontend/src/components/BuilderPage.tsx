@@ -208,7 +208,7 @@ export function BuilderPage() {
   }, [project.slug, project.remoteId, project.datasets, toast, t])
 
   const handleImportTable = useCallback(async (result: ImportTableResult) => {
-    const pid = connectionsProjectId || project.slug || project.remoteId || project.id
+    const pid = result.project_id || connectionsProjectId || project.slug || project.remoteId || project.id
     const updated = await fetchRemoteProject(pid)
     replaceProject(updated)
     setEditingDatasetId(result.dataset_id)
