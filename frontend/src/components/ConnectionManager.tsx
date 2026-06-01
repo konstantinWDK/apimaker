@@ -154,10 +154,6 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
   return (
     <div className="conn-mgr">
       <div className="conn-mgr__header">
-        <div>
-          <p className="conn-mgr__title">{t('connectionManager.title')}</p>
-          <p className="conn-mgr__subtitle">{t('connectionManager.subtitle')}</p>
-        </div>
         <div className="conn-mgr__header-actions">
           <button type="button" className="btn primary btn-small" onClick={startNewConnection}>
             + {t('connectionManager.newConnection')}
@@ -314,7 +310,7 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
 
       <style>{`
         .conn-mgr { display: flex; flex-direction: column; gap: 0.75rem; }
-        .conn-mgr__header { display: flex; justify-content: space-between; align-items: center; }
+        .conn-mgr__header { display: flex; justify-content: flex-end; align-items: center; }
         .conn-mgr__header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end; }
         .conn-mgr__title { margin: 0; font-size: 0.95rem; font-weight: 600; color: #1e293b; }
         .conn-mgr__subtitle { margin: 0.15rem 0 0; font-size: 0.76rem; color: #64748b; max-width: 36rem; }
