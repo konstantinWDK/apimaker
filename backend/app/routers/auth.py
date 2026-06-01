@@ -1,7 +1,5 @@
 """JWT-based authentication endpoints."""
 
-from __future__ import annotations
-
 from datetime import datetime, timezone
 
 from sqlmodel import Session, select

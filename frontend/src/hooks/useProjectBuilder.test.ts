@@ -146,6 +146,104 @@ describe('useProjectBuilder store', () => {
     expect(state.projects[0].datasets).toHaveLength(1)
   })
 
+  it('should handle saveProject correctly when project has remoteId and update succeeds', async () => {
+    vi.mocked(api.updateProject).mockResolvedValue(true)
+    vi.mocked(api.fetchRemoteProjects).mockResolvedValue([])
+    window.sessionStorage.setItem('doapi-jwt-token', 'fake-token')
+
+    useProjectBuilder.setState({
+      project: {
+        id: 'local-id',
+        remoteId: 'my-api',
+        slug: 'my-api',
+        name: 'My API',
+        description: '',
+        authMethod: 'none',
+        targetStack: 'fastapi',
+        endpoints: [],
+        datasets: [],
+      },
+    })
+
+    const result = await useProjectBuilder.getState().saveProject()
+    expect(result).toBe('my-api')
+    window.sessionStorage.removeItem('doapi-jwt-token')
+  })
+
+  it('should return null from saveProject when update fails and recovery fails', async () => {
+    vi.mocked(api.updateProject).mockResolvedValue(false)
+    vi.mocked(api.fetchRemoteProjects).mockResolvedValue([])
+    vi.mocked(api.createProjectFromDraft).mockResolvedValue(null)
+
+    useProjectBuilder.setState({
+      project: {
+        id: 'local-id',
+        remoteId: 'my-api',
+        slug: 'my-api',
+        name: 'My API',
+        description: '',
+        authMethod: 'none',
+        targetStack: 'fastapi',
+        endpoints: [],
+        datasets: [],
+      },
+    })
+
+    const result = await useProjectBuilder.getState().saveProject()
+    expect(result).toBeNull()
+  })
+
+  it('should handle replaceProject with result.project_id matching current project remoteId', () => {
+    useProjectBuilder.setState({
+      project: {
+        id: 'local-uuid',
+        remoteId: 'my-api',
+        slug: 'my-api',
+        name: 'My API',
+        description: '',
+        authMethod: 'none',
+        targetStack: 'fastapi',
+        endpoints: [],
+        datasets: [],
+      },
+      projects: [
+        {
+          id: 'local-uuid',
+          remoteId: 'my-api',
+          slug: 'my-api',
+          name: 'My API',
+          description: '',
+          authMethod: 'none',
+          targetStack: 'fastapi',
+          endpoints: [],
+          datasets: [],
+        },
+      ],
+    })
+
+    // Simulate what handleImportTable does:
+    // fetchRemoteProject returns project with backend UUID
+    const backendProject = {
+      id: 'backend-uuid',
+      remoteId: 'my-api',
+      slug: 'my-api',
+      name: 'My API',
+      description: '',
+      authMethod: 'none',
+      targetStack: 'fastapi',
+      endpoints: [],
+      datasets: [{ id: 'new-dataset', name: 'Imported', sourceType: 'database', fields: [], sampleRows: [] }],
+    }
+
+    useProjectBuilder.getState().replaceProject(backendProject)
+
+    const state = useProjectBuilder.getState()
+    // Should replace, not duplicate
+    expect(state.projects).toHaveLength(1)
+    expect(state.project.datasets).toHaveLength(1)
+    expect(state.project.datasets[0].name).toBe('Imported')
+  })
+
   it('should deduplicate local and remote project entries when loading projects', () => {
     useProjectBuilder.setState({
       project: {

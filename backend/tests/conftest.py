@@ -11,7 +11,9 @@ os.environ.setdefault(
 )
 
 from app.db import create_db_and_tables  # noqa: E402
+from app.routers.auth import limiter  # noqa: E402
 
 
 def pytest_sessionstart(session) -> None:
     create_db_and_tables()
+    limiter.enabled = False

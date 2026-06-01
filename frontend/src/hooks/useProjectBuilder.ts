@@ -2,6 +2,7 @@ import { create } from 'zustand'
 
 import type { ApiEndpoint, DatasetMeta, ProjectDraft } from '../types/schemas'
 import { fireToast } from '../components/Toast'
+import { slugify } from '../lib/slug'
 import {
   fetchRemoteProjects,
   createProjectFromDraft,
@@ -58,6 +59,7 @@ export const createDefaultProject = (): ProjectDraft => {
   return {
     id,
     name: 'Nueva API',
+    slug: 'nueva-api',
     description: 'Diseña tu API declarando datos y endpoints',
     authMethod: 'none',
     targetStack: 'fastapi',
@@ -212,7 +214,11 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
 
   updateProject: (payload) =>
     set((state) => {
-      const nextProject = { ...state.project, ...payload, updatedAt: new Date().toISOString() }
+      let resolvedPayload = payload
+      if (payload.name !== undefined && payload.slug === undefined && !state.project.slug) {
+        resolvedPayload = { ...payload, slug: slugify(payload.name) }
+      }
+      const nextProject = { ...state.project, ...resolvedPayload, updatedAt: new Date().toISOString() }
       persist(nextProject, state.selectedDatasetId)
 
       // Update the project in the projects list too
@@ -498,6 +504,9 @@ export const useProjectBuilder = create<BuilderState>((set, get) => ({
     try {
       let effectiveId = project.remoteId
       let currentProject = { ...project }
+      if (!currentProject.slug) {
+        currentProject = { ...currentProject, slug: slugify(currentProject.name) }
+      }
 
       if (!effectiveId) {
         let created = await createProjectFromDraft(currentProject)

@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from app.db import engine
-from app.db_models import Dataset, DatasetField, DbConnection, Endpoint, User
+from app.db_models import Dataset, DatasetField, DbConnection, Endpoint, Project, User
 from app.main import app
 from app.routers.connections import _build_sqlalchemy_url
 from app.services.jwt_service import hash_password
@@ -156,6 +156,76 @@ def test_sqlite_datasource_explorer_imports_table_as_dataset(tmp_path: Path) -> 
         assert {field.name for field in fields} == {"id", "customer_id", "total"}
         endpoints = session.exec(select(Endpoint).where(Endpoint.target_dataset_id == dataset.id)).all()
         assert {endpoint.operation_type for endpoint in endpoints} == {"list", "get", "create", "update", "delete"}
+
+
+def test_import_does_not_create_additional_projects(tmp_path: Path) -> None:
+    source_db = tmp_path / "source_noextra.db"
+    _create_external_sqlite(source_db)
+    headers = _auth_headers()
+    project_id = _create_project(headers)
+
+    # Count projects before import
+    with Session(engine) as session:
+        before = len(session.exec(select(Project)).all())
+
+    created = client.post(
+        f"/api/connections/project/{project_id}",
+        headers=headers,
+        json={"name": "SQLite source", "db_type": "sqlite", "database": source_db.as_posix()},
+    )
+    assert created.status_code == 201
+    connection_id = created.json()["id"]
+
+    imported = client.post(
+        f"/api/connections/{connection_id}/import-table",
+        headers=headers,
+        json={"table_name": "customers", "dataset_name": "Customers", "sample_limit": 5},
+    )
+    assert imported.status_code == 201
+    body = imported.json()
+    assert body["project_id"] == project_id
+
+    # Verify no new project was created — the dataset is in the original project
+    with Session(engine) as session:
+        after = len(session.exec(select(Project)).all())
+        assert after == before, "Import should NOT create a new project"
+        ds = session.get(Dataset, body["dataset_id"])
+        assert ds is not None
+        assert ds.project_id == project_id
+
+
+def test_import_uses_correct_project_when_connection_belongs_to_project(tmp_path: Path) -> None:
+    # Create two projects and a connection on the first one
+    source_db = tmp_path / "source2.db"
+    _create_external_sqlite(source_db)
+    headers = _auth_headers()
+    project_a = _create_project(headers)
+    project_b = _create_project(headers)
+
+    created = client.post(
+        f"/api/connections/project/{project_a}",
+        headers=headers,
+        json={"name": "SQLite source", "db_type": "sqlite", "database": source_db.as_posix()},
+    )
+    assert created.status_code == 201
+    connection_id = created.json()["id"]
+
+    # Import table via the connection (belongs to project_a)
+    imported = client.post(
+        f"/api/connections/{connection_id}/import-table",
+        headers=headers,
+        json={"table_name": "customers", "dataset_name": "Customers", "sample_limit": 5},
+    )
+    assert imported.status_code == 201
+    body = imported.json()
+    assert body["project_id"] == project_a
+    assert body["project_id"] != project_b
+
+    # Verify dataset is attached to project_a, not project_b
+    with Session(engine) as session:
+        ds = session.get(Dataset, body["dataset_id"])
+        assert ds is not None
+        assert ds.project_id == project_a
 
 
 def test_import_creates_nested_endpoint_when_parent_table_is_imported(tmp_path: Path) -> None:

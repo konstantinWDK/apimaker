@@ -164,8 +164,9 @@ export function BuilderPage() {
   }, [project.lastGeneration])
 
   useEffect(() => {
-    setConnectionsProjectId(project.slug || project.remoteId || null)
-    setConnectionsError(null)
+    if (project.slug || project.remoteId) {
+      setConnectionsProjectId(project.slug || project.remoteId)
+    }
   }, [project.id, project.slug, project.remoteId])
 
   useEffect(() => {
