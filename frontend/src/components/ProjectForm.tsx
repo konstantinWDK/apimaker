@@ -112,6 +112,25 @@ export function ProjectForm({ project, onChange }: Props) {
           border-color: #bfdbfe;
           box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
         }
+        [data-theme="dark"] .label-tiny {
+          color: var(--text-secondary);
+        }
+        [data-theme="dark"] .stack-bubble {
+          background: var(--bg-tertiary);
+          border-color: var(--border-color);
+          color: var(--text-secondary);
+        }
+        [data-theme="dark"] .stack-bubble:hover {
+          background: var(--bg-hover);
+          border-color: var(--text-muted);
+          color: var(--text-primary);
+        }
+        [data-theme="dark"] .stack-bubble.active {
+          background: rgba(59, 130, 246, 0.18);
+          border-color: var(--accent-blue);
+          color: #bfdbfe;
+          box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.22);
+        }
       `}</style>
     </div>
   )
