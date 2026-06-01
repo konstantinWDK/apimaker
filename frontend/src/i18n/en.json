@@ -573,6 +573,7 @@
   "endpoint.namePathRequired": "Name and path are required",
   "endpoint.newTitle": "New endpoint",
   "endpoint.newDesc": "Select a dataset, choose the operation type and fill in the data. The path is auto-generated based on the type.",
+  "endpoint.operationType": "Operation type",
   "endpoint.dataset": "Dataset",
   "endpoint.method": "HTTP Method",
   "endpoint.path": "Path",

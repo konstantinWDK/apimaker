@@ -136,6 +136,7 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
 
   const selectedDs = project.datasets.find(d => d.id === draft.targetDatasetId)
   const selectedDsName = selectedDs?.name || 'items'
+  const cleanOperationLabel = (label: string) => label.replace(/^.*·\s*/, '')
 
   return (
     <div className="endpoint-designer">
@@ -159,24 +160,20 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
           {t('endpoint.newDesc')}
         </p>
 
-        {/* Operation type selector */}
-        <div className="endpoint-blueprint__ops">
-          {OPERATION_OPTIONS.map((op) => (
-            <button
-              key={op.value}
-              type="button"
-              className={`endpoint-blueprint__op ${draft.operationType === op.value ? 'active' : ''}`}
-              style={draft.operationType === op.value && op.method ? { borderColor: METHOD_COLORS[op.method as ApiEndpoint['method']], color: METHOD_COLORS[op.method as ApiEndpoint['method']] } : {}}
-              onClick={() => handleOperationChange(op.value)}
-            >
-              {op.label}
-            </button>
-          ))}
-        </div>
-        <p className="endpoint-blueprint__hint">{OPERATION_OPTIONS.find(o => o.value === draft.operationType)?.desc}</p>
-
         {/* Fields */}
         <div className="endpoint-blueprint__fields">
+          <div className="endpoint-blueprint__field">
+            <label>{t('endpoint.operationType')}</label>
+            <select
+              value={draft.operationType}
+              onChange={(e) => handleOperationChange(e.target.value as ApiEndpoint['operationType'])}
+            >
+              {OPERATION_OPTIONS.map((op) => (
+                <option key={op.value} value={op.value}>{cleanOperationLabel(op.label)}</option>
+              ))}
+            </select>
+            <span className="endpoint-blueprint__hint">{OPERATION_OPTIONS.find(o => o.value === draft.operationType)?.desc}</span>
+          </div>
           <div className="endpoint-blueprint__field">
             <label>{t('endpoint.dataset')}</label>
             <select
@@ -248,11 +245,11 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
 
       {/* ─── Lista de endpoints ─── */}
       <div className="endpoint-list" style={{ marginTop: '1.5rem' }}>
-        <p className="endpoint-blueprint__title" style={{ fontSize: '0.95rem', marginBottom: '0.75rem' }}>
+        <p className="endpoint-list__title">
           {t('endpoint.defined', { count: endpoints.length })}
         </p>
         {endpoints.length === 0 ? (
-          <p className="endpoint-empty" style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8', fontSize: '0.85rem' }}>
+          <p className="endpoint-empty">
             {t('endpoint.noEndpoints')}
           </p>
         ) : (
@@ -265,7 +262,7 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
                       <label>Tipo</label>
                       <select value={editDraft.operationType} onChange={(e) => handleEditOperationChange(e.target.value as ApiEndpoint['operationType'])}>
                         {OPERATION_OPTIONS.map((op) => (
-                          <option key={op.value} value={op.value}>{op.label}</option>
+                          <option key={op.value} value={op.value}>{cleanOperationLabel(op.label)}</option>
                         ))}
                       </select>
                     </div>
@@ -337,20 +334,8 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
         .endpoint-blueprint__desc {
           margin: 0 0 1rem; font-size: 0.8rem; color: #64748b;
         }
-        .endpoint-blueprint__ops {
-          display: flex; gap: 0.35rem; flex-wrap: wrap; margin-bottom: 0.35rem;
-        }
-        .endpoint-blueprint__op {
-          padding: 0.4rem 0.85rem; border-radius: 6px; border: 1px solid #e2e8f0;
-          background: #fff; font-size: 0.8rem; cursor: pointer; color: #475569;
-          transition: all 0.12s; font-weight: 500;
-        }
-        .endpoint-blueprint__op:hover { border-color: #93c5fd; color: #2563eb; }
-        .endpoint-blueprint__op.active {
-          background: #eff6ff; border-color: #3b82f6; color: #1d4ed8; font-weight: 600;
-        }
         .endpoint-blueprint__hint {
-          font-size: 0.75rem; color: #64748b; margin: 0 0 1rem; padding-left: 0.15rem;
+          font-size: 0.75rem; color: #64748b; margin: 0.1rem 0 0; padding-left: 0.15rem;
         }
         .endpoint-blueprint__fields {
           display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem;
@@ -368,6 +353,9 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
           border-color: #3b82f6; box-shadow: 0 0 0 2px #bfdbfe;
         }
         .endpoint-blueprint__actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+        .endpoint-list__title {
+          margin: 0 0 0.75rem; font-weight: 600; font-size: 0.95rem; color: #1e293b;
+        }
 
         .endpoint-item__dataset {
           margin-left: auto; font-size: 0.7rem; color: #94a3b8;
@@ -384,6 +372,39 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
         }
         .endpoint-empty {
           text-align: center; padding: 1.5rem; color: #94a3b8; font-size: 0.85rem;
+        }
+
+        [data-theme="dark"] .endpoint-blueprint {
+          background: var(--bg-tertiary); border-color: var(--border-color);
+        }
+        [data-theme="dark"] .endpoint-blueprint__title,
+        [data-theme="dark"] .endpoint-list__title {
+          color: var(--text-primary);
+        }
+        [data-theme="dark"] .endpoint-blueprint__desc,
+        [data-theme="dark"] .endpoint-blueprint__hint,
+        [data-theme="dark"] .endpoint-empty {
+          color: var(--text-muted);
+        }
+        [data-theme="dark"] .endpoint-blueprint__field label {
+          color: var(--text-secondary);
+        }
+        [data-theme="dark"] .endpoint-blueprint__field input,
+        [data-theme="dark"] .endpoint-blueprint__field select {
+          background: var(--bg-secondary); border-color: var(--border-color); color: var(--text-primary);
+        }
+        [data-theme="dark"] .endpoint-blueprint__field input:focus,
+        [data-theme="dark"] .endpoint-blueprint__field select:focus {
+          border-color: var(--accent-blue); box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+        }
+        [data-theme="dark"] .endpoint-item__dataset {
+          background: var(--bg-tertiary); color: var(--text-secondary);
+        }
+        [data-theme="dark"] .endpoint-item__type-badge {
+          background: rgba(99, 102, 241, 0.18); color: #c7d2fe; border-color: rgba(129, 140, 248, 0.35);
+        }
+        [data-theme="dark"] .endpoint-edit-form {
+          background: var(--bg-tertiary); border-color: var(--accent-blue);
         }
       `}</style>
     </div>

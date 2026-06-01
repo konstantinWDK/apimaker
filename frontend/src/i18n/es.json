@@ -574,6 +574,7 @@
   "endpoint.namePathRequired": "Nombre y path son obligatorios",
   "endpoint.newTitle": "Nuevo endpoint",
   "endpoint.newDesc": "Selecciona un dataset, elige el tipo de operación y completa los datos. La ruta se genera automáticamente según el tipo.",
+  "endpoint.operationType": "Tipo de operación",
   "endpoint.dataset": "Dataset",
   "endpoint.method": "Método HTTP",
   "endpoint.path": "Ruta",
