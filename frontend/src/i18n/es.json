@@ -163,7 +163,7 @@
   "builder.crudBase": "CRUD base + rutas personalizadas",
   "builder.needsTwoDatasets": "Necesitas al menos 2 datasets para crear un mapeo de datos.",
   "builder.externalSources": "Fuentes de Datos",
-  "builder.externalSourcesDesc": "Conecta orígenes de datos, explora tablas e importa datasets desde un único lugar",
+  "builder.externalSourcesDesc": "Conecta una base de datos, verifica el acceso, explora tablas e impórtalas como datasets.",
   "builder.webhooksDesc": "Notifica a URLs externas cuando cambian los datos en el mock server",
   "builder.versionsDesc": "Historial de cambios del proyecto",
   "builder.generationOptions": "Opciones de generación",

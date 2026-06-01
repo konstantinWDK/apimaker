@@ -357,7 +357,7 @@ export function BuilderPage() {
         )
       case 'connections':
         return (
-          <SectionCard title={t('builder.dataSources')} accent="sky" fullWidth>
+          <SectionCard title={t('builder.dataSources')} subtitle={t('builder.externalSourcesDesc')} accent="sky" fullWidth>
             {isPreparingConnections ? (
               <div className="empty-state">
                 <p className="muted-text">{t('builder.preparingDatasources')}</p>

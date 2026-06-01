@@ -162,6 +162,7 @@
   "builder.crudBase": "Base CRUD + custom routes",
   "builder.needsTwoDatasets": "You need at least 2 datasets to create a data mapping.",
   "builder.externalSources": "External Data Sources",
+  "builder.externalSourcesDesc": "Connect a database, verify access, explore tables, and import them as datasets.",
   "builder.webhooksDesc": "Notify external URLs when mock server data changes",
   "builder.versionsDesc": "Project change history",
   "builder.generationOptions": "Generation Options",
