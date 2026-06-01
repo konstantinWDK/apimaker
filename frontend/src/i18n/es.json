@@ -570,6 +570,8 @@
   "endpoint.deleteDesc": "Elimina un registro",
   "endpoint.custom": "Ruta personalizada",
   "endpoint.customDesc": "Define tu propio método y ruta",
+  "endpoint.useCustom": "Usar ruta personalizada",
+  "endpoint.useTemplate": "Usar plantilla",
   "endpoint.completeFields": "Completa el nombre y la ruta del endpoint",
   "endpoint.namePathRequired": "Nombre y path son obligatorios",
   "endpoint.newTitle": "Nuevo endpoint",

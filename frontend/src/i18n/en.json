@@ -569,6 +569,8 @@
   "endpoint.deleteDesc": "Deletes a record",
   "endpoint.custom": "Custom route",
   "endpoint.customDesc": "Define your own method and route",
+  "endpoint.useCustom": "Use custom route",
+  "endpoint.useTemplate": "Use template",
   "endpoint.completeFields": "Fill in the name and path of the endpoint",
   "endpoint.namePathRequired": "Name and path are required",
   "endpoint.newTitle": "New endpoint",

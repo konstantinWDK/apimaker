@@ -53,7 +53,6 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
       { value: 'create', label: t('endpoint.create'), method: 'POST', desc: t('endpoint.createDesc') },
       { value: 'update', label: t('endpoint.update'), method: 'PUT', desc: t('endpoint.updateDesc') },
       { value: 'delete', label: t('endpoint.delete'), method: 'DELETE', desc: t('endpoint.deleteDesc') },
-      { value: 'custom', label: t('endpoint.custom'), method: '', desc: t('endpoint.customDesc') },
     ],
     [t],
   )
@@ -106,6 +105,27 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
     const datasetName = ds?.name || 'items'
     const updates = getOperationUpdates(opType, datasetName)
     setEditDraft(prev => prev ? ({ ...prev, ...updates, operationType: opType }) : null)
+  }
+
+  const useCustomDraft = () => {
+    setDraft(prev => ({ ...prev, operationType: 'custom' }))
+  }
+
+  const useTemplateDraft = () => {
+    const ds = project.datasets.find(d => d.id === draft.targetDatasetId) || project.datasets[0]
+    const updates = getOperationUpdates('list', ds?.name || 'items')
+    setDraft(prev => ({ ...prev, ...updates, operationType: 'list' }))
+  }
+
+  const useCustomEditDraft = () => {
+    setEditDraft(prev => prev ? ({ ...prev, operationType: 'custom' }) : null)
+  }
+
+  const useTemplateEditDraft = () => {
+    if (!editDraft) return
+    const ds = project.datasets.find(d => d.id === editDraft.targetDatasetId) || project.datasets[0]
+    const updates = getOperationUpdates('list', ds?.name || 'items')
+    setEditDraft(prev => prev ? ({ ...prev, ...updates, operationType: 'list' }) : null)
   }
 
   const getOperationUpdates = (opType: ApiEndpoint['operationType'], datasetName: string): Partial<ApiEndpoint> => {
@@ -164,18 +184,29 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
 
         {/* Fields */}
         <div className="endpoint-blueprint__fields">
-          <div className="endpoint-blueprint__field">
-            <label>{t('endpoint.operationType')}</label>
-            <select
-              value={draft.operationType}
-              onChange={(e) => handleOperationChange(e.target.value as ApiEndpoint['operationType'])}
-            >
-              {OPERATION_OPTIONS.map((op) => (
-                <option key={op.value} value={op.value}>{cleanOperationLabel(op.label)}</option>
-              ))}
-            </select>
-            <span className="endpoint-blueprint__hint">{OPERATION_OPTIONS.find(o => o.value === draft.operationType)?.desc}</span>
-          </div>
+          {draft.operationType === 'custom' ? (
+            <div className="endpoint-blueprint__field">
+              <label>{t('endpoint.custom')}</label>
+              <div className="endpoint-blueprint__mode">
+                <span className="endpoint-blueprint__hint">{t('endpoint.customDesc')}</span>
+                <button type="button" className="btn subtle btn-small" onClick={useTemplateDraft}>{t('endpoint.useTemplate')}</button>
+              </div>
+            </div>
+          ) : (
+            <div className="endpoint-blueprint__field">
+              <label>{t('endpoint.operationType')}</label>
+              <select
+                value={draft.operationType}
+                onChange={(e) => handleOperationChange(e.target.value as ApiEndpoint['operationType'])}
+              >
+                {OPERATION_OPTIONS.map((op) => (
+                  <option key={op.value} value={op.value}>{cleanOperationLabel(op.label)}</option>
+                ))}
+              </select>
+              <span className="endpoint-blueprint__hint">{OPERATION_OPTIONS.find(o => o.value === draft.operationType)?.desc}</span>
+              <button type="button" className="endpoint-blueprint__link" onClick={useCustomDraft}>{t('endpoint.useCustom')}</button>
+            </div>
+          )}
           <div className="endpoint-blueprint__field">
             <label>{t('endpoint.dataset')}</label>
             <select
@@ -260,14 +291,25 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
               {editingId === endpoint.id && editDraft ? (
                 <form onSubmit={handleEditSubmit} className="endpoint-edit-form">
                   <div className="endpoint-blueprint__fields">
-                    <div className="endpoint-blueprint__field">
-                      <label>Tipo</label>
-                      <select value={editDraft.operationType} onChange={(e) => handleEditOperationChange(e.target.value as ApiEndpoint['operationType'])}>
-                        {OPERATION_OPTIONS.map((op) => (
-                          <option key={op.value} value={op.value}>{cleanOperationLabel(op.label)}</option>
-                        ))}
-                      </select>
-                    </div>
+                    {editDraft.operationType === 'custom' ? (
+                      <div className="endpoint-blueprint__field">
+                        <label>{t('endpoint.custom')}</label>
+                        <div className="endpoint-blueprint__mode">
+                          <span className="endpoint-blueprint__hint">{t('endpoint.customDesc')}</span>
+                          <button type="button" className="btn subtle btn-small" onClick={useTemplateEditDraft}>{t('endpoint.useTemplate')}</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="endpoint-blueprint__field">
+                        <label>{t('endpoint.operationType')}</label>
+                        <select value={editDraft.operationType} onChange={(e) => handleEditOperationChange(e.target.value as ApiEndpoint['operationType'])}>
+                          {OPERATION_OPTIONS.map((op) => (
+                            <option key={op.value} value={op.value}>{cleanOperationLabel(op.label)}</option>
+                          ))}
+                        </select>
+                        <button type="button" className="endpoint-blueprint__link" onClick={useCustomEditDraft}>{t('endpoint.useCustom')}</button>
+                      </div>
+                    )}
                     {editDraft.operationType === 'custom' && (
                       <div className="endpoint-blueprint__field">
                         <label>{t('endpoint.method')}</label>
@@ -339,6 +381,14 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
         .endpoint-blueprint__hint {
           font-size: 0.75rem; color: #64748b; margin: 0.1rem 0 0; padding-left: 0.15rem;
         }
+        .endpoint-blueprint__mode {
+          display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; min-height: 2.15rem;
+        }
+        .endpoint-blueprint__link {
+          align-self: flex-start; border: none; background: transparent; color: #2563eb;
+          cursor: pointer; font-size: 0.72rem; font-weight: 700; padding: 0;
+        }
+        .endpoint-blueprint__link:hover { text-decoration: underline; }
         .endpoint-blueprint__fields {
           display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem;
         }
@@ -387,6 +437,9 @@ export function EndpointDesigner({ project, endpoints, onAdd, onRemove, previewB
         [data-theme="dark"] .endpoint-blueprint__hint,
         [data-theme="dark"] .endpoint-empty {
           color: var(--text-muted);
+        }
+        [data-theme="dark"] .endpoint-blueprint__link {
+          color: #93c5fd;
         }
         [data-theme="dark"] .endpoint-blueprint__field label {
           color: var(--text-secondary);
