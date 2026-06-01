@@ -19,6 +19,12 @@ interface Props {
   onImportTable: (result: ImportTableResult) => void | Promise<void>
 }
 
+const DEFAULT_DB_PORTS: Record<string, number> = {
+  postgresql: 5432,
+  mysql: 3306,
+  mssql: 1433,
+}
+
 export function ConnectionManager({ projectId, onImportTable }: Props) {
   const { t } = useTranslation()
   const [connections, setConnections] = useState<DbConnectionInfo[]>([])
@@ -53,6 +59,14 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
   const startNewConnection = () => {
     resetForm()
     setShowForm(true)
+  }
+
+  const handleDbTypeChange = (dbType: string) => {
+    setForm(prev => ({
+      ...prev,
+      db_type: dbType,
+      port: DEFAULT_DB_PORTS[dbType] ?? prev.port,
+    }))
   }
 
   const handleSave = async () => {
@@ -169,7 +183,7 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
             <label className="form-field"><span className="label">{t('connectionManager.name')}</span>
               <input className="field" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder={t('connectionManager.namePlaceholder')} /></label>
             <label className="form-field"><span className="label">{t('connectionManager.type')}</span>
-              <select className="field" value={form.db_type} onChange={e => setForm({ ...form, db_type: e.target.value })}>
+              <select className="field" value={form.db_type} onChange={e => handleDbTypeChange(e.target.value)}>
                 <option value="postgresql">PostgreSQL</option>
                 <option value="mysql">MySQL</option>
                 <option value="sqlite">SQLite</option>
@@ -180,7 +194,7 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
                 <label className="form-field"><span className="label">{t('connectionManager.host')}</span>
                   <input className="field" value={form.host} onChange={e => setForm({ ...form, host: e.target.value })} placeholder="127.0.0.1" /></label>
                 <label className="form-field"><span className="label">{t('connectionManager.port')}</span>
-                  <input className="field" type="number" value={form.port} onChange={e => setForm({ ...form, port: parseInt(e.target.value) || 5432 })} /></label>
+                  <input className="field" type="number" value={form.port} onChange={e => setForm({ ...form, port: parseInt(e.target.value) || DEFAULT_DB_PORTS[form.db_type] || 5432 })} /></label>
                 <label className="form-field"><span className="label">{t('connectionManager.user')}</span>
                   <input className="field" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} placeholder="postgres" /></label>
                 <label className="form-field"><span className="label">{t('connectionManager.password')}</span>
