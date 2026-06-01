@@ -87,6 +87,23 @@ def test_connection_url_normalizes_localhost_to_ipv4() -> None:
     assert "localhost" not in url
 
 
+def test_connection_url_includes_password_for_driver() -> None:
+    connection = DbConnection(
+        project_id="project-1",
+        name="Local Postgres",
+        db_type="postgresql",
+        host="127.0.0.1",
+        port=5432,
+        username="doapi",
+        database="doapi",
+    )
+
+    url = _build_sqlalchemy_url(connection, "secret")
+
+    assert "secret" in url
+    assert "***" not in url
+
+
 def test_sqlite_datasource_explorer_imports_table_as_dataset(tmp_path: Path) -> None:
     source_db = tmp_path / "source.db"
     _create_external_sqlite(source_db)

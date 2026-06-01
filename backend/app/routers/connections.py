@@ -90,18 +90,22 @@ def _build_sqlalchemy_url(conn: DbConnection, password: str | None = None) -> st
     db = conn.database or ""
 
     if db_type == "postgresql":
-        return str(URL.create("postgresql+psycopg2", username=conn.username, password=password or "", host=host, port=port, database=db))
+        return _render_url(URL.create("postgresql+psycopg2", username=conn.username, password=password or "", host=host, port=port, database=db))
     elif db_type == "mysql":
-        return str(URL.create("mysql+pymysql", username=conn.username, password=password or "", host=host, port=port, database=db))
+        return _render_url(URL.create("mysql+pymysql", username=conn.username, password=password or "", host=host, port=port, database=db))
     elif db_type == "mssql":
-        return str(URL.create("mssql+pymssql", username=conn.username, password=password or "", host=host, port=port, database=db))
-    return str(URL.create("postgresql+psycopg2", username=conn.username, password=password or "", host=host, port=port, database=db))
+        return _render_url(URL.create("mssql+pymssql", username=conn.username, password=password or "", host=host, port=port, database=db))
+    return _render_url(URL.create("postgresql+psycopg2", username=conn.username, password=password or "", host=host, port=port, database=db))
 
 
 # ── CRUD Endpoints ──
 
 def _normalize_host(host: str) -> str:
     return "127.0.0.1" if host.strip().lower() in {"localhost", "::1"} else host.strip()
+
+
+def _render_url(url: URL) -> str:
+    return url.render_as_string(hide_password=False)
 
 
 explorer = DataSourceExplorer(_build_sqlalchemy_url, _decrypt_password)
