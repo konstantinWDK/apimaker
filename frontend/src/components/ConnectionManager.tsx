@@ -350,6 +350,75 @@ export function ConnectionManager({ projectId, onImportTable }: Props) {
         .conn-mgr__schema-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
         .conn-mgr__schema-table th { text-align: left; padding: 0.25rem 0.5rem; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; font-weight: 600; }
         .conn-mgr__schema-table td { padding: 0.25rem 0.5rem; border-bottom: 1px solid #f1f5f9; font-family: monospace; }
+        [data-theme="dark"] .conn-mgr__title,
+        [data-theme="dark"] .conn-mgr__item-name,
+        [data-theme="dark"] .conn-mgr__table-name {
+          color: var(--text-primary);
+        }
+        [data-theme="dark"] .conn-mgr__subtitle,
+        [data-theme="dark"] .conn-mgr__item-detail,
+        [data-theme="dark"] .conn-mgr__explorer-title {
+          color: var(--text-secondary);
+        }
+        [data-theme="dark"] .conn-mgr__form,
+        [data-theme="dark"] .conn-mgr__item {
+          background: var(--bg-secondary);
+          border-color: var(--border-color);
+          color: var(--text-primary);
+        }
+        [data-theme="dark"] .conn-mgr__hint {
+          background: rgba(14, 165, 233, 0.14);
+          border-color: rgba(56, 189, 248, 0.35);
+          color: var(--text-secondary);
+        }
+        [data-theme="dark"] .conn-mgr__explorer {
+          border-top-color: var(--border-color);
+        }
+        [data-theme="dark"] .conn-mgr__table-item {
+          background: var(--bg-tertiary);
+          border-color: var(--border-color);
+          color: var(--text-primary);
+        }
+        [data-theme="dark"] .conn-mgr__table-kind {
+          color: var(--text-tertiary);
+        }
+        [data-theme="dark"] .conn-mgr__table-meta {
+          background: var(--bg-secondary);
+          color: var(--text-secondary);
+        }
+        [data-theme="dark"] .conn-mgr__schema-table th {
+          background: var(--bg-tertiary);
+          border-bottom-color: var(--border-color);
+          color: var(--text-secondary);
+        }
+        [data-theme="dark"] .conn-mgr__schema-table td {
+          border-bottom-color: var(--border-color);
+          color: var(--text-primary);
+        }
+        [data-theme="dark"] .conn-mgr__test-result.ok {
+          background: rgba(22, 101, 52, 0.24);
+          color: #86efac;
+        }
+        [data-theme="dark"] .conn-mgr__test-result.err {
+          background: rgba(153, 27, 27, 0.24);
+          color: #fca5a5;
+        }
+        [data-theme="dark"] .conn-mgr__db-badge--postgresql {
+          background: rgba(59, 130, 246, 0.22);
+          color: #93c5fd;
+        }
+        [data-theme="dark"] .conn-mgr__db-badge--mysql {
+          background: rgba(245, 158, 11, 0.22);
+          color: #fcd34d;
+        }
+        [data-theme="dark"] .conn-mgr__db-badge--sqlite {
+          background: rgba(16, 185, 129, 0.22);
+          color: #6ee7b7;
+        }
+        [data-theme="dark"] .conn-mgr__db-badge--mssql {
+          background: rgba(139, 92, 246, 0.22);
+          color: #c4b5fd;
+        }
       `}</style>
     </div>
   )
