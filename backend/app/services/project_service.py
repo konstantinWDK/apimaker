@@ -443,6 +443,14 @@ class ProjectService:
         for ep in existing_endpoints:
             session.delete(ep)
 
+        # Delete mapping rules before dataset fields because they hold FKs to dataset_fields.
+        existing_mappings = session.exec(
+            select(FieldMappingRule).where(FieldMappingRule.project_id == str(project_id))
+        ).all()
+        for m in existing_mappings:
+            session.delete(m)
+        session.flush()
+
         existing_datasets = session.exec(
             select(Dataset).where(Dataset.project_id == str(project_id))
         ).all()
@@ -452,14 +460,8 @@ class ProjectService:
             ).all()
             for f in existing_fields:
                 session.delete(f)
+            session.flush()
             session.delete(ds)
-
-        # Delete mapping rules
-        existing_mappings = session.exec(
-            select(FieldMappingRule).where(FieldMappingRule.project_id == str(project_id))
-        ).all()
-        for m in existing_mappings:
-            session.delete(m)
 
         # Delete share snapshots
         from ..db_models import ShareSnapshot
