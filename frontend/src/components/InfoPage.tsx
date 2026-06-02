@@ -98,13 +98,6 @@ export function InfoPage() {
         </div>
         <div className="info-card">
           <div className="info-card__icon">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#d946ef" strokeWidth="2"><path d="M4 4h16v16H4V4zm4 4h8v8H8V8z"/></svg>
-          </div>
-          <h3 className="info-card__title">{t('info.mappingsTitle')}</h3>
-          <p className="info-card__desc">{t('info.mappingsDesc')}</p>
-        </div>
-        <div className="info-card">
-          <div className="info-card__icon">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#f43f5e" strokeWidth="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4.04a2 2 0 00-2 0l-7 4.04A2 2 0 003 8v8a2 2 0 001 1.73l7 4.04a2 2 0 002 0l7-4.04A2 2 0 0021 16z"/></svg>
           </div>
           <h3 className="info-card__title">{t('info.dockerTitle')}</h3>

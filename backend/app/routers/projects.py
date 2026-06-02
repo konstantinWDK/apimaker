@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from ..db import get_session
-from ..db_models import Dataset, DatasetField, Endpoint, FieldMappingRule, Project as DBProject, WorkspaceMember
+from ..db_models import Dataset, DatasetField, Endpoint, Project as DBProject, WorkspaceMember
 from ..models import (
     UpdateProjectRequest,
     CreateProjectRequest,
@@ -19,8 +19,6 @@ from ..models import (
     GenerationResult,
     Project as PydanticProject,
     UploadDatasetRequest,
-    MappingRule as PydanticMappingRule,
-    CreateMappingRuleRequest,
 )
 from ..security import (
     CurrentUser,
@@ -374,87 +372,6 @@ def define_endpoints(
             datasets_with_fields=data["datasets"],
             endpoints=data["endpoints"],
         )
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-
-# ─── Mapping rules ──────────────────────────────────────────────
-
-def _mapping_to_dict(m: FieldMappingRule) -> dict:
-    trans = m.transformation
-    if trans:
-        import json as _json
-        try:
-            trans = _json.loads(trans)
-        except Exception:
-            pass
-    return {
-        "id": m.id,
-        "project_id": m.project_id,
-        "source_dataset_id": m.source_dataset_id,
-        "source_field_id": m.source_field_id,
-        "target_dataset_id": m.target_dataset_id,
-        "target_field_id": m.target_field_id,
-        "transformation": trans,
-        "created_at": m.created_at.isoformat() if m.created_at else None,
-        "updated_at": m.updated_at.isoformat() if m.updated_at else None,
-    }
-
-
-@router.get("/{project_id}/mappings", response_model=list[PydanticMappingRule])
-def list_mappings(
-    project_id: str,
-    session: Session = Depends(get_session),
-    user: CurrentUser = Depends(get_current_user_from_header),
-    _project: DBProject = Depends(require_project_access),
-) -> list[PydanticMappingRule]:
-    try:
-        resolved_id = project_service.resolve_id(session, project_id)
-        mappings = project_service.list_mappings(session, resolved_id)
-        return [_mapping_to_dict(m) for m in mappings]
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-
-@router.post("/{project_id}/mappings", response_model=PydanticMappingRule, status_code=status.HTTP_201_CREATED)
-def create_mapping(
-    project_id: str,
-    payload: CreateMappingRuleRequest,
-    session: Session = Depends(get_session),
-    user: CurrentUser = Depends(get_current_user_from_header),
-    _project: DBProject = Depends(require_project_write_access),
-) -> PydanticMappingRule:
-    try:
-        resolved_id = project_service.resolve_id(session, project_id)
-        trans = payload.transformation
-        if trans and isinstance(trans, dict):
-            import json as _json
-            trans = _json.dumps(trans)
-        mapping = project_service.create_mapping(
-            session,
-            project_id=resolved_id,
-            source_dataset_id=payload.source_dataset_id,
-            source_field_id=payload.source_field_id,
-            target_dataset_id=payload.target_dataset_id,
-            target_field_id=payload.target_field_id,
-            transformation=trans,
-        )
-        return _mapping_to_dict(mapping)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-
-@router.delete("/{project_id}/mappings/{mapping_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
-def delete_mapping(
-    project_id: str,
-    mapping_id: str,
-    session: Session = Depends(get_session),
-    user: CurrentUser = Depends(get_current_user_from_header),
-    _project: DBProject = Depends(require_project_write_access),
-) -> None:
-    try:
-        resolved_id = project_service.resolve_id(session, project_id)
-        project_service.delete_mapping(session, mapping_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

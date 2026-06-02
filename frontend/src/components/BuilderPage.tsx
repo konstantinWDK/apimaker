@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { DataMappingPanel } from './DataMappingPanel'
 import { EndpointDesigner } from './EndpointDesigner'
 import { GenerationResultPanel } from './GenerationResultPanel'
 import { DatasetEditor } from './DatasetEditor'
@@ -14,10 +13,10 @@ import { ConnectionManager } from './ConnectionManager'
 
 import { useProjectBuilder } from '../hooks/useProjectBuilder'
 import { useToast } from './Toast'
-import type { GenerationResult, MappingRule } from '../types/schemas'
+import type { GenerationResult } from '../types/schemas'
 import { slugify } from '../lib/slug'
 import { readBackendConfig } from '../lib/backendConfig'
-import { createGenerationJob, fetchMappings, fetchRemoteProject, getGenerationJob, createMapping, deleteMapping } from '../lib/api'
+import { createGenerationJob, fetchRemoteProject, getGenerationJob } from '../lib/api'
 import type { GenerationJob, ImportTableResult } from '../lib/api'
 
 export function BuilderPage() {
@@ -44,12 +43,11 @@ export function BuilderPage() {
   const [generationWarning, setGenerationWarning] = useState<string | null>(null)
   const [generationJob, setGenerationJob] = useState<GenerationJob | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
-  const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'mappings' | 'connections' | 'result' | 'webhooks' | 'versions'>('datasets')
+  const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'connections' | 'result' | 'webhooks' | 'versions'>('datasets')
   const [connectionsProjectId, setConnectionsProjectId] = useState<string | null>(project.slug || project.remoteId || null)
   const [isPreparingConnections, setIsPreparingConnections] = useState(false)
   const [connectionsError, setConnectionsError] = useState<string | null>(null)
   const [editingDatasetId, setEditingDatasetId] = useState<string | null>(null)
-  const [mappings, setMappings] = useState<MappingRule[]>([])
   const localBaseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'
   const backendBaseUrl = readBackendConfig().baseUrl?.replace(/\/$/, '') || 'http://localhost:8000'
 
@@ -57,7 +55,6 @@ export function BuilderPage() {
     () => [
       { id: 'datasets', label: t('builder.datasets') },
       { id: 'endpoints', label: t('builder.endpoints') },
-      { id: 'mappings', label: t('builder.mappings') },
       { id: 'connections', label: t('builder.dataSources') },
       { id: 'webhooks', label: t('builder.webhooks') },
       { id: 'versions', label: t('builder.versions') },
@@ -180,34 +177,6 @@ export function BuilderPage() {
   // AUTO-SAVE is handled by useProjectBuilder's internal 1s debounce queue.
   // Auto-save is triggered per-field via updateProject/upsertDataset/upsertEndpoint.
 
-  useEffect(() => {
-    const pid = project.slug || project.remoteId
-    if (!pid) return
-    fetchMappings(pid).then(setMappings).catch(() => {})
-  }, [project.slug, project.remoteId])
-
-  const handleAddMapping = useCallback(async (sourceFieldId: string, targetFieldId: string) => {
-    const pid = project.slug || project.remoteId
-    if (!pid) {
-      toast(t('builder.saveFirst'), 'error')
-      return
-    }
-    const sourceDatasetId = project.datasets.find(d => d.fields.some(f => f.id === sourceFieldId))?.id
-    const targetDatasetId = project.datasets.find(d => d.fields.some(f => f.id === targetFieldId))?.id
-    if (!sourceDatasetId || !targetDatasetId) return
-    try {
-      const created = await createMapping(pid, {
-        source_dataset_id: sourceDatasetId,
-        source_field_id: sourceFieldId,
-        target_dataset_id: targetDatasetId,
-        target_field_id: targetFieldId,
-      })
-      setMappings(prev => [...prev, created])
-    } catch (err) {
-      toast(`Error al crear mapping: ${err instanceof Error ? err.message : 'desconocido'}`, 'error')
-    }
-  }, [project.slug, project.remoteId, project.datasets, toast, t])
-
   const handleImportTable = useCallback(async (result: ImportTableResult) => {
     const pid = result.project_id || connectionsProjectId || project.slug || project.remoteId || project.id
     const updated = await fetchRemoteProject(pid)
@@ -216,17 +185,6 @@ export function BuilderPage() {
     setSelectedDatasetId(result.dataset_id)
     setActiveTab('datasets')
   }, [connectionsProjectId, project.slug, project.remoteId, project.id, replaceProject, setSelectedDatasetId])
-
-  const handleRemoveMapping = useCallback(async (mappingId: string) => {
-    const pid = project.slug || project.remoteId
-    if (!pid) return
-    try {
-      await deleteMapping(pid, mappingId)
-      setMappings(prev => prev.filter(m => m.id !== mappingId))
-    } catch (err) {
-      toast(`Error al eliminar mapping: ${err instanceof Error ? err.message : 'desconocido'}`, 'error')
-    }
-  }, [project.slug, project.remoteId, toast])
 
   useEffect(() => {
     if (!result || project.endpoints.length === 0) return
@@ -337,23 +295,6 @@ export function BuilderPage() {
               warningMessage={generationWarning}
               clearWarning={() => setGenerationWarning(null)}
             />
-          </SectionCard>
-        )
-      case 'mappings':
-        return (
-          <SectionCard title="" accent="sky" fullWidth>
-            {project.datasets.length < 2 ? (
-              <div className="empty-state">
-                <p className="muted-text">{t('builder.needsTwoDatasets')}</p>
-              </div>
-            ) : (
-              <DataMappingPanel
-                datasets={project.datasets}
-                mappings={mappings}
-                onAddMapping={handleAddMapping}
-                onRemoveMapping={handleRemoveMapping}
-              />
-            )}
           </SectionCard>
         )
       case 'connections':

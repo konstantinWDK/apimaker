@@ -1,4 +1,4 @@
-import type { MappingRule, ProjectDraft } from '../types/schemas'
+import type { ProjectDraft } from '../types/schemas'
 import { readBackendConfig } from './backendConfig'
 
 const cleanBaseUrl = (value: string) => value.replace(/\/$/, '')
@@ -530,58 +530,6 @@ export const createShare = async (
 /**
  * Get a share snapshot (public).
  */
-// ─── Mapping Rules API ─────────────────────────────────────────
-
-export interface MappingPayload {
-  source_dataset_id: string
-  source_field_id: string
-  target_dataset_id: string
-  target_field_id: string
-  transformation?: Record<string, any> | null
-}
-
-const mapMappingResponse = (m: any): MappingRule => ({
-  id: m.id,
-  projectId: m.project_id,
-  sourceDatasetId: m.source_dataset_id,
-  sourceFieldId: m.source_field_id,
-  targetDatasetId: m.target_dataset_id,
-  targetFieldId: m.target_field_id,
-  transformation: m.transformation || undefined,
-  createdAt: m.created_at,
-  updatedAt: m.updated_at,
-})
-
-export const fetchMappings = async (projectId: string): Promise<MappingRule[]> => {
-  const baseUrl = ensureBaseUrl()
-  const headers = buildHeaders()
-  const response = await fetch(`${baseUrl}/projects/${projectId}/mappings`, { headers })
-  const data = await handleResponse(response)
-  return (data || []).map(mapMappingResponse)
-}
-
-export const createMapping = async (projectId: string, payload: MappingPayload): Promise<MappingRule> => {
-  const baseUrl = ensureBaseUrl()
-  const headers = buildHeaders()
-  const response = await fetch(`${baseUrl}/projects/${projectId}/mappings`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload),
-  })
-  const data = await handleResponse(response)
-  return mapMappingResponse(data)
-}
-
-export const deleteMapping = async (projectId: string, mappingId: string): Promise<void> => {
-  const baseUrl = ensureBaseUrl()
-  const headers = buildHeaders()
-  const response = await fetch(`${baseUrl}/projects/${projectId}/mappings/${mappingId}`, {
-    method: 'DELETE',
-    headers,
-  })
-  await handleResponse(response)
-}
-
 export const getShareSnapshot = async (
   snapshotId: string,
   slug: string,

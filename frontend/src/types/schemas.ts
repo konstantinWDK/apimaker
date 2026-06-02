@@ -65,18 +65,6 @@ export interface ApiEndpoint {
   targetDatasetId?: string // Link to a specific dataset in the project
 }
 
-export interface MappingRule {
-  id: string
-  projectId?: string
-  sourceDatasetId: string
-  sourceFieldId: string
-  targetDatasetId: string
-  targetFieldId: string
-  transformation?: { type: 'direct' | 'cast' | 'concat' | 'format' | 'expression'; config?: Record<string, any> }
-  createdAt?: string
-  updatedAt?: string
-}
-
 export interface DeploymentInfo {
   host: string
   user: string

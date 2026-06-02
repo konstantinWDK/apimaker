@@ -68,22 +68,6 @@ class DatasetField(SQLModel, table=True):
     references: Optional[str] = None  # JSON: {"datasetId": "id", "fieldName": "name"}
 
 
-class FieldMappingRule(SQLModel, table=True):
-    """Mapping rule between a source field and a target field across datasets."""
-
-    __tablename__ = "field_mapping_rules"
-
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    project_id: str = Field(foreign_key="projects.id", index=True)
-    source_dataset_id: str = Field(foreign_key="datasets.id")
-    source_field_id: str = Field(foreign_key="dataset_fields.id")
-    target_dataset_id: str = Field(foreign_key="datasets.id")
-    target_field_id: str = Field(foreign_key="dataset_fields.id")
-    transformation: Optional[str] = None  # JSON: {"type": "direct|cast|concat|format|expression", "config": {}}
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
 class Dataset(SQLModel, table=True):
     """Dataset attached to a project."""
 

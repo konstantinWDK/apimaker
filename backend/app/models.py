@@ -30,26 +30,6 @@ class FieldSchema(BaseModel):
     references: str | None = None  # JSON: {"datasetId": "id", "fieldName": "name"}
 
 
-class MappingRule(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid4()))
-    project_id: str | None = None
-    source_dataset_id: str
-    source_field_id: str
-    target_dataset_id: str
-    target_field_id: str
-    transformation: str | None = None  # JSON: {"type": "direct|cast|concat|format|expression", "config": {}}
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-class CreateMappingRuleRequest(BaseModel):
-    source_dataset_id: str
-    source_field_id: str
-    target_dataset_id: str
-    target_field_id: str
-    transformation: str | None = None
-
-
 class DatasetMeta(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     name: str

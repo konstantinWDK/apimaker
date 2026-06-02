@@ -16,7 +16,6 @@ from app.db_models import (
     Datasource,
     DbConnection,
     Endpoint,
-    FieldMappingRule,
     GenerationJob,
     MockRecord,
     Project,
@@ -151,7 +150,7 @@ def test_owner_can_delete_project_with_endpoints_releases_mocks_versions_and_web
         assert session.exec(select(ShareSnapshot).where(ShareSnapshot.project_id == pid)).all() == []
 
 
-def test_owner_can_delete_project_with_dataset_fields_and_mappings() -> None:
+def test_owner_can_delete_project_with_datasets() -> None:
     with Session(engine) as session:
         suffix = uuid4().hex[:8]
         user = User(username=f"delete_fields_{suffix}", password_hash=hash_password("testpass123"), role="user")
@@ -164,28 +163,8 @@ def test_owner_can_delete_project_with_dataset_fields_and_mappings() -> None:
         session.commit()
         session.refresh(project)
 
-        source_dataset = Dataset(id=f"source-{suffix}", project_id=project.id, name="Source", source_type="manual")
-        target_dataset = Dataset(id=f"target-{suffix}", project_id=project.id, name="Target", source_type="manual")
-        session.add(source_dataset)
-        session.add(target_dataset)
-        session.commit()
-
-        source_field = DatasetField(dataset_id=source_dataset.id, name="id", field_type="integer", is_primary_key=True)
-        target_field = DatasetField(dataset_id=target_dataset.id, name="source_id", field_type="integer")
-        session.add(source_field)
-        session.add(target_field)
-        session.commit()
-        session.refresh(source_field)
-        session.refresh(target_field)
-
-        mapping = FieldMappingRule(
-            project_id=project.id,
-            source_dataset_id=source_dataset.id,
-            source_field_id=source_field.id,
-            target_dataset_id=target_dataset.id,
-            target_field_id=target_field.id,
-        )
-        session.add(mapping)
+        dataset = Dataset(id=f"ds-{suffix}", project_id=project.id, name="Test", source_type="manual")
+        session.add(dataset)
         session.commit()
 
         project_id = project.id
@@ -197,4 +176,3 @@ def test_owner_can_delete_project_with_dataset_fields_and_mappings() -> None:
     with Session(engine) as session:
         assert session.get(Project, project_id) is None
         assert session.exec(select(Dataset).where(Dataset.project_id == project_id)).all() == []
-        assert session.exec(select(FieldMappingRule).where(FieldMappingRule.project_id == project_id)).all() == []
