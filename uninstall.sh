@@ -42,7 +42,9 @@ DOCKER_CMD="$(compose_cmd)"
 
 echo -e "${BLUE}Stopping Docker services of this project...${NC}"
 if [ -n "$DOCKER_CMD" ]; then
-    $DOCKER_CMD --profile postgres --profile mysql down --volumes --remove-orphans || true
+    $DOCKER_CMD --profile postgres --profile mysql down --volumes --remove-orphans --rmi all || true
+    echo -e "${BLUE}Pruning Docker build cache...${NC}"
+    docker builder prune -a -f 2>/dev/null || true
 else
     echo -e "${YELLOW}Docker Compose not available; skipping container shutdown.${NC}"
 fi
@@ -55,17 +57,22 @@ echo -e "${BLUE}Cleaning up files...${NC}"
 
 echo "  - Backend..."
 rm -rf backend/.venv
-rm -f backend/app/data/*.db
-rm -f backend/app/data/*.json
-rm -f backend/app/data/*.sqlite
+rm -rf backend/app/data
 rm -f backend/.env
-find backend -name "__pycache__" -type d -prune -exec rm -rf {} +
-find backend -name ".pytest_cache" -type d -prune -exec rm -rf {} +
+find backend -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
+find backend -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null
+find backend -type d -name ".eggs" -exec rm -rf {} + 2>/dev/null
+find backend -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null
+rm -rf backend/artifacts
 
 echo "  - Frontend..."
 rm -rf frontend/node_modules
 rm -rf frontend/dist
 rm -rf frontend/.vite
+rm -f frontend/.env
+
+echo "  - Deployments..."
+rm -rf deployments
 
 echo "  - Root..."
 rm -f .env

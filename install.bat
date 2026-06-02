@@ -23,6 +23,10 @@ echo [1/5] Installing dependencies...
 pushd backend || goto fail
 if not exist ".venv" (
     "%PYTHON_CMD%" -m venv .venv || goto fail
+) else if not exist ".venv\Scripts\python.exe" (
+    echo Virtual environment seems corrupted, recreating...
+    rmdir /s /q ".venv"
+    "%PYTHON_CMD%" -m venv .venv || goto fail
 )
 set "VENV_PY=.venv\Scripts\python.exe"
 if not exist "%VENV_PY%" (
@@ -187,8 +191,8 @@ if /i "%USE_DOCKER%"=="y" (
         echo @echo off
         echo cd /d "%%~dp0"
         echo echo Starting DoApi...
-        echo start "Backend" cmd /c "cd /d "%%~dp0backend" ^&^& .venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
-        echo start "Frontend" cmd /c "cd /d "%%~dp0frontend" ^&^& npm run dev"
+        echo start "Backend" /D "%%~dp0backend" cmd /c ".venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
+        echo start "Frontend" /D "%%~dp0frontend" cmd /c "npm run dev"
         echo echo.
         echo echo Both servers started in separate windows.
         echo echo Backend: http://localhost:8000

@@ -56,6 +56,10 @@ echo -e "${BLUE}Installing dependencies...${NC}"
 cd backend
 if [ ! -d ".venv" ]; then
     python3 -m venv .venv
+elif [ ! -f ".venv/bin/python" ] && [ ! -f ".venv/bin/python3" ]; then
+    echo "Virtual environment seems corrupted, recreating..."
+    rm -rf .venv
+    python3 -m venv .venv
 fi
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -258,8 +262,8 @@ else
         echo '@echo off'
         echo 'cd /d "%~dp0"'
         echo 'echo Starting DoApi...'
-        echo 'start "Backend" cmd /c "cd /d "%~dp0backend" && .venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"'
-        echo 'start "Frontend" cmd /c "cd /d "%~dp0frontend" && npm run dev"'
+        echo 'start "Backend" /D "%~dp0backend" cmd /c ".venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"'
+        echo 'start "Frontend" /D "%~dp0frontend" cmd /c "npm run dev"'
         echo 'echo.'
         echo 'echo Both servers started in separate windows.'
         echo 'echo Backend: http://localhost:8000'
