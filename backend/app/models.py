@@ -251,6 +251,8 @@ class DeploymentResponse(BaseModel):
     host: str | None = None
     is_remote: bool = False
     share_token: str | None = None
+    custom_domain: str | None = None
+    ssl_enabled: bool = False
     version_id: str | None = None
     version_number: int | None = None
     docker_status: str = "unknown"

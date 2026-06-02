@@ -342,6 +342,8 @@ class Deployment(SQLModel, table=True):
     host: str | None = None  # for remote deploys
     is_remote: bool = False
     share_token: str | None = Field(default=None, index=True)  # for public share URL
+    custom_domain: str | None = None  # e.g. "api.midominio.com"
+    ssl_enabled: bool = False
     version_id: str | None = None  # ProjectVersion.id for rollback
     version_number: int | None = None  # Human-readable version number
     deployed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

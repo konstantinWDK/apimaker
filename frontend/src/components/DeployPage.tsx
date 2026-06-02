@@ -104,6 +104,8 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
   const [sshKey, setSshKey] = useState('')
   const [apiPort, setApiPort] = useState('8080')
   const [deployLog, setDeployLog] = useState<string[]>([])
+  const [editingDomain, setEditingDomain] = useState<string | null>(null)
+  const [domainInput, setDomainInput] = useState('')
   const [deploying, setDeploying] = useState(false)
   const [deployDone, setDeployDone] = useState(false)
   const [dockerAvail, setDockerAvail] = useState<{ available: boolean; version?: string; containers_running?: number; error?: string } | null>(null)
@@ -273,6 +275,17 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
     onDeployDone()
   }, [onDeployDone, t])
 
+  const handleSetDomain = useCallback(async (slug: string, domain: string) => {
+    try {
+      const res = await apiFetch(`/api/deploy/${slug}/domain`, {
+        method: 'PATCH',
+        body: JSON.stringify({ slug, domain }),
+      })
+      if (res.ok) onDeployDone()
+    } catch { /* ignore */ }
+    setEditingDomain(null)
+  }, [onDeployDone])
+
   const handleGenerateShareUrl = useCallback(async (slug: string) => {
     try {
       const res = await apiFetch(`/api/deploy/${slug}/share`)
@@ -382,6 +395,43 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                         </div>
                       )
                     })}
+                  </div>
+                )}
+                {dep.custom_domain && (
+                  <div style={{ marginTop: '0.3rem', fontSize: '0.78rem' }}>
+                    <span style={{ color: '#22c55e', fontWeight: 600 }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ display: 'inline', verticalAlign: 'middle', marginRight: '0.25rem' }}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </span>
+                    <a href={`https://${dep.custom_domain}`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}>
+                      {dep.custom_domain}
+                    </a>
+                  </div>
+                )}
+                {editingDomain === dep.slug ? (
+                  <div style={{ marginTop: '0.4rem', display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      className="field"
+                      value={domainInput}
+                      onChange={e => setDomainInput(e.target.value)}
+                      placeholder="api.tudominio.com"
+                      style={{ flex: 1, fontSize: '0.78rem', padding: '0.3rem 0.5rem' }}
+                    />
+                    <button type="button" className="btn primary btn-small" style={{ fontSize: '0.7rem', padding: '0.25rem 0.5rem' }}
+                      onClick={() => handleSetDomain(dep.slug, domainInput)}>{t('deploy.save')}</button>
+                    <button type="button" className="btn ghost btn-small" style={{ fontSize: '0.7rem', padding: '0.25rem 0.5rem' }}
+                      onClick={() => { setEditingDomain(null); setDomainInput('') }}>{t('deploy.cancel')}</button>
+                  </div>
+                ) : (
+                  <div style={{ marginTop: '0.3rem' }}>
+                    <button type="button" className="btn ghost" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', color: '#6366f1' }}
+                      onClick={() => { setEditingDomain(dep.slug); setDomainInput(dep.custom_domain || '') }}>
+                      {dep.custom_domain ? t('deploy.changeDomain') : t('deploy.setDomain')}
+                    </button>
+                    {dep.custom_domain && (
+                      <button type="button" className="btn ghost" style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', color: '#dc2626', marginLeft: '0.3rem' }}
+                        onClick={() => handleSetDomain(dep.slug, '')}>{t('deploy.remove')}</button>
+                    )}
                   </div>
                 )}
                 {dep.share_token && (

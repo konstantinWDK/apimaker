@@ -151,6 +151,7 @@ def _deploy_to_dict(d: Deployment) -> dict:
         "host": d.host,
         "is_remote": d.is_remote,
         "share_token": d.share_token,
+        "custom_domain": d.custom_domain,
         "deployed_at": d.deployed_at.isoformat() if d.deployed_at else None,
         "docker_status": "unknown",
     }
@@ -262,6 +263,39 @@ def _ensure_deploy_image(logs: list[str], force: bool = False) -> bool:
         return False
 
 
+def _caddy_compose_section(custom_domain: str | None) -> str:
+    """Return a Caddy reverse-proxy docker-compose section for a custom domain."""
+    if not custom_domain:
+        return ""
+    return f"""
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - CADDY_DOMAIN={custom_domain}
+    configs:
+      - source: caddyfile
+        target: /etc/caddy/Caddyfile
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+configs:
+  caddyfile:
+    content: |
+      {custom_domain} {{
+        reverse_proxy api:8000
+      }}
+
+volumes:
+  caddy_data:
+  caddy_config:
+"""
+
+
 def _build_docker_compose(
     port: int, slug: str, db_url: str,
     include_postgres_container: bool = False,
@@ -274,6 +308,7 @@ def _build_docker_compose(
     mysql_pass: str = "",
     mysql_db: str = "api_deploy",
     mysql_port: int = 3306,
+    custom_domain: str | None = None,
     **kwargs: Any,
 ) -> str:
     """Generate a docker-compose.yml using the local deploy image."""
@@ -281,6 +316,8 @@ def _build_docker_compose(
         volumes_path = _get_host_deploy_root()
     else:
         volumes_path = str(DEPLOY_ROOT)
+
+    caddy_section = _caddy_compose_section(custom_domain)
 
     if include_postgres_container:
         if not pg_pass:
@@ -319,12 +356,9 @@ def _build_docker_compose(
 
 volumes:
   pgdata:
-"""
+{caddy_section}"""
 
-    if include_mysql_container:
-        if not mysql_pass:
-            mysql_pass = f"deploy_secret_{int(Path(__file__).stat().st_mtime)}"
-        return f"""services:
+    mysql_template = f"""services:
   api:
     image: {DEPLOY_IMAGE}
     ports:
@@ -359,7 +393,12 @@ volumes:
 
 volumes:
   mysqldata:
-"""
+""" + caddy_section
+
+    if include_mysql_container:
+        if not mysql_pass:
+            mysql_pass = f"deploy_secret_{int(Path(__file__).stat().st_mtime)}"
+        return mysql_template
 
     return f"""services:
   api:
@@ -372,7 +411,7 @@ volumes:
     volumes:
       - {volumes_path}:/app/deployments
     restart: unless-stopped
-"""
+{caddy_section}"""
 
 
 @router.post("/local/stop")
@@ -862,9 +901,74 @@ def get_deployment_logs(
         return []
 
 
+class DomainRequest(BaseModel):
+    slug: str
+    domain: str  # e.g. "api.midominio.com" or "" to remove
+
+
 class RollbackRequest(BaseModel):
     slug: str
     version_id: str
+
+
+@router.patch("/{slug}/domain")
+def set_custom_domain(
+    slug: str,
+    req: DomainRequest,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(require_admin),
+) -> DeploymentResponse:
+    """Set or remove a custom domain for a deployment. Regenerates docker-compose with Caddy proxy."""
+    dep = _get_deployment(session, req.slug)
+    if not dep:
+        raise HTTPException(status_code=404, detail="Deployment not found")
+
+    old_domain = dep.custom_domain
+    dep.custom_domain = req.domain or None
+    dep.ssl_enabled = bool(req.domain)
+
+    # Regenerate docker-compose with or without Caddy
+    deploy_dir = _deploy_dir_for_slug(req.slug)
+    compose_path = deploy_dir / "docker-compose.yml"
+    if compose_path.exists():
+        try:
+            # Re-read port from existing compose
+            port = dep.port or 8080
+            new_compose = _build_docker_compose(
+                port=port, slug=req.slug, db_url="",
+                custom_domain=dep.custom_domain,
+            )
+            compose_path.write_text(new_compose, encoding="utf-8")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error regenerating compose: {str(e)}")
+
+    dep.updated_at = datetime.now(timezone.utc)
+    session.add(dep)
+    session.commit()
+    session.refresh(dep)
+
+    # Restart deployment if it was running to apply the new proxy
+    if dep.status == "running" and dep.custom_domain != old_domain:
+        try:
+            subprocess.run(
+                ["docker", "compose", "up", "-d", "--remove-orphans"],
+                cwd=str(deploy_dir), capture_output=True, timeout=120,
+            )
+        except Exception:
+            pass
+
+    endpoints_list = json.loads(dep.endpoints) if dep.endpoints else []
+    return DeploymentResponse(
+        id=dep.id, project_id=dep.project_id, slug=dep.slug, name=dep.name,
+        url=dep.url, port=dep.port, stack=dep.stack,
+        status=dep.status, db_type=dep.db_type, auth_method=dep.auth_method,
+        endpoints=endpoints_list, host=dep.host, is_remote=dep.is_remote,
+        share_token=dep.share_token, custom_domain=dep.custom_domain, ssl_enabled=dep.ssl_enabled,
+        docker_status=_check_docker_container(dep.slug),
+        version_id=dep.version_id, version_number=dep.version_number,
+        deployed_at=dep.deployed_at.isoformat() if dep.deployed_at else None,
+        updated_at=dep.updated_at.isoformat() if dep.updated_at else None,
+    )
 
 
 @router.post("/local/rollback")

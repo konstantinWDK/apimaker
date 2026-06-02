@@ -459,6 +459,15 @@ npm install && npm start</pre>
             {t('docs.deployLogsDesc')}
           </p>
         </div>
+        <div className="docs-deploy-card">
+          <div className="docs-deploy-header">
+            <h3>{t('docs.deployCustomDomain')}</h3>
+          </div>
+          <p>{t('docs.deployCustomDomainDesc')}</p>
+          <pre className="docs-deploy-code"># En el panel Deploy, haz clic en "Set custom domain"
+# e ingresa tu dominio (ej: api.midominio.com)
+# Caddy auto-genera SSL con Let's Encrypt</pre>
+        </div>
       </div>
 
       <div className="docs-checklist">
