@@ -187,7 +187,12 @@ if /i "%USE_DOCKER%"=="y" (
         echo @echo off
         echo cd /d "%%~dp0"
         echo echo Starting DoApi...
-        echo npx concurrently -n "Backend,Frontend" -c "blue,green" "cd backend ^&^& .venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000" "cd frontend ^&^& npm run dev"
+        echo start "Backend" cmd /c "cd /d "%%~dp0backend" ^&^& .venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
+        echo start "Frontend" cmd /c "cd /d "%%~dp0frontend" ^&^& npm run dev"
+        echo echo.
+        echo echo Both servers started in separate windows.
+        echo echo Backend: http://localhost:8000
+        echo echo Frontend: http://localhost:5173
     ) > start.bat
     (
         echo #!/usr/bin/env bash

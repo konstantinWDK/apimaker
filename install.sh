@@ -238,6 +238,52 @@ if [ "$USE_DOCKER" = "y" ]; then
     export APIMAKER_DATABASE_URL="$DB_URL_DOCKER"
     echo -e "${BLUE}Starting services with Docker...${NC}"
     $DOCKER_CMD $PROFILES up -d --build
+
+    {
+        echo '@echo off'
+        echo 'cd /d "%~dp0"'
+        echo 'echo Starting DoApi with Docker...'
+        echo "$DOCKER_CMD $PROFILES up -d"
+        echo 'pause'
+    } > start.bat
+
+    {
+        echo '#!/usr/bin/env bash'
+        echo 'cd "$(dirname "$0")"'
+        echo 'echo "Starting DoApi with Docker..."'
+        echo "$DOCKER_CMD $PROFILES up -d"
+    } > start.sh
+else
+    {
+        echo '@echo off'
+        echo 'cd /d "%~dp0"'
+        echo 'echo Starting DoApi...'
+        echo 'start "Backend" cmd /c "cd /d "%~dp0backend" && .venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"'
+        echo 'start "Frontend" cmd /c "cd /d "%~dp0frontend" && npm run dev"'
+        echo 'echo.'
+        echo 'echo Both servers started in separate windows.'
+        echo 'echo Backend: http://localhost:8000'
+        echo 'echo Frontend: http://localhost:5173'
+    } > start.bat
+
+    {
+        echo '#!/usr/bin/env bash'
+        echo 'cd "$(dirname "$0")"'
+        echo 'echo "Starting DoApi..."'
+        echo ''
+        echo '(cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000) &'
+        echo 'BACKEND_PID=$!'
+        echo ''
+        echo '(cd frontend && npm run dev) &'
+        echo 'FRONTEND_PID=$!'
+        echo ''
+        echo 'echo "Backend: http://localhost:8000"'
+        echo 'echo "Frontend: http://localhost:5173"'
+        echo 'echo "Press Ctrl+C to stop both servers."'
+        echo ''
+        echo 'trap "kill \$BACKEND_PID \$FRONTEND_PID 2>/dev/null; exit" INT TERM'
+        echo 'wait'
+    } > start.sh
 fi
 
 echo ""
@@ -250,11 +296,4 @@ echo -e "Password:     ${YELLOW}$ADMIN_PASS${NC}"
 echo -e "Database:     ${CYAN}$DB_TYPE${NC}"
 if [ "$NEED_DOCKER_DB" = true ]; then
     echo -e "${CYAN}DB running in Docker.${NC}"
-fi
-
-if [ "$USE_DOCKER" != "y" ]; then
-    echo ""
-    echo -e "${YELLOW}To start the application, open two terminals:${NC}"
-    echo -e "  Terminal 1 (Backend):  ${CYAN}cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000${NC}"
-    echo -e "  Terminal 2 (Frontend): ${CYAN}cd frontend && npm run dev${NC}"
 fi
