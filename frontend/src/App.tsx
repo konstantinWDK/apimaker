@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { Routes, Route, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { LayoutDashboard, Play, Shield, Settings, Rocket, Database, TestTube, BookOpen, Info, Activity, LayoutList, BarChart3 } from 'lucide-react'
+import { LayoutDashboard, Play, Shield, Settings, Rocket, Database, TestTube, BookOpen, Activity, LayoutList, BarChart3 } from 'lucide-react'
 
 import { SetupWizard } from './components/SetupWizard'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -26,7 +26,7 @@ const ConfigPage = lazy(() => import('./components/ConfigPage').then((module) =>
 const DashboardPage = lazy(() => import('./components/DashboardPage').then((module) => ({ default: module.DashboardPage })))
 const DeployPage = lazy(() => import('./components/DeployPage').then((module) => ({ default: module.DeployPage })))
 const DocsPage = lazy(() => import('./components/DocsPage').then((module) => ({ default: module.DocsPage })))
-const InfoPage = lazy(() => import('./components/InfoPage').then((module) => ({ default: module.InfoPage })))
+
 const MonitorPage = lazy(() => import('./components/MonitorPage').then((module) => ({ default: module.MonitorPage })))
 const ProductOpsPage = lazy(() => import('./components/ProductOpsPage').then((module) => ({ default: module.ProductOpsPage })))
 const SecurityPage = lazy(() => import('./components/SecurityPage').then((module) => ({ default: module.SecurityPage })))
@@ -242,13 +242,7 @@ export function App() {
             <BookOpen size={16} />
             {t('nav.docs')}
           </NavLink>
-          <NavLink
-            to="/info"
-            className={({ isActive }) => isActive ? 'nav-button active' : 'nav-button'}
-          >
-            <Info size={16} />
-            {t('nav.info')}
-          </NavLink>
+
         </div>
         <div className="nav-actions">
           <LanguageSwitcher />
@@ -287,7 +281,7 @@ export function App() {
                 <Routes location={location}>
                   <Route path="/" element={<BuilderPage />} />
                   <Route path="/simulator" element={<SimulatorPage />} />
-                  <Route path="/info" element={<InfoPage />} />
+
                   <Route path="/security" element={<SecurityPage />} />
                   <Route path="/deploy" element={<DeployPage />} />
                   <Route path="/operations" element={<ProductOpsPage />} />

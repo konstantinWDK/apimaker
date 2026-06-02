@@ -117,6 +117,79 @@ export function DocsPage() {
           </div>
         </div>
       </div>
+
+      {/* Available Stacks */}
+      <div className="docs-section" id="stacks">
+        <h2 className="docs-section__title">{t('info.availableStacks')}</h2>
+        <div className="info-stacks">
+          <div className="info-stack">
+            <div className="info-stack__head">
+              <span className="info-stack__dot" style={{ background: '#3b82f6' }} />
+              <strong>FastAPI</strong>
+              <span className="info-stack__badge">{t('info.complete')}</span>
+            </div>
+            <p className="info-stack__desc">{t('info.fastapiDesc')}</p>
+          </div>
+          <div className="info-stack">
+            <div className="info-stack__head">
+              <span className="info-stack__dot" style={{ background: '#10b981' }} />
+              <strong>Express</strong>
+              <span className="info-stack__badge">{t('info.complete')}</span>
+            </div>
+            <p className="info-stack__desc">{t('info.expressDesc')}</p>
+          </div>
+          <div className="info-stack">
+            <div className="info-stack__head">
+              <span className="info-stack__dot" style={{ background: '#8b5cf6' }} />
+              <strong>NestJS</strong>
+              <span className="info-stack__badge">{t('info.complete')}</span>
+            </div>
+            <p className="info-stack__desc">{t('info.nestjsDesc')}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Start */}
+      <div className="docs-section" id="quickstart">
+        <h2 className="docs-section__title">{t('info.quickStart')}</h2>
+        <div className="info-steps">
+          <div className="info-step">
+            <span className="info-step__num">1</span>
+            <div>
+              <strong>{t('info.installAndStart')}</strong>
+              <p>{t('info.installDesc')}</p>
+            </div>
+          </div>
+          <div className="info-step">
+            <span className="info-step__num">2</span>
+            <div>
+              <strong>{t('info.createDataset')}</strong>
+              <p>{t('info.createDatasetDesc')}</p>
+            </div>
+          </div>
+          <div className="info-step">
+            <span className="info-step__num">3</span>
+            <div>
+              <strong>{t('info.designEndpoints')}</strong>
+              <p>{t('info.designEndpointsDesc')}</p>
+            </div>
+          </div>
+          <div className="info-step">
+            <span className="info-step__num">4</span>
+            <div>
+              <strong>{t('info.testSimulator')}</strong>
+              <p>{t('info.testSimulatorDesc')}</p>
+            </div>
+          </div>
+          <div className="info-step">
+            <span className="info-step__num">5</span>
+            <div>
+              <strong>{t('info.generateDeploy')}</strong>
+              <p>{t('info.generateDeployDesc')}</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 
