@@ -3606,6 +3606,16 @@ input[type='password'] {
 }
 
 /* Project Title H1 Styles */
+.page-header {
+  padding: 1.25rem 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 1rem;
+}
+[data-theme="dark"] .page-header {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+}
+
 .page-title {
   font-size: 2.25rem;
   font-weight: 800;
@@ -4981,7 +4991,6 @@ input[type='password'] {
 [data-theme="dark"] .nav-button:hover { background: var(--bg-tertiary); color: var(--text-primary); }
 [data-theme="dark"] .nav-button.active { background: var(--bg-tertiary); color: var(--accent-blue); }
 [data-theme="dark"] .page-container { background: var(--bg-primary); }
-[data-theme="dark"] .page-header { background: var(--bg-secondary); border-color: var(--border-color); }
 [data-theme="dark"] .section-card { background: var(--bg-secondary); border-color: var(--border-color); }
 [data-theme="dark"] .section-card__header { border-color: var(--border-color); }
 [data-theme="dark"] .info-card { background: var(--bg-secondary); border-color: var(--border-color); }
@@ -5910,10 +5919,6 @@ input[type='password'] {
 }
 [data-theme="dark"] .section-card--amber {
   border-color: #3a2a1a;
-}
-[data-theme="dark"] .page-header {
-  background: var(--bg-secondary);
-  border-color: var(--border-color);
 }
 [data-theme="dark"] .page-title {
   color: var(--text-primary);
