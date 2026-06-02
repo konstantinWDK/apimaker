@@ -4729,6 +4729,7 @@ input[type='password'] {
 
 .docs-section {
   margin-bottom: 2rem; scroll-margin-top: 1rem;
+  padding: 1.25rem; border: 1px solid transparent; border-radius: 12px;
 }
 .docs-section__title {
   font-size: 1.35rem; font-weight: 700; color: var(--text-primary);
