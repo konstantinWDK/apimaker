@@ -187,6 +187,7 @@ fi
     echo "APIMAKER_ENVIRONMENT=development"
     echo "APIMAKER_DATABASE_URL=$DB_URL_DOCKER"
     echo "APIMAKER_JWT_SECRET_KEY=$(random_hex 32)"
+    echo "APIMAKER_ENCRYPTION_KEY=$(random_hex 32)"
 } > .env
 
 if [ "$NEED_DOCKER_DB" = true ]; then
