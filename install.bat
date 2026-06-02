@@ -107,7 +107,7 @@ if /i "%USE_DOCKER%"=="y" (
 )
 
 call :random_hex JWT_SECRET 64
-call :random_urlsafe ENCRYPTION_KEY 48
+call :random_hex ENCRYPTION_KEY 64
 (
     echo APIMAKER_ENVIRONMENT=development
     echo APIMAKER_DATABASE_URL=%DB_URL_DOCKER%
