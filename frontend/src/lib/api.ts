@@ -344,35 +344,7 @@ export const createRemoteProject = async (
     body: JSON.stringify({ name, description, target_stack: targetStack }),
   })
   const data = await handleResponse(response)
-  return {
-    id: data.project.id,
-    remoteId: data.project.slug || data.project.id,
-    slug: data.project.slug,
-    name: data.project.name,
-    description: data.project.description,
-    authMethod: (data.project.auth_method as any) || 'none',
-    targetStack: data.project.target_stack,
-    datasets: (data.datasets || []).map((ds: any) => ({
-      id: ds.id,
-      name: ds.name,
-      sourceType: ds.source_type,
-      fields: (ds.fields || []).map((f: any) => ({
-        id: f.id || crypto.randomUUID(),
-        name: f.name,
-        type: f.type,
-        required: f.required ?? true,
-        description: f.description,
-        isPrimaryKey: f.is_primary_key ?? false,
-        defaultValue: f.default_value,
-        fakerCategory: f.faker_category,
-        enum: f.enum_values || undefined,
-        references: f.references || undefined,
-      })),
-      sampleRows: ds.sample_rows || [],
-    })),
-    endpoints: data.endpoints || [],
-    updatedAt: data.project.updated_at,
-  }
+  return mapProjectResponse(data)
 }
 
 /**
@@ -396,7 +368,7 @@ export const fetchRemoteProject = async (projectId: string): Promise<ProjectDraf
   const headers = buildHeaders()
   const response = await fetch(`${baseUrl}/projects/${projectId}`, { headers })
   const data = await handleResponse(response)
-  return mapProjectResponse({ ...data.project, datasets: data.datasets || [], endpoints: data.endpoints || [] })
+  return mapProjectResponse(data)
 }
 
 /**

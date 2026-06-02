@@ -65,6 +65,7 @@ def _db_to_pydantic(db_project, datasets_with_fields=None, endpoints=None, inclu
                 except Exception:
                     enum_vals = None
             fields_data.append({
+                "id": f.id,
                 "name": f.name,
                 "type": f.field_type,
                 "required": f.required,
