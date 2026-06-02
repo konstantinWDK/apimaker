@@ -26,6 +26,7 @@ from ..db_models import ApiAccessLog, Deployment, Project
 from ..models import ApiAccessLogEntry, DeploymentResponse, ShareDeployResponse
 from ..security import CurrentUser, require_admin
 from ..services.project_service import project_service
+from ..services.version_service import version_service
 
 logger = logging.getLogger("doapi.deploy")
 router = APIRouter(prefix="/deploy", tags=["deploy"])
@@ -712,6 +713,7 @@ def list_deployments(
             status=d.status, db_type=d.db_type, auth_method=d.auth_method,
             endpoints=endpoints_list, host=d.host, is_remote=d.is_remote,
             share_token=d.share_token, docker_status=docker_status,
+            version_id=d.version_id, version_number=d.version_number,
             deployed_at=d.deployed_at.isoformat() if d.deployed_at else None,
             updated_at=d.updated_at.isoformat() if d.updated_at else None,
         ))
@@ -860,6 +862,61 @@ def get_deployment_logs(
         return []
 
 
+class RollbackRequest(BaseModel):
+    slug: str
+    version_id: str
+
+
+@router.post("/local/rollback")
+def rollback_deployment(
+    req: RollbackRequest,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(require_admin),
+) -> DeployStatus:
+    """Restore a project to a previous version and redeploy."""
+    logs: list[str] = []
+    dep = _get_deployment(session, req.slug)
+    if not dep:
+        raise HTTPException(status_code=404, detail="Deployment not found")
+
+    logs.append(f" Restoring version {req.version_id[:8]}...")
+    try:
+        version_service.restore_version(session, dep.project_id, req.version_id)
+        logs.append(" Version restored in database")
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Version not found")
+
+    # Re-export project.json
+    deploy_dir = _deploy_dir_for_slug(req.slug)
+    _export_project_json(session, dep.project_id, deploy_dir / "project.json")
+    logs.append(" Project re-exported")
+
+    # Rebuild image and redeploy
+    _ensure_deploy_image(logs, force=True)
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "up", "-d", "--force-recreate", "--remove-orphans"],
+            cwd=str(deploy_dir), capture_output=True, text=True, timeout=180,
+        )
+        if result.returncode != 0:
+            logs.append(result.stderr.strip()[:500])
+            return DeployStatus(status="error", logs=logs, message="Rollback deploy failed")
+    except Exception as e:
+        logs.append(f" Error: {str(e)}")
+        return DeployStatus(status="error", logs=logs)
+
+    # Create a new version snapshot marking the rollback
+    new_version = version_service.create_version(session, dep.project_id, message=f"Rollback to v{dep.version_number or '?'}")
+    dep.version_id = new_version.id
+    dep.version_number = new_version.version
+    dep.updated_at = datetime.now(timezone.utc)
+    session.add(dep)
+    session.commit()
+
+    logs.append(f" Rollback complete — new snapshot v{new_version.version}")
+    return DeployStatus(status="running", url=dep.url, logs=logs, message=f"Rolled back to version {req.version_id[:8]}")
+
+
 @router.post("/local")
 def deploy_local(
     req: LocalDeployRequest,
@@ -876,6 +933,10 @@ def deploy_local(
 
     slug = _safe_slug(project.slug or str(project.id))
     deploy_dir = _deploy_dir_for_slug(slug)
+
+    # Auto-create version snapshot before deploying
+    version = version_service.create_version(session, str(project.id), message=f"Deploy {slug}")
+    logs.append(f" Snapshot v{version.version} created ({version.id[:8]})")
 
     # Stop the existing deployment for this project before checking the port.
     # Otherwise redeploying on the same port would be seen as a conflict.
@@ -1032,6 +1093,8 @@ def deploy_local(
         "endpoints": deployed_endpoints,
         "db_type": "postgresql" if include_postgres_container else ("mysql" if include_mysql_container else req.db_type),
         "db_credentials": db_creds,
+        "version_id": version.id,
+        "version_number": version.version,
     })
 
     url = f"http://localhost:{port}/api"

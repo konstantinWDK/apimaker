@@ -257,6 +257,22 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
     setGlobalDeployState(finalStatus, finalMsg)
   }
 
+  const handleRollback = useCallback(async (slug: string, versionId: string) => {
+    if (!window.confirm(t('deploy.confirmRollback'))) return
+    setDeploying(true)
+    log(t('deploy.rollingBack'))
+    try {
+      const res = await apiFetch('/api/deploy/local/rollback', {
+        method: 'POST',
+        body: JSON.stringify({ slug, version_id: versionId }),
+      })
+      const data = await res.json()
+      data.logs?.forEach((l: string) => log(l))
+    } catch (e: any) { log(` ${e.message}`) }
+    setDeploying(false)
+    onDeployDone()
+  }, [onDeployDone, t])
+
   const handleGenerateShareUrl = useCallback(async (slug: string) => {
     try {
       const res = await apiFetch(`/api/deploy/${slug}/share`)
@@ -294,6 +310,7 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                     <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{dep.name}</div>
                     <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
                       {dep.url} · {dep.stack} · {statusLabel(dep.docker_status)}
+                      {dep.version_number && <span style={{ marginLeft: '0.4rem', padding: '0.1rem 0.35rem', background: 'var(--bg-tertiary)', borderRadius: '4px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>v{dep.version_number}</span>}
                     </div>
                     {dep.auth_method && (
                       <div style={{ marginTop: '0.25rem', display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
@@ -323,6 +340,10 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                     ) : (
                       <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#166534' }}
                         onClick={() => handleAction(dep.slug, 'start')}>{t('deploy.start')}</button>
+                    )}
+                    {dep.version_id && (
+                      <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#d97706' }}
+                        onClick={() => handleRollback(dep.slug, dep.version_id)} disabled={deploying}>{t('deploy.rollback')}</button>
                     )}
                     <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#4f46e5' }}
                       onClick={() => handleRedeploy(dep.slug)} disabled={deploying}>{t('deploy.applyChanges')}</button>
