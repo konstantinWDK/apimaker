@@ -4872,7 +4872,7 @@ input[type='password'] {
   font-size: 0.65rem; font-weight: 700; color: #fff; padding: 0.15rem 0.45rem;
   border-radius: 4px; text-transform: uppercase; min-width: 48px; text-align: center;
 }
-.docs-endpoint-path { font-family: monospace; color: #1e293b; font-weight: 600; }
+.docs-endpoint-path { font-family: monospace; color: var(--text-primary); font-weight: 600; }
 .docs-endpoint-summary { color: var(--text-muted); }
 
 @media (max-width: 768px) {
@@ -5098,7 +5098,7 @@ input[type='password'] {
   color: var(--text-primary);
 }
 [data-theme="dark"] .endpoint-card__path {
-  color: var(--accent-blue);
+  color: var(--text-primary);
 }
 [data-theme="dark"] .dataset-badge__name {
   color: var(--text-primary);
@@ -5265,8 +5265,15 @@ input[type='password'] {
 }
 [data-theme="dark"] .endpoint-item__route,
 [data-theme="dark"] .endpoint-item__path {
-  color: var(--accent-blue);
+  color: var(--text-primary);
 }
+[data-theme="dark"] .endpoint-item__method--get { color: #7dd3fc; background: rgba(14, 165, 233, 0.12); }
+[data-theme="dark"] .endpoint-item__method--post { color: #6ee7b7; background: rgba(16, 185, 129, 0.12); }
+[data-theme="dark"] .endpoint-item__method--put { color: #fdba74; background: rgba(249, 115, 22, 0.12); }
+[data-theme="dark"] .endpoint-item__method--patch { color: #d8b4fe; background: rgba(168, 85, 247, 0.12); }
+[data-theme="dark"] .endpoint-item__method--delete { color: #fca5a5; background: rgba(239, 68, 68, 0.12); }
+[data-theme="dark"] .docs-endpoint-method { background-blend-mode: screen; }
+[data-theme="dark"] .docs-endpoint-path { color: var(--text-primary); }
 [data-theme="dark"] .endpoint-item__title {
   color: var(--text-primary);
 }
