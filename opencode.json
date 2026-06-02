@@ -117,8 +117,5 @@
         "bash": "deny"
       }
     }
-  },
-  "rules": [
-    "{file:.opencode/rules/project-rules.md}"
-  ]
+  }
 }
