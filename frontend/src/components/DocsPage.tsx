@@ -13,15 +13,6 @@ export function DocsPage() {
   const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<DocTab>('overview')
 
-  const TABS: { id: DocTab; label: string; icon: string }[] = [
-    { id: 'overview', label: t('docs.tabOverview'), icon: '★' },
-    { id: 'instalacion', label: t('docs.tabInstall'), icon: '↓' },
-    { id: 'tutorial', label: t('docs.tabTutorial'), icon: '✓' },
-    { id: 'cli', label: t('docs.tabCli'), icon: '⌘' },
-    { id: 'codigo', label: t('docs.tabCode'), icon: '</>' },
-    { id: 'desplegar', label: t('docs.tabDeploy'), icon: '▲' },
-  ]
-
   const TABLE_OF_CONTENTS: TocItem[] = [
     { id: 'overview', label: t('docs.tabOverview'), tab: 'overview' },
     { id: 'features', label: t('docs.features'), tab: 'overview' },
@@ -449,19 +440,6 @@ python -c "import secrets; print('ENCRYPTION_KEY:', secrets.token_urlsafe(32))"<
   return (
     <div className="docs-layout">
       <div className="docs-content">
-        <div className="docs-tabs">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              className={`docs-tab ${activeTab === tab.id ? 'docs-tab--active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              <span className="docs-tab__icon">{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
         {activeTab === 'overview' && renderOverview()}
         {activeTab === 'instalacion' && renderInstalacion()}
         {activeTab === 'tutorial' && renderTutorial()}
