@@ -464,9 +464,39 @@ npm install && npm start</pre>
             <h3>{t('docs.deployCustomDomain')}</h3>
           </div>
           <p>{t('docs.deployCustomDomainDesc')}</p>
-          <pre className="docs-deploy-code"># En el panel Deploy, haz clic en "Set custom domain"
-# e ingresa tu dominio (ej: api.midominio.com)
-# Caddy auto-genera SSL con Let's Encrypt</pre>
+          <div style={{ fontSize: '0.82rem', lineHeight: 1.6, margin: '0.5rem 0' }}>
+            <strong>{t('docs.dnsFlow')}</strong>
+            <pre className="docs-code" style={{ margin: '0.3rem 0 0.75rem', fontSize: '0.75rem', whiteSpace: 'pre' }}>{`tudominio.com  ──CNAME──►  api.tudominio.com
+                                      │
+                                      ▼
+                              Tu Servidor (IP: 1.2.3.4)
+                                      │
+                          ┌───────────┴───────────┐
+                          ▼                       ▼
+                      Puerto 80                Puerto 443
+                   (HTTP redirect)          (HTTPS + SSL)
+                          │                       │
+                          └─────── Caddy ─────────┘
+                                   │
+                                   ▼
+                           reverse_proxy
+                                   │
+                                   ▼
+                         api:8000 (contenedor)
+                                   │
+                          ┌────────┴────────┐
+                          ▼                 ▼
+                    PostgreSQL          SQLite
+                    container           local`}</pre>
+          </div>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            <strong>{t('docs.deployFlowSteps')}</strong>
+          </p>
+          <ol style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', paddingLeft: '1.2rem', margin: '0.3rem 0' }}>
+            <li>{t('docs.dnsStep1')}</li>
+            <li>{t('docs.dnsStep2')}</li>
+            <li>{t('docs.dnsStep3')}</li>
+          </ol>
         </div>
       </div>
 
