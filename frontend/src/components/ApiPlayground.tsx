@@ -1,398 +1,198 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Play, Save, Terminal, Plus, Trash2, ChevronRight, ChevronDown, Clock, Bookmark, FileJson, Code2 } from 'lucide-react'
-import type { ProjectDraft } from '../types/schemas'
-import { readBackendConfig } from '../lib/backendConfig'
+import type { ProjectDraft, ApiEndpoint } from '../types/schemas'
 
 interface Props {
   project: ProjectDraft
-  mockRunning: boolean
-  onStartMock: () => Promise<void>
-  mockLoading?: boolean
-  mockError?: string | null
-  selectedDatasetId?: string
-  deploymentBaseUrl?: string | null
+  mockBaseUrl: string
+  deployUrl?: string | null
 }
 
-interface ApiResponse { url: string; status: number; body: unknown; method: string; time: number; size: number }
-interface KvRow { key: string; value: string; enabled: boolean }
-interface SavedQuery { id: string; name: string; method: string; path: string; body: string; params: KvRow[]; headers: KvRow[]; collection: string }
-interface HistoryEntry { id: string; method: string; path: string; status: number; duration: number; timestamp: string }
-
-const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const
-const METHOD_COLORS: Record<string, string> = { GET: '#22c55e', POST: '#3b82f6', PUT: '#f59e0b', PATCH: '#a855f7', DELETE: '#ef4444' }
-type ResponseView = 'pretty' | 'raw'
-function emptyKv(): KvRow { return { key: '', value: '', enabled: true } }
-
-export function ApiPlayground({ project, mockRunning, onStartMock, mockLoading, selectedDatasetId, deploymentBaseUrl }: Props) {
+export function ApiPlayground({ project, mockBaseUrl, deployUrl }: Props) {
   const { t } = useTranslation()
-  const backendConfig = readBackendConfig()
-  const backendBaseUrl = backendConfig.baseUrl?.replace(/\/$/, '') || 'http://localhost:8000'
-  const effectiveId = project.slug || project.remoteId || project.id
-  const mockBase = deploymentBaseUrl || `${backendBaseUrl}/api/mock/${effectiveId}`
-
-  const endpoints = useMemo(() =>
-    selectedDatasetId
-      ? project.endpoints.filter(ep => !ep.targetDatasetId || ep.targetDatasetId === selectedDatasetId)
-      : project.endpoints,
-    [project.endpoints, selectedDatasetId]
-  )
-
-  const [method, setMethod] = useState('GET')
-  const [url, setUrl] = useState('')
-  const [body, setBody] = useState('')
-  const [params, setParams] = useState<KvRow[]>([emptyKv()])
-  const [headers, setHeaders] = useState<KvRow[]>([{ key: 'Content-Type', value: 'application/json', enabled: true }])
-  const [response, setResponse] = useState<ApiResponse | null>(null)
+  const [selectedEp, setSelectedEp] = useState<ApiEndpoint | null>(null)
+  const [targetUrl, setTargetUrl] = useState<'mock' | 'deploy'>(deployUrl ? 'deploy' : 'mock')
+  const [headersText, setHeadersText] = useState('{}')
+  const [bodyText, setBodyText] = useState('')
+  const [response, setResponse] = useState<{ status: number; statusText: string; body: string; duration: string } | null>(null)
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'params' | 'headers' | 'body'>('params')
-  const [respView, setRespView] = useState<ResponseView>('pretty')
+  const [error, setError] = useState<string | null>(null)
 
-  const [savedQueries, setSavedQueries] = useState<SavedQuery[]>(() => {
-    try { return JSON.parse(localStorage.getItem('doapi-queries') || '[]') } catch { return [] }
-  })
-  const [history, setHistory] = useState<HistoryEntry[]>(() => {
-    try { return JSON.parse(localStorage.getItem('doapi-history') || '[]') } catch { return [] }
-  })
-  const [queryName, setQueryName] = useState('')
-  const [collection, setCollection] = useState('Default')
-  const [collectionsOpen, setCollectionsOpen] = useState(true)
-  const [histOpen, setHistOpen] = useState(false)
-  const [showSave, setShowSave] = useState(false)
-  const [sidebarOpen] = useState(true)
+  const baseUrl = targetUrl === 'deploy' && deployUrl ? deployUrl : mockBaseUrl
 
-  const authKey = project.authMethod === 'apikey' ? 'X-API-Key' : project.authMethod === 'jwt' ? 'Authorization' : null
-  const authVal = project.authMethod === 'apikey' ? (project.apiKey || '') : ''
-
-  useEffect(() => {
-    if (!authKey) return
-    setHeaders(prev => prev.some(h => h.key === authKey) ? prev : [{ key: authKey, value: authVal, enabled: true }, ...prev])
-  }, [project.id])
-
-  useEffect(() => {
-    if (endpoints.length > 0 && !url) {
-      const ep = endpoints[0]
-      setMethod(ep.method)
-      setUrl(ep.path)
-      setBody(ep.method === 'POST' || ep.method === 'PUT' ? '{\n  \n}' : '')
-    }
-  }, [endpoints, url])
-
-  const buildFullUrl = useCallback(() => {
-    let fullUrl = mockBase + (url.startsWith('/') ? url : `/${url}`)
-    const active = params.filter(p => p.key && p.enabled)
-    if (active.length) fullUrl += '?' + active.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&')
-    return fullUrl
-  }, [url, params, mockBase])
-
-  const execute = useCallback(async (m?: string, p?: string, b?: string) => {
-    const execMethod = m || method
-    const execPath = p || url
-    const execBody = b !== undefined ? b : body
-    const execUrl = mockBase + (execPath.startsWith('/') ? execPath : `/${execPath}`) + (
-      params.filter(p2 => p2.key && p2.enabled).length
-        ? '?' + params.filter(p2 => p2.key && p2.enabled).map(p2 => `${encodeURIComponent(p2.key)}=${encodeURIComponent(p2.value)}`).join('&')
-        : ''
-    )
+  const handleSend = useCallback(async () => {
+    if (!selectedEp) return
     setLoading(true)
+    setError(null)
+    setResponse(null)
     const start = performance.now()
     try {
-      const h: Record<string, string> = {}
-      headers.filter(hh => hh.key && hh.enabled).forEach(hh => { h[hh.key] = hh.value })
-      const res = await fetch(execUrl, {
-        method: execMethod,
-        headers: h,
-        body: ['POST', 'PUT', 'PATCH'].includes(execMethod) ? execBody || undefined : undefined,
-      })
-      const text = await res.text()
-      const duration = Math.round(performance.now() - start)
-      let parsed = text
-      try { parsed = JSON.stringify(JSON.parse(text), null, 2) } catch {}
-      setResponse({ url: execUrl, status: res.status, body: parsed, method: execMethod, time: duration, size: text.length })
-      const entry: HistoryEntry = { id: crypto.randomUUID(), method: execMethod, path: execPath, status: res.status, duration, timestamp: new Date().toISOString() }
-      setHistory(prev => {
-        const next = [entry, ...prev].slice(0, 50)
-        localStorage.setItem('doapi-history', JSON.stringify(next)); return next
-      })
-    } catch {
-      setResponse({ url: execUrl, status: 0, body: 'Connection error', method: execMethod, time: 0, size: 0 })
-    } finally { setLoading(false) }
-  }, [method, url, body, headers, params, mockBase])
+      let headers: Record<string, string> = {}
+      try { headers = JSON.parse(headersText || '{}') } catch { throw new Error(t('apiPlayground.invalidHeaders')) }
+      if (!headers['Content-Type']) headers['Content-Type'] = 'application/json'
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); execute() }
-  }
+      let body: BodyInit | undefined
+      if (['POST', 'PUT', 'PATCH'].includes(selectedEp.method) && bodyText.trim()) {
+        try { JSON.parse(bodyText); body = bodyText } catch { throw new Error(t('apiPlayground.invalidBody')) }
+      }
 
-  const saveQuery = () => {
-    if (!queryName.trim()) return
-    const q: SavedQuery = { id: crypto.randomUUID(), name: queryName.trim(), method, path: url, body, params: params.filter(p => p.key), headers: headers.filter(h => h.key), collection }
-    const next = [...savedQueries, q]
-    setSavedQueries(next)
-    localStorage.setItem('doapi-queries', JSON.stringify(next))
-    setQueryName(''); setShowSave(false)
-  }
-
-  const loadQuery = (q: SavedQuery) => {
-    setMethod(q.method); setUrl(q.path); setBody(q.body)
-    setParams(q.params.length ? q.params : [emptyKv()])
-    setHeaders(q.headers.length ? q.headers : [{ key: 'Content-Type', value: 'application/json', enabled: true }])
-  }
-
-  const deleteQuery = (id: string) => {
-    const next = savedQueries.filter(q => q.id !== id)
-    setSavedQueries(next)
-    localStorage.setItem('doapi-queries', JSON.stringify(next))
-  }
-
-  const copyCurl = async () => {
-    const full = buildFullUrl()
-    let curl = `curl -X ${method} '${full}'`
-    headers.filter(h => h.key && h.enabled).forEach(h => curl += ` \\\n  -H '${h.key}: ${h.value}'`)
-    if (['POST', 'PUT', 'PATCH'].includes(method) && body) curl += ` \\\n  -d '${body.replace(/'/g, "\\'")}'`
-    await navigator.clipboard.writeText(curl)
-  }
-
-  const groups = savedQueries.reduce<Record<string, SavedQuery[]>>((acc, q) => {
-    const c = q.collection || 'Default'
-    if (!acc[c]) acc[c] = []
-    acc[c].push(q)
-    return acc
-  }, {})
+      const res = await fetch(`${baseUrl}${selectedEp.path}`, { method: selectedEp.method, headers, body })
+      const duration = ((performance.now() - start) / 1000).toFixed(2)
+      const rawBody = await res.text()
+      let prettyBody = rawBody
+      try { prettyBody = JSON.stringify(JSON.parse(rawBody), null, 2) } catch { /* raw */ }
+      setResponse({ status: res.status, statusText: res.statusText, body: prettyBody, duration: `${duration}s` })
+    } catch (e: any) {
+      setError(e.message || 'Unknown error')
+    }
+    setLoading(false)
+  }, [selectedEp, baseUrl, headersText, bodyText, t])
 
   return (
-    <div onKeyDown={handleKeyDown}>
-      {!mockRunning && (
-        <div className="pg__banner" style={{ marginBottom: '0.75rem' }}>
-          <span>{t('playground.mockServerStopped')}</span>
-          <button type="button" className="btn primary btn-small" onClick={onStartMock} disabled={mockLoading} style={{ marginLeft: '0.5rem' }}>
-            {mockLoading ? t('playground.starting') : t('playground.startMockServer')}
-          </button>
-        </div>
-      )}
-
-      <div className="pg__layout" style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-        <div className="pg__main" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {/* URL Bar */}
-          <div className="pg__urlbar" style={{ display: 'flex', gap: '0.35rem', alignItems: 'stretch' }}>
-            <select value={method} onChange={e => setMethod(e.target.value)}
-              style={{
-                padding: '0.45rem 0.6rem', borderRadius: 8, border: `2px solid ${METHOD_COLORS[method] || '#64748b'}`,
-                background: 'var(--bg-secondary)', color: METHOD_COLORS[method] || 'var(--text-primary)',
-                fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', width: 80, textAlign: 'center',
-              }}>
-              {METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
-            <div style={{ flex: 1 }}>
-              <input value={url} onChange={e => setUrl(e.target.value)}
-                placeholder="/pokemon"
-                style={{
-                  width: '100%', padding: '0.45rem 0.75rem', borderRadius: 8,
-                  border: '1px solid var(--border-color)', background: 'var(--bg-secondary)',
-                  color: 'var(--text-primary)', fontSize: '0.85rem', fontFamily: 'monospace',
-                  boxSizing: 'border-box',
-                }} />
-            </div>
-            <button type="button" className="btn primary" onClick={() => execute()} disabled={loading}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.45rem 1rem', fontWeight: 700 }}>
-              <Play size={15} /> {loading ? '...' : t('playground.send')}
-            </button>
-          </div>
-
-          {/* Tabs */}
-          <div className="pg__editor" style={{ border: '1px solid var(--border-color)', borderRadius: 10, overflow: 'hidden', background: 'var(--bg-secondary)' }}>
-            <div className="pg__tabs" style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-tertiary)' }}>
-              {(['params', 'headers', 'body'] as const).map(tab => (
-                <button key={tab} type="button" onClick={() => setActiveTab(tab)}
-                  style={{
-                    padding: '0.5rem 1rem', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem',
-                    background: activeTab === tab ? 'var(--bg-secondary)' : 'transparent',
-                    color: activeTab === tab ? 'var(--accent-blue)' : 'var(--text-muted)',
-                    borderBottom: activeTab === tab ? '2px solid var(--accent-blue)' : '2px solid transparent',
-                  }}>
-                  {tab === 'params' ? t('playground.params') : tab === 'headers' ? t('playground.headers') : t('playground.body')}
-                </button>
-              ))}
-            </div>
-            <div style={{ padding: '0.75rem' }}>
-              {activeTab === 'params' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  {params.map((p, i) => (
-                    <div key={i} style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-                      <input type="checkbox" checked={p.enabled} onChange={() => { const n = [...params]; n[i] = { ...p, enabled: !p.enabled }; setParams(n) }}
-                        style={{ width: 16, height: 16, accentColor: 'var(--accent-blue)' }} />
-                      <input value={p.key} onChange={e => { const n = [...params]; n[i] = { ...p, key: e.target.value }; setParams(n) }}
-                        placeholder={t('playground.key')} style={{ flex: 1, padding: '0.35rem 0.5rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
-                      <input value={p.value} onChange={e => { const n = [...params]; n[i] = { ...p, value: e.target.value }; setParams(n) }}
-                        placeholder={t('playground.value')} style={{ flex: 1, padding: '0.35rem 0.5rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
-                      <button type="button" className="btn ghost" onClick={() => setParams(params.filter((_, j) => j !== i))} style={{ padding: '0.25rem' }}>
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  ))}
-                  <button type="button" className="btn ghost" onClick={() => setParams([...params, emptyKv()])} style={{ alignSelf: 'flex-start', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <Plus size={13} /> {t('playground.addParam')}
-                  </button>
-                </div>
-              )}
-              {activeTab === 'headers' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  {headers.map((h, i) => (
-                    <div key={i} style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-                      <input type="checkbox" checked={h.enabled} onChange={() => { const n = [...headers]; n[i] = { ...h, enabled: !h.enabled }; setHeaders(n) }}
-                        style={{ width: 16, height: 16, accentColor: 'var(--accent-blue)' }} />
-                      <input value={h.key} onChange={e => { const n = [...headers]; n[i] = { ...h, key: e.target.value }; setHeaders(n) }}
-                        style={{ flex: 1, padding: '0.35rem 0.5rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
-                      <input value={h.value} onChange={e => { const n = [...headers]; n[i] = { ...h, value: e.target.value }; setHeaders(n) }}
-                        style={{ flex: 1, padding: '0.35rem 0.5rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
-                      <button type="button" className="btn ghost" onClick={() => setHeaders(headers.filter((_, j) => j !== i))} style={{ padding: '0.25rem' }}>
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  ))}
-                  <button type="button" className="btn ghost" onClick={() => setHeaders([...headers, emptyKv()])} style={{ alignSelf: 'flex-start', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <Plus size={13} /> {t('playground.addHeader')}
-                  </button>
-                </div>
-              )}
-              {activeTab === 'body' && (
-                <textarea value={body} onChange={e => setBody(e.target.value)}
-                  placeholder='{ "key": "value" }'
-                  style={{
-                    width: '100%', minHeight: 140, padding: '0.75rem', borderRadius: 8,
-                    border: '1px solid var(--border-color)', background: 'var(--bg-primary)',
-                    color: 'var(--text-primary)', fontSize: '0.8rem', fontFamily: 'monospace',
-                    resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.5,
-                  }} />
-              )}
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <button type="button" className="btn ghost" onClick={() => setShowSave(!showSave)} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.82rem' }}>
-              <Save size={14} /> {t('playground.save')}
-            </button>
-            <button type="button" className="btn ghost" onClick={copyCurl} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.82rem' }}>
-              <Terminal size={14} /> cURL
-            </button>
-            <div style={{ flex: 1 }} />
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('playground.sendHint')}</span>
-          </div>
-
-          {showSave && (
-            <div className="info-card" style={{ padding: '0.75rem 1rem' }}>
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <input value={queryName} onChange={e => setQueryName(e.target.value)} placeholder={t('playground.queryName')} autoFocus
-                  style={{ flex: 1, padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.82rem' }} />
-                <input value={collection} onChange={e => setCollection(e.target.value)} placeholder={t('playground.collection')}
-                  style={{ width: 140, padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.82rem' }} />
-                <button type="button" className="btn primary" onClick={saveQuery} style={{ fontSize: '0.82rem' }}>{t('playground.saveQuery')}</button>
-                <button type="button" className="btn ghost" onClick={() => setShowSave(false)} style={{ fontSize: '0.82rem' }}>{t('playground.cancel')}</button>
-              </div>
-            </div>
-          )}
-
-          {/* Response */}
-          {response && (
-            <div className="info-card" style={{ padding: 0, overflow: 'hidden' }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0.75rem',
-                borderBottom: '1px solid var(--border-color)', background: 'var(--bg-tertiary)',
-              }}>
-                <span style={{
-                  fontWeight: 700, fontSize: '0.85rem',
-                  color: response.status >= 200 && response.status < 300 ? 'var(--accent-green)' : response.status >= 400 ? 'var(--accent-red)' : 'var(--text-muted)',
-                }}>{response.status || 'ERR'}</span>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{response.time}ms</span>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{response.size >= 1024 ? `${(response.size / 1024).toFixed(1)}KB` : `${response.size}B`}</span>
-                <div style={{ flex: 1 }} />
-                <div style={{ display: 'flex', gap: '0.15rem', background: 'var(--bg-primary)', borderRadius: 6, padding: '0.1rem' }}>
-                  {(['pretty', 'raw'] as ResponseView[]).map(v => (
-                    <button key={v} type="button" onClick={() => setRespView(v)}
-                      style={{
-                        padding: '0.2rem 0.5rem', borderRadius: 4, border: 'none', cursor: 'pointer', fontSize: '0.72rem',
-                        background: respView === v ? 'var(--accent-blue)' : 'transparent',
-                        color: respView === v ? '#fff' : 'var(--text-muted)', fontWeight: 600,
-                      }}>
-                      {v === 'pretty' ? <FileJson size={12} style={{ verticalAlign: 'middle' }} /> : <Code2 size={12} style={{ verticalAlign: 'middle' }} />} {v === 'pretty' ? t('playground.pretty') : t('playground.raw')}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <pre style={{
-                margin: 0, padding: '0.75rem', fontSize: '0.78rem', lineHeight: 1.5, overflow: 'auto', maxHeight: 350,
-                fontFamily: 'monospace', background: '#0a0f1c', color: '#e2e8f0',
-              }}>
-                {respView === 'pretty' ? (() => { try { return JSON.stringify(JSON.parse(response.body as string), null, 2) } catch { return String(response.body) } })() : String(response.body)}
-              </pre>
-            </div>
-          )}
-        </div>
-
-        {/* Sidebar: Saved Queries + History */}
-        {sidebarOpen && (
-          <div style={{ width: 260, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div className="info-card" style={{ padding: 0, overflow: 'hidden' }}>
-              <div style={{ padding: '0.5rem 0.75rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}
-                onClick={() => setCollectionsOpen(!collectionsOpen)}>
-                <Bookmark size={14} style={{ color: 'var(--accent-indigo)' }} />
-                <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--text-primary)', flex: 1 }}>{t('playground.savedQueries')}</span>
-                {collectionsOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-              </div>
-              {collectionsOpen && (
-                <div style={{ maxHeight: 220, overflow: 'auto' }}>
-                  {Object.keys(groups).length === 0 ? (
-                    <p style={{ padding: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>{t('playground.noSaved')}</p>
-                  ) : Object.entries(groups).map(([col, qs]) => (
-                    <div key={col}>
-                      <div style={{ padding: '0.25rem 0.75rem', fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', background: 'var(--bg-tertiary)' }}>
-                        {col}
-                      </div>
-                      {qs.map(q => (
-                        <div key={q.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.25rem 0.75rem', cursor: 'pointer' }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                          <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#fff', padding: '0.08rem 0.25rem', borderRadius: 3, background: METHOD_COLORS[q.method] || '#64748b', minWidth: 28, textAlign: 'center' }}>{q.method}</span>
-                          <span style={{ flex: 1, fontSize: '0.75rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} onClick={() => loadQuery(q)}>{q.name}</span>
-                          <button type="button" onClick={() => deleteQuery(q.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.1rem' }}>
-                            <Trash2 size={10} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="info-card" style={{ padding: 0, overflow: 'hidden' }}>
-              <div style={{ padding: '0.5rem 0.75rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}
-                onClick={() => setHistOpen(!histOpen)}>
-                <Clock size={14} style={{ color: 'var(--text-muted)' }} />
-                <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--text-primary)', flex: 1 }}>{t('playground.history')}</span>
-                {histOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-              </div>
-              {histOpen && (
-                <div style={{ maxHeight: 180, overflow: 'auto' }}>
-                  {history.length === 0 ? (
-                    <p style={{ padding: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>{t('playground.noHistory')}</p>
-                  ) : history.map(entry => (
-                    <div key={entry.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.75rem', cursor: 'pointer', fontSize: '0.72rem' }}
-                      onClick={() => { setMethod(entry.method); setUrl(entry.path); execute(entry.method, entry.path) }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                      <span style={{ fontWeight: 700, color: entry.status >= 200 && entry.status < 300 ? 'var(--accent-green)' : 'var(--accent-red)', minWidth: 24 }}>{entry.status}</span>
-                      <span style={{ fontWeight: 600, fontSize: '0.62rem', color: METHOD_COLORS[entry.method] || '#64748b', minWidth: 32 }}>{entry.method}</span>
-                      <span style={{ flex: 1, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.path}</span>
-                      <span style={{ color: 'var(--text-muted)' }}>{entry.duration}ms</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+    <div className="api-playground">
+      <div className="api-playground__toolbar">
+        <h3 className="api-playground__title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ display: 'inline', verticalAlign: 'middle', marginRight: '0.4rem' }}><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          {t('apiPlayground.title')}
+        </h3>
+        {deployUrl && (
+          <div className="api-playground__target-toggle">
+            <button
+              type="button"
+              className={`btn btn-small ${targetUrl === 'mock' ? 'primary' : 'ghost'}`}
+              onClick={() => setTargetUrl('mock')}
+            >{t('apiPlayground.mockServer')}</button>
+            <button
+              type="button"
+              className={`btn btn-small ${targetUrl === 'deploy' ? 'primary' : 'ghost'}`}
+              onClick={() => setTargetUrl('deploy')}
+            >{t('apiPlayground.deployedApi')}</button>
           </div>
         )}
       </div>
+
+      <div className="api-playground__layout">
+        <div className="api-playground__endpoints">
+          <div className="api-playground__endpoints-header">{t('apiPlayground.endpoints')}</div>
+          {project.endpoints.length === 0 ? (
+            <p className="muted-text" style={{ fontSize: '0.8rem', padding: '0.5rem' }}>{t('apiPlayground.noEndpoints')}</p>
+          ) : (
+            <div className="api-playground__endpoints-list">
+              {project.endpoints.map(ep => (
+                <div
+                  key={ep.id}
+                  className={`api-playground__endpoint ${selectedEp?.id === ep.id ? 'active' : ''}`}
+                  onClick={() => { setSelectedEp(ep); setResponse(null); setError(null) }}
+                >
+                  <span className={`api-playground__method api-playground__method--${ep.method.toLowerCase()}`}>{ep.method}</span>
+                  <span className="api-playground__path">{ep.path}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="api-playground__editor">
+          {!selectedEp ? (
+            <div className="api-playground__placeholder">{t('apiPlayground.selectEndpoint')}</div>
+          ) : (
+            <div className="api-playground__request">
+              <div className="api-playground__request-url">
+                <span className={`api-playground__method api-playground__method--${selectedEp.method.toLowerCase()}`}>{selectedEp.method}</span>
+                <code className="api-playground__url">{baseUrl}{selectedEp.path}</code>
+              </div>
+
+              <div className="api-playground__section">
+                <label className="api-playground__label">{t('apiPlayground.headers')}</label>
+                <textarea
+                  className="api-playground__textarea"
+                  rows={3}
+                  value={headersText}
+                  onChange={e => setHeadersText(e.target.value)}
+                  placeholder='{"Authorization": "Bearer ..."}'
+                />
+              </div>
+
+              {['POST', 'PUT', 'PATCH'].includes(selectedEp.method) && (
+                <div className="api-playground__section">
+                  <label className="api-playground__label">{t('apiPlayground.body')}</label>
+                  <textarea
+                    className="api-playground__textarea"
+                    rows={6}
+                    value={bodyText}
+                    onChange={e => setBodyText(e.target.value)}
+                    placeholder='{"key": "value"}'
+                  />
+                </div>
+              )}
+
+              <button
+                type="button"
+                className="btn primary"
+                onClick={handleSend}
+                disabled={loading}
+                style={{ marginTop: '0.5rem' }}
+              >
+                {loading ? t('apiPlayground.sending') : t('apiPlayground.send')}
+              </button>
+
+              {error && (
+                <div className="api-playground__error">{error}</div>
+              )}
+
+              {response && (
+                <div className="api-playground__response">
+                  <div className="api-playground__response-header">
+                    <span className="api-playground__response-status" style={{ color: response.status < 400 ? '#22c55e' : '#ef4444' }}>
+                      {response.status} {response.statusText}
+                    </span>
+                    <span className="api-playground__response-duration">{response.duration}</span>
+                  </div>
+                  <pre className="api-playground__response-body">{response.body}</pre>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <style>{`
+        .api-playground { border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; background: var(--bg-secondary); }
+        .api-playground__toolbar { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-color); background: var(--bg-tertiary); }
+        .api-playground__title { margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--text-primary); }
+        .api-playground__target-toggle { display: flex; gap: 0.3rem; }
+        .api-playground__layout { display: flex; min-height: 300px; }
+        .api-playground__endpoints { width: 200px; flex-shrink: 0; border-right: 1px solid var(--border-color); }
+        .api-playground__endpoints-header { padding: 0.5rem 0.75rem; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); border-bottom: 1px solid var(--border-color); }
+        .api-playground__endpoints-list { overflow-y: auto; max-height: 350px; }
+        .api-playground__endpoint { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.75rem; cursor: pointer; border-bottom: 1px solid var(--border-color); transition: background 0.1s; }
+        .api-playground__endpoint:hover { background: var(--bg-hover); }
+        .api-playground__endpoint.active { background: rgba(99, 102, 241, 0.08); }
+        .api-playground__method { font-size: 0.6rem; font-weight: 700; padding: 0.1rem 0.3rem; border-radius: 3px; flex-shrink: 0; min-width: 3.2em; text-align: center; }
+        .api-playground__method--get { color: #22c55e; background: rgba(34, 197, 94, 0.12); }
+        .api-playground__method--post { color: #3b82f6; background: rgba(59, 130, 246, 0.12); }
+        .api-playground__method--put { color: #f59e0b; background: rgba(245, 158, 11, 0.12); }
+        .api-playground__method--patch { color: #f59e0b; background: rgba(245, 158, 11, 0.12); }
+        .api-playground__method--delete { color: #ef4444; background: rgba(239, 68, 68, 0.12); }
+        .api-playground__path { font-size: 0.78rem; font-family: 'SF Mono', 'Fira Code', monospace; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .api-playground__editor { flex: 1; padding: 1rem; overflow-y: auto; max-height: 500px; }
+        .api-playground__placeholder { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 0.85rem; }
+        .api-playground__request-url { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; padding: 0.5rem; background: var(--bg-tertiary); border-radius: 6px; }
+        .api-playground__url { font-size: 0.82rem; color: var(--accent-blue); word-break: break-all; }
+        .api-playground__section { margin-bottom: 0.75rem; }
+        .api-playground__label { display: block; font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.25rem; text-transform: uppercase; letter-spacing: 0.03em; }
+        .api-playground__textarea { width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; font-size: 0.8rem; font-family: 'SF Mono', 'Fira Code', monospace; color: var(--text-primary); resize: vertical; }
+        .api-playground__textarea:focus { outline: none; border-color: var(--accent-blue); }
+        .api-playground__error { margin-top: 0.5rem; padding: 0.5rem; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; color: #ef4444; font-size: 0.8rem; }
+        .api-playground__response { margin-top: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; }
+        .api-playground__response-header { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.75rem; background: var(--bg-tertiary); border-bottom: 1px solid var(--border-color); font-size: 0.8rem; font-weight: 600; }
+        .api-playground__response-duration { font-size: 0.72rem; color: var(--text-muted); font-weight: 400; }
+        .api-playground__response-body { margin: 0; padding: 0.75rem; font-size: 0.78rem; font-family: 'SF Mono', 'Fira Code', monospace; color: var(--text-primary); background: var(--bg-secondary); max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+        [data-theme="dark"] .api-playground { background: var(--bg-secondary); }
+        [data-theme="dark"] .api-playground__request-url { background: var(--bg-tertiary); }
+        [data-theme="dark"] .api-playground__textarea { background: #0a0f1c; }
+        [data-theme="dark"] .api-playground__response-body { background: #0a0f1c; }
+      `}</style>
     </div>
   )
 }

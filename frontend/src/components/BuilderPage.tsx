@@ -10,13 +10,14 @@ import { SectionCard } from './SectionCard'
 import { WebhookPanel } from './WebhookPanel'
 import { VersionPanel } from './VersionPanel'
 import { ConnectionManager } from './ConnectionManager'
+import { ApiPlayground } from './ApiPlayground'
 
 import { useProjectBuilder } from '../hooks/useProjectBuilder'
 import { useToast } from './Toast'
 import type { GenerationResult } from '../types/schemas'
 import { slugify } from '../lib/slug'
 import { readBackendConfig } from '../lib/backendConfig'
-import { createGenerationJob, fetchRemoteProject, getGenerationJob } from '../lib/api'
+import { createGenerationJob, fetchRemoteProject, getGenerationJob, apiFetch } from '../lib/api'
 import type { GenerationJob, ImportTableResult } from '../lib/api'
 
 export function BuilderPage() {
@@ -43,11 +44,13 @@ export function BuilderPage() {
   const [generationWarning, setGenerationWarning] = useState<string | null>(null)
   const [generationJob, setGenerationJob] = useState<GenerationJob | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
-  const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'connections' | 'result' | 'webhooks' | 'versions'>('datasets')
+  const [activeTab, setActiveTab] = useState<'datasets' | 'endpoints' | 'playground' | 'connections' | 'result' | 'webhooks' | 'versions'>('datasets')
   const [connectionsProjectId, setConnectionsProjectId] = useState<string | null>(project.slug || project.remoteId || null)
   const [isPreparingConnections, setIsPreparingConnections] = useState(false)
   const [connectionsError, setConnectionsError] = useState<string | null>(null)
   const [editingDatasetId, setEditingDatasetId] = useState<string | null>(null)
+  const [deployments, setDeployments] = useState<any[]>([])
+  const [quickDeploying, setQuickDeploying] = useState(false)
   const localBaseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'
   const backendBaseUrl = readBackendConfig().baseUrl?.replace(/\/$/, '') || 'http://localhost:8000'
 
@@ -55,6 +58,7 @@ export function BuilderPage() {
     () => [
       { id: 'datasets', label: t('builder.datasets') },
       { id: 'endpoints', label: t('builder.endpoints') },
+      { id: 'playground', label: t('builder.playground') },
       { id: 'connections', label: t('builder.dataSources') },
       { id: 'webhooks', label: t('builder.webhooks') },
       { id: 'versions', label: t('builder.versions') },
@@ -154,6 +158,36 @@ export function BuilderPage() {
       setIsGenerating(false)
     }
   }
+
+  const activeDeployUrl = useMemo(() => {
+    const activeDep = deployments.find(d =>
+      [project.slug, project.remoteId, project.id].includes(d.slug) && d.docker_status === 'running'
+    )
+    return activeDep?.url || null
+  }, [deployments, project.slug, project.remoteId, project.id])
+
+  useEffect(() => {
+    apiFetch('/api/deploy/list').then(r => r.json()).then(setDeployments).catch(() => {})
+  }, [project.slug, project.remoteId])
+
+  const handleQuickRedeploy = useCallback(async () => {
+    const pid = project.slug || project.remoteId
+    if (!pid) return
+    setQuickDeploying(true)
+    try {
+      await saveProject()
+      const slug = project.slug || project.remoteId
+      if (slug) {
+        await apiFetch('/api/deploy/local/redeploy', {
+          method: 'POST',
+          body: JSON.stringify({ slug, project_id: pid }),
+        })
+      }
+      const res = await apiFetch('/api/deploy/list')
+      setDeployments(await res.json())
+    } catch { /* ignore */ }
+    setQuickDeploying(false)
+  }, [project.slug, project.remoteId, saveProject])
 
   useEffect(() => {
     setResult(project.lastGeneration ?? null)
@@ -297,6 +331,16 @@ export function BuilderPage() {
             />
           </SectionCard>
         )
+      case 'playground':
+        return (
+          <SectionCard title={t('builder.playground')} subtitle={t('builder.playgroundDesc')} accent="emerald" fullWidth>
+            <ApiPlayground
+              project={project}
+              mockBaseUrl={`${localBaseUrl}/api/mock/${project.slug || project.remoteId || project.id}`}
+              deployUrl={activeDeployUrl}
+            />
+          </SectionCard>
+        )
       case 'connections':
         return (
           <SectionCard title={t('builder.dataSources')} subtitle={t('builder.externalSourcesDesc')} accent="sky" fullWidth>
@@ -402,6 +446,23 @@ export function BuilderPage() {
             </div>
             <ProjectForm project={project} onChange={updateProject} />
           </div>
+          {activeDeployUrl && (
+            <div className="app-header__deploy-actions">
+              <span className="deploy-indicator" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', color: '#22c55e' }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+                {t('builder.live')}
+              </span>
+              <button
+                type="button"
+                className="btn ghost btn-small"
+                onClick={handleQuickRedeploy}
+                disabled={quickDeploying}
+                style={{ fontSize: '0.75rem', color: '#6366f1' }}
+              >
+                {quickDeploying ? t('builder.deploying') : t('builder.redeploy')}
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
