@@ -10,6 +10,9 @@ port = int(sys.argv[2]) if len(sys.argv) > 2 else 8000
 # Use provided DB URL or default SQLite
 db_url = os.environ.get("APIMAKER_DEPLOY_DB_URL") or f"sqlite:///{json_path.parent / 'data.db'}"
 os.environ["APIMAKER_DATABASE_URL"] = db_url
+# Set access log path so standalone server writes to the deploy directory
+os.environ["API_ACCESS_LOG_PATH"] = str(json_path.parent / "access_logs.jsonl")
+os.environ["APIMAKER_DEPLOY_DIR"] = str(json_path.parent)
 
 # Now safe to import app modules
 from app.standalone_server import _ensure_project_in_db, create_app_for_project

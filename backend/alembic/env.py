@@ -9,12 +9,14 @@ from app.db import DATABASE_URL
 
 # Import our database models so Alembic can detect them
 from app.db_models import (
+    ApiAccessLog,
     Automation,
     AutomationRun,
     Dataset,
     DatasetField,
     Datasource,
     DbConnection,
+    Deployment,
     Endpoint,
     GenerationJob,
     MockRecord,

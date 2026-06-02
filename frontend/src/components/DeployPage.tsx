@@ -257,6 +257,16 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
     setGlobalDeployState(finalStatus, finalMsg)
   }
 
+  const handleGenerateShareUrl = useCallback(async (slug: string) => {
+    try {
+      const res = await apiFetch(`/api/deploy/${slug}/share`)
+      const data = await res.json()
+      if (data.token) {
+        onDeployDone()
+      }
+    } catch { /* ignore */ }
+  }, [onDeployDone])
+
   const statusColor = (s: string) => s === 'running' ? '#22c55e' : s === 'stopped' ? '#ef4444' : '#94a3b8'
   const statusLabel = (s: string) => s === 'running' ? t('deploy.statusRunning') : s === 'stopped' ? t('deploy.statusStopped') : t('deploy.statusUnknown')
 
@@ -318,6 +328,8 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                       onClick={() => handleRedeploy(dep.slug)} disabled={deploying}>{t('deploy.applyChanges')}</button>
                     <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
                       onClick={() => handleAction(dep.slug, 'restart')}>{t('deploy.restart')}</button>
+                    <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#6366f1' }}
+                      onClick={() => handleGenerateShareUrl(dep.slug)}>URL</button>
                     <button type="button" className="btn ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#dc2626' }}
                       onClick={() => handleAction(dep.slug, 'delete')}>{t('deploy.delete')}</button>
                   </div>
@@ -351,6 +363,18 @@ function DeployManager({ project, saveProject, updateProject, deployments, loadi
                     })}
                   </div>
                 )}
+                {dep.share_token && (
+                  <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)', fontSize: '0.78rem' }}>
+                    <div style={{ color: '#6366f1', marginBottom: '0.3rem', fontWeight: 600 }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ display: 'inline', verticalAlign: 'middle', marginRight: '0.3rem' }}><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/></svg>
+                      {t('deploy.sharedUrl')}
+                    </div>
+                    <code style={{ fontSize: '0.75rem', color: 'var(--accent-blue)', wordBreak: 'break-all' }}>
+                      {window.location.origin}/api/deploy/shared/{dep.share_token}
+                    </code>
+                  </div>
+                )}
+                <DeployLogViewer slug={dep.slug} />
               </div>
             ))}
           </div>
@@ -628,6 +652,73 @@ function PasswordDisplay({ value }: { value: string }) {
 }
 
 /* ========== CLI PANEL ========== */
+function DeployLogViewer({ slug }: { slug: string }) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const [logs, setLogs] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+
+  const loadLogs = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await apiFetch(`/api/deploy/${slug}/logs?limit=50`)
+      const data = await res.json()
+      setLogs(data)
+    } catch { setLogs([]) }
+    setLoading(false)
+  }, [slug])
+
+  useEffect(() => { if (open) loadLogs() }, [open, loadLogs])
+
+  return (
+    <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
+      <button
+        type="button"
+        className="btn ghost"
+        style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#6366f1' }}
+        onClick={() => setOpen(!open)}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ display: 'inline', verticalAlign: 'middle', marginRight: '0.3rem' }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        {open ? t('deploy.hideLogs') : t('deploy.viewLogs')}
+        {logs.length > 0 && !open && <span style={{ marginLeft: '0.3rem', fontSize: '0.7rem', color: '#94a3b8' }}>({logs.length})</span>}
+      </button>
+      {open && (
+        <div style={{
+          marginTop: '0.5rem', maxHeight: '200px', overflowY: 'auto',
+          background: '#0a0f1c', borderRadius: '6px', padding: '0.5rem',
+          fontSize: '0.7rem', fontFamily: 'monospace', color: '#e2e8f0',
+        }}>
+          {loading ? (
+            <span style={{ color: '#94a3b8' }}>{t('deploy.loading')}</span>
+          ) : logs.length === 0 ? (
+            <span style={{ color: '#94a3b8' }}>{t('deploy.noLogs')}</span>
+          ) : (
+            logs.map((log: any, i: number) => (
+              <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.2rem', lineHeight: '1.4' }}>
+                <span style={{
+                  color: log.status_code && log.status_code < 400 ? '#22c55e' : '#ef4444',
+                  flexShrink: 0, width: '2rem',
+                }}>{log.status_code || '???'}</span>
+                <span style={{ color: '#93c5fd', flexShrink: 0, width: '0.5rem' }}>{log.method}</span>
+                <span style={{ color: '#e2e8f0', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.path}</span>
+                <span style={{ color: '#94a3b8', flexShrink: 0 }}>{log.latency_ms}ms</span>
+              </div>
+            ))
+          )}
+          {logs.length > 0 && (
+            <button
+              type="button"
+              className="btn ghost"
+              style={{ fontSize: '0.7rem', padding: '0.2rem 0.4rem', marginTop: '0.3rem', color: '#94a3b8' }}
+              onClick={loadLogs}
+            >{t('deploy.refresh')}</button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function CliDeployPanel({ project }: any) {
   const { t } = useTranslation()
   const steps = [

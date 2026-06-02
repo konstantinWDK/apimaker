@@ -194,6 +194,24 @@ def create_app_for_project(
         except Exception:
             pass
 
+    # Determine access log file path from deploy volume or env
+    _log_path = os.environ.get("API_ACCESS_LOG_PATH", "")
+    if not _log_path:
+        deploy_path = os.environ.get("APIMAKER_DEPLOY_DIR", "")
+        if deploy_path:
+            _log_path = os.path.join(deploy_path, "access_logs.jsonl")
+    _log_file = open(_log_path, "a", buffering=1) if _log_path else None
+
+    def _write_access_log(method: str, path: str, status_code: int, client_ip: str, latency_ms: int):
+        if _log_file is None:
+            return
+        import json as _json
+        _log_file.write(_json.dumps({
+            "method": method, "path": path, "status_code": status_code,
+            "client_ip": client_ip, "latency_ms": latency_ms,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }) + "\n")
+
     app = FastAPI(title=title or f"DoApi - {project_id}")
 
     app.add_middleware(
@@ -203,7 +221,7 @@ def create_app_for_project(
         allow_headers=["*"],
     )
 
-    # Telemetry middleware
+    # Telemetry + access log middleware
     @app.middleware("http")
     async def telemetry_middleware(request: Request, call_next):
         start = time.time()
@@ -211,6 +229,8 @@ def create_app_for_project(
         duration_ms = int((time.time() - start) * 1000)
         if request.url.path not in ("/health",):
             _enqueue_telemetry(request.method, request.url.path, response.status_code, duration_ms)
+            client_ip = request.client.host if request.client else "unknown"
+            _write_access_log(request.method, request.url.path, response.status_code, client_ip, duration_ms)
         return response
 
     @app.on_event("startup")

@@ -234,3 +234,41 @@ class TestConnectionResult(BaseModel):
     success: bool
     message: str
     server_version: str | None = None
+
+
+class DeploymentResponse(BaseModel):
+    id: str
+    project_id: str
+    slug: str
+    name: str
+    url: str | None = None
+    port: int | None = None
+    stack: str | None = None
+    status: str
+    db_type: str = "sqlite"
+    auth_method: str = "none"
+    endpoints: list[str] = []
+    host: str | None = None
+    is_remote: bool = False
+    share_token: str | None = None
+    docker_status: str = "unknown"
+    deployed_at: str | None = None
+    updated_at: str | None = None
+
+
+class ShareDeployResponse(BaseModel):
+    url: str
+    token: str
+    expires_at: str | None = None
+
+
+class ApiAccessLogEntry(BaseModel):
+    id: str
+    method: str
+    path: str
+    status_code: int | None = None
+    client_ip: str | None = None
+    latency_ms: int | None = None
+    request_body: str | None = None
+    response_body: str | None = None
+    created_at: str

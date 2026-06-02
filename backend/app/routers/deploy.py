@@ -22,6 +22,8 @@ from pydantic import BaseModel
 from sqlmodel import Session
 
 from ..db import get_session
+from ..db_models import ApiAccessLog, Deployment, Project
+from ..models import ApiAccessLogEntry, DeploymentResponse, ShareDeployResponse
 from ..security import CurrentUser, require_admin
 from ..services.project_service import project_service
 
@@ -49,7 +51,6 @@ if _IS_DOCKER:
 else:
     DEPLOY_ROOT = BACKEND_DIR.parent / "deployments"
 
-TRACKING_FILE = DEPLOY_ROOT / ".deployments.json"
 PORT_RANGE = range(8080, 8100)
 DEPLOY_IMAGE = "doapi-deploy:latest"
 
@@ -133,20 +134,58 @@ class DeployStatus(BaseModel):
     logs: list[str] = []
 
 
-def _load_tracking() -> dict[str, Any]:
-    """Load deployment tracking data."""
-    if TRACKING_FILE.exists():
-        try:
-            return json.loads(TRACKING_FILE.read_text())
-        except (json.JSONDecodeError, IOError):
-            pass
-    return {}
+def _deploy_to_dict(d: Deployment) -> dict:
+    endpoints_list = json.loads(d.endpoints) if d.endpoints else []
+    return {
+        "slug": d.slug,
+        "name": d.name,
+        "port": d.port,
+        "url": d.url,
+        "stack": d.stack,
+        "status": d.status,
+        "auth_method": d.auth_method,
+        "endpoints": endpoints_list,
+        "db_type": d.db_type,
+        "db_credentials": json.loads(d.db_credentials) if d.db_credentials else None,
+        "host": d.host,
+        "is_remote": d.is_remote,
+        "share_token": d.share_token,
+        "deployed_at": d.deployed_at.isoformat() if d.deployed_at else None,
+        "docker_status": "unknown",
+    }
 
 
-def _save_tracking(data: dict) -> None:
-    """Save deployment tracking data."""
-    DEPLOY_ROOT.mkdir(parents=True, exist_ok=True)
-    TRACKING_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+def _upsert_deployment_tracking(session: Session, slug: str, data: dict) -> Deployment:
+    deployment = session.exec(select(Deployment).where(Deployment.slug == slug)).first()
+    if deployment:
+        for key, value in data.items():
+            if key == "endpoints" and isinstance(value, list):
+                value = json.dumps(value)
+            if key == "db_credentials" and isinstance(value, dict):
+                value = json.dumps(value)
+            setattr(deployment, key, value)
+        deployment.updated_at = datetime.now(timezone.utc)
+    else:
+        if "endpoints" in data and isinstance(data["endpoints"], list):
+            data["endpoints"] = json.dumps(data["endpoints"])
+        if "db_credentials" in data and isinstance(data["db_credentials"], dict):
+            data["db_credentials"] = json.dumps(data["db_credentials"])
+        deployment = Deployment(**data)
+        session.add(deployment)
+    session.commit()
+    session.refresh(deployment)
+    return deployment
+
+
+def _get_deployment(session: Session, slug: str) -> Deployment | None:
+    return session.exec(select(Deployment).where(Deployment.slug == slug)).first()
+
+
+def _delete_deployment(session: Session, slug: str) -> None:
+    deployment = _get_deployment(session, slug)
+    if deployment:
+        session.delete(deployment)
+        session.commit()
 
 
 def _port_is_free(port: int) -> bool:
@@ -336,7 +375,11 @@ volumes:
 
 
 @router.post("/local/stop")
-def stop_deployment(req: SlugRequest, user: CurrentUser = Depends(require_admin)) -> DeployStatus:
+def stop_deployment(
+    req: SlugRequest,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(require_admin),
+) -> DeployStatus:
     """Stop a local deployment."""
     slug = _safe_slug(req.slug)
     deploy_dir = _deploy_dir_for_slug(slug)
@@ -351,16 +394,22 @@ def stop_deployment(req: SlugRequest, user: CurrentUser = Depends(require_admin)
     except Exception as e:
         return DeployStatus(status="error", message=str(e))
 
-    tracking = _load_tracking()
-    if slug in tracking:
-        tracking[slug]["status"] = "stopped"
-        _save_tracking(tracking)
+    dep = _get_deployment(session, slug)
+    if dep:
+        dep.status = "stopped"
+        dep.updated_at = datetime.now(timezone.utc)
+        session.add(dep)
+        session.commit()
 
     return DeployStatus(status="stopped", message="Deployment stopped")
 
 
 @router.post("/local/start")
-def start_deployment(req: SlugRequest, user: CurrentUser = Depends(require_admin)) -> DeployStatus:
+def start_deployment(
+    req: SlugRequest,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(require_admin),
+) -> DeployStatus:
     """Start a stopped deployment."""
     slug = _safe_slug(req.slug)
     deploy_dir = _deploy_dir_for_slug(slug)
@@ -375,15 +424,21 @@ def start_deployment(req: SlugRequest, user: CurrentUser = Depends(require_admin
         return DeployStatus(status="timeout", message="Timeout starting container")
     except Exception as e:
         return DeployStatus(status="error", message=str(e))
-    tracking = _load_tracking()
-    if slug in tracking:
-        tracking[slug]["status"] = "running"
-        _save_tracking(tracking)
+    dep = _get_deployment(session, slug)
+    if dep:
+        dep.status = "running"
+        dep.updated_at = datetime.now(timezone.utc)
+        session.add(dep)
+        session.commit()
     return DeployStatus(status="running", message="Deployment started")
 
 
 @router.post("/local/restart")
-def restart_deployment(req: SlugRequest, user: CurrentUser = Depends(require_admin)) -> DeployStatus:
+def restart_deployment(
+    req: SlugRequest,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(require_admin),
+) -> DeployStatus:
     """Restart a deployment."""
     slug = _safe_slug(req.slug)
     deploy_dir = _deploy_dir_for_slug(slug)
@@ -400,10 +455,12 @@ def restart_deployment(req: SlugRequest, user: CurrentUser = Depends(require_adm
         return DeployStatus(status="timeout", message="Timeout restarting")
     except Exception as e:
         return DeployStatus(status="error", message=str(e))
-    tracking = _load_tracking()
-    if slug in tracking:
-        tracking[slug]["status"] = "running"
-        _save_tracking(tracking)
+    dep = _get_deployment(session, slug)
+    if dep:
+        dep.status = "running"
+        dep.updated_at = datetime.now(timezone.utc)
+        session.add(dep)
+        session.commit()
     return DeployStatus(status="running", message="Deployment restarted")
 
 
@@ -512,13 +569,18 @@ def deploy_remote(
         logs.append(f" API deployed at {url}")
 
         # Track deployment
-        tracking = _load_tracking()
-        tracking[f"{slug}-remote"] = {
-            "name": project.name, "host": req.host, "port": req.api_port,
-            "url": url, "stack": project.target_stack, "status": "running",
+        _upsert_deployment_tracking(session, f"{slug}-remote", {
+            "project_id": str(project.id),
+            "slug": f"{slug}-remote",
+            "name": project.name,
+            "host": req.host,
+            "port": req.api_port,
+            "url": url,
+            "stack": project.target_stack,
+            "status": "running",
             "auth_method": project.auth_method or "none",
-        }
-        _save_tracking(tracking)
+            "is_remote": True,
+        })
 
         return DeployStatus(status="running", url=url, logs=logs, message="Remote deploy successful")
 
@@ -534,7 +596,11 @@ def deploy_remote(
 
 
 @router.post("/local/delete")
-def delete_deployment(req: SlugRequest, user: CurrentUser = Depends(require_admin)) -> DeployStatus:
+def delete_deployment(
+    req: SlugRequest,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(require_admin),
+) -> DeployStatus:
     """Stop and remove a local deployment entirely."""
     slug = _safe_slug(req.slug)
     deploy_dir = _deploy_dir_for_slug(slug)
@@ -549,11 +615,8 @@ def delete_deployment(req: SlugRequest, user: CurrentUser = Depends(require_admi
     else:
         logs.append(" No deployment directory found")
 
-    tracking = _load_tracking()
-    if slug in tracking:
-        del tracking[slug]
-        _save_tracking(tracking)
-        logs.append(" Deployment removed from registry")
+    _delete_deployment(session, slug)
+    logs.append(" Deployment removed from registry")
 
     return DeployStatus(status="deleted", logs=logs, message="Deployment eliminado")
 
@@ -594,17 +657,17 @@ def redeploy_local(
         logs.append(f" Error: {str(e)}")
         return DeployStatus(status="error", logs=logs)
 
-    tracking = _load_tracking()
-    if slug in tracking:
-        tracking[slug]["name"] = project.name
-        tracking[slug]["stack"] = project.target_stack
-        tracking[slug]["status"] = "running"
-        tracking[slug]["auth_method"] = project.auth_method or "none"
-        tracking[slug]["endpoints"] = deployed_endpoints
-        tracking[slug]["deployed_at"] = datetime.now(timezone.utc).astimezone().isoformat()
-        _save_tracking(tracking)
+    _upsert_deployment_tracking(session, slug, {
+        "name": project.name,
+        "stack": project.target_stack,
+        "status": "running",
+        "auth_method": project.auth_method or "none",
+        "endpoints": deployed_endpoints,
+        "deployed_at": datetime.now(timezone.utc),
+    })
 
-    url = tracking.get(slug, {}).get("url") if tracking else None
+    dep = _get_deployment(session, slug)
+    url = dep.url if dep else None
     logs.append(" Changes applied to deployment")
     return DeployStatus(status="running", url=url, logs=logs, message="Redeploy completed")
 
@@ -632,16 +695,26 @@ def _check_docker_container(slug: str) -> str:
         return "unknown"
 
 
-@router.get("/list")
-def list_deployments(user: CurrentUser = Depends(require_admin)) -> list[dict]:
+@router.get("/list", response_model=list[DeploymentResponse])
+def list_deployments(
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(require_admin),
+) -> list[DeploymentResponse]:
     """List all deployments with real-time Docker status."""
-    tracking = _load_tracking()
-    result: list[dict] = []
-    for slug, info in tracking.items():
-        entry = dict(info)
-        entry["slug"] = slug
-        entry["docker_status"] = _check_docker_container(slug)
-        result.append(entry)
+    deployments = session.exec(select(Deployment).order_by(Deployment.deployed_at.desc())).all()
+    result: list[DeploymentResponse] = []
+    for d in deployments:
+        endpoints_list = json.loads(d.endpoints) if d.endpoints else []
+        docker_status = _check_docker_container(d.slug)
+        result.append(DeploymentResponse(
+            id=d.id, project_id=d.project_id, slug=d.slug, name=d.name,
+            url=d.url, port=d.port, stack=d.stack,
+            status=d.status, db_type=d.db_type, auth_method=d.auth_method,
+            endpoints=endpoints_list, host=d.host, is_remote=d.is_remote,
+            share_token=d.share_token, docker_status=docker_status,
+            deployed_at=d.deployed_at.isoformat() if d.deployed_at else None,
+            updated_at=d.updated_at.isoformat() if d.updated_at else None,
+        ))
     return result
 
 
@@ -669,7 +742,10 @@ def docker_status(user: CurrentUser = Depends(require_admin)) -> dict:
 
 
 @router.get("/local/ports")
-def list_ports(user: CurrentUser = Depends(require_admin)) -> dict:
+def list_ports(
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(require_admin),
+) -> dict:
     """List used and available ports for local deployments."""
     used: list[int] = []
     available: list[int] = []
@@ -678,11 +754,11 @@ def list_ports(user: CurrentUser = Depends(require_admin)) -> dict:
             available.append(p)
         else:
             used.append(p)
-    tracked = _load_tracking()
+    deployments = session.exec(select(Deployment).where(Deployment.is_remote == False)).all()
     return {
         "used": used,
         "available": available,
-        "deployments": tracked,
+        "deployments": [_deploy_to_dict(d) for d in deployments],
     }
 
 
@@ -703,6 +779,85 @@ def rebuild_deploy_image(user: CurrentUser = Depends(require_admin)) -> DeploySt
     if _ensure_deploy_image(logs):
         return DeployStatus(status="ok", logs=logs, message="Image rebuilt")
     return DeployStatus(status="error", logs=logs, message="Error rebuilding image")
+
+
+@router.get("/{slug}/share", response_model=ShareDeployResponse)
+def generate_share_url(
+    slug: str,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(require_admin),
+) -> ShareDeployResponse:
+    """Generate a shareable URL for a deployment."""
+    import secrets
+    dep = _get_deployment(session, slug)
+    if not dep:
+        raise HTTPException(status_code=404, detail="Deployment not found")
+    if not dep.share_token:
+        dep.share_token = secrets.token_urlsafe(16)
+        session.add(dep)
+        session.commit()
+        session.refresh(dep)
+    return ShareDeployResponse(
+        url=f"/api/deploy/shared/{dep.share_token}",
+        token=dep.share_token,
+    )
+
+
+@router.get("/shared/{token}")
+def access_shared_deploy(
+    token: str,
+    session: Session = Depends(get_session),
+) -> dict:
+    """Public endpoint to access a shared deployment's info."""
+    dep = session.exec(select(Deployment).where(Deployment.share_token == token)).first()
+    if not dep:
+        raise HTTPException(status_code=404, detail="Shared deployment not found")
+    endpoints_list = json.loads(dep.endpoints) if dep.endpoints else []
+    return {
+        "name": dep.name,
+        "url": dep.url,
+        "stack": dep.stack,
+        "status": dep.status,
+        "auth_method": dep.auth_method,
+        "endpoints": endpoints_list,
+    }
+
+
+@router.get("/{slug}/logs", response_model=list[ApiAccessLogEntry])
+def get_deployment_logs(
+    slug: str,
+    limit: int = 100,
+    offset: int = 0,
+    user: CurrentUser = Depends(require_admin),
+) -> list[ApiAccessLogEntry]:
+    """Get access logs for a deployment from the JSONL file."""
+    deploy_dir = _deploy_dir_for_slug(slug)
+    log_file = deploy_dir / "access_logs.jsonl"
+    if not log_file.exists():
+        return []
+    try:
+        lines = log_file.read_text().strip().split("\n")
+        lines = [l for l in lines if l.strip()]
+        lines.reverse()
+        selected = lines[offset:offset + limit]
+        result = []
+        for i, line in enumerate(selected):
+            try:
+                entry = json.loads(line)
+                result.append(ApiAccessLogEntry(
+                    id=str(offset + i),
+                    method=entry.get("method", "UNKNOWN"),
+                    path=entry.get("path", ""),
+                    status_code=entry.get("status_code"),
+                    client_ip=entry.get("client_ip"),
+                    latency_ms=entry.get("latency_ms"),
+                    created_at=entry.get("timestamp", ""),
+                ))
+            except json.JSONDecodeError:
+                continue
+        return result
+    except Exception:
+        return []
 
 
 @router.post("/local")
@@ -853,8 +1008,21 @@ def deploy_local(
     ))
 
     # Track deployment
-    tracking = _load_tracking()
-    tracking[slug] = {
+    db_creds = None
+    if include_postgres_container:
+        db_creds = {
+            "user": container_pg_user, "password": container_pg_pass,
+            "database": container_pg_db, "host": "localhost", "port": pg_host_port,
+        }
+    elif include_mysql_container:
+        db_creds = {
+            "user": container_mysql_user, "password": container_mysql_pass,
+            "database": container_mysql_db, "host": "localhost", "port": mysql_host_port,
+        }
+
+    _upsert_deployment_tracking(session, slug, {
+        "project_id": str(project.id),
+        "slug": slug,
         "name": project.name,
         "port": port,
         "url": f"http://localhost:{port}/api",
@@ -863,30 +1031,14 @@ def deploy_local(
         "auth_method": project.auth_method or "none",
         "endpoints": deployed_endpoints,
         "db_type": "postgresql" if include_postgres_container else ("mysql" if include_mysql_container else req.db_type),
-        "deployed_at": datetime.now(timezone.utc).astimezone().isoformat(),
-    }
-    if include_postgres_container:
-        tracking[slug]["db_credentials"] = {
-            "user": container_pg_user,
-            "password": container_pg_pass,
-            "database": container_pg_db,
-            "host": "localhost",
-            "port": pg_host_port,
-        }
-    elif include_mysql_container:
-        tracking[slug]["db_credentials"] = {
-            "user": container_mysql_user,
-            "password": container_mysql_pass,
-            "database": container_mysql_db,
-            "host": "localhost",
-            "port": mysql_host_port,
-        }
-    _save_tracking(tracking)
+        "db_credentials": db_creds,
+    })
 
     url = f"http://localhost:{port}/api"
     logs.append(f" API at {url}")
+    all_deployments = session.exec(select(Deployment)).all()
     logs.append(f" Active deployments:")
-    for s, d in _load_tracking().items():
-        logs.append(f"   {d['name']}: {d['url']}")
+    for d in all_deployments:
+        logs.append(f"   {d.name}: {d.url}")
 
     return DeployStatus(status="running", url=url, logs=logs, message=f"Successful deploy on port {port}")

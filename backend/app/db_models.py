@@ -320,3 +320,45 @@ class WebhookDelivery(SQLModel, table=True):
     response_body: str | None = Field(default=None, sa_column=Column(Text))
     error: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class Deployment(SQLModel, table=True):
+    """Track a deployed instance of a project."""
+
+    __tablename__ = "deployments"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    project_id: str = Field(foreign_key="projects.id", index=True)
+    slug: str = Field(index=True)
+    name: str
+    url: str | None = None
+    port: int | None = None
+    stack: str | None = None
+    status: str = "unknown"  # running | stopped | unknown | error
+    db_type: str = "sqlite"
+    db_credentials: str | None = None  # JSON
+    auth_method: str = "none"
+    endpoints: str | None = None  # JSON list
+    host: str | None = None  # for remote deploys
+    is_remote: bool = False
+    share_token: str | None = Field(default=None, index=True)  # for public share URL
+    deployed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ApiAccessLog(SQLModel, table=True):
+    """Access log entry for a deployed API."""
+
+    __tablename__ = "api_access_logs"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    deployment_id: str = Field(foreign_key="deployments.id", index=True)
+    method: str
+    path: str
+    status_code: int | None = None
+    client_ip: str | None = None
+    user_agent: str | None = None
+    latency_ms: int | None = None
+    request_body: str | None = None
+    response_body: str | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
